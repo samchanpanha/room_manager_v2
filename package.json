@@ -1,0 +1,53 @@
+{
+  "name": "rentmanager",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0 -p 3000",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "cp prisma/dev.db prisma/test-billing.db && DATABASE_URL=file:./test-billing.db vitest run",
+    "test:watch": "vitest",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:reset": "prisma migrate reset --force && npm run db:seed",
+    "test:billing": "cp prisma/dev.db prisma/test-billing.db && vitest run tests/billing-service.test.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.3.0",
+    "@react-pdf/renderer": "4.5.1",
+    "@tanstack/react-query": "^5.64.1",
+    "aws4fetch": "^1.0.20",
+    "next": "15.1.6",
+    "qrcode": "1.5.4",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "zod": "3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.7",
+    "@types/qrcode": "1.5.5",
+    "@types/react": "19.0.7",
+    "@types/react-dom": "19.0.3",
+    "autoprefixer": "10.4.20",
+    "eslint": "8.57.1",
+    "eslint-config-next": "15.1.6",
+    "postcss": "8.4.49",
+    "prisma": "6.3.0",
+    "tailwindcss": "3.4.17",
+    "tsx": "4.19.2",
+    "typescript": "5.7.3",
+    "vitest": "2.1.8"
+  },
+  "overrides": {
+    "@react-pdf/layout": "4.6.1",
+    "@react-pdf/textkit": "6.3.0",
+    "@react-pdf/render": "4.5.1"
+  }
+}

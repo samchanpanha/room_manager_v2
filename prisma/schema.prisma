@@ -1,0 +1,1689 @@
+// RentManager — Prisma schema v1 (Phases 0–2: M00 kernel, M01 RBDC, M04 physical inventory)
+// Notes:
+//  - Dev datasource is SQLite for sandbox portability; production target is PostgreSQL (INTENT.md §15 v1.1).
+//  - Enum-like columns are strings (SQLite portability); valid values are enforced in zod/application logic.
+//  - All money columns are integer minor units (INTENT.md §9.1).
+//  - Migrations are additive; never destructive (INTENT.md §3).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── M00 Kernel ─────────────────────────────
+
+/// Party model: one table reused for members, owners, vendors, staff contacts.
+model Party {
+  id             String          @id @default(cuid())
+  type           String // PERSON | COMPANY
+  name           String
+  email          String?
+  phone          String?
+  createdAt      DateTime        @default(now())
+  users          User[]
+  memberProfiles MemberProfile[]
+  ownerProfiles  OwnerProfile[]
+}
+
+model User {
+  id           String                   @id @default(cuid())
+  email        String                   @unique
+  name         String
+  passwordHash String
+  status       String                   @default("active") // active | disabled
+  totpEnabled  Boolean                  @default(false)
+  partyId      String?
+  party        Party?                   @relation(fields: [partyId], references: [id])
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  sessions     Session[]
+  roles        UserRole[]
+  assignments  UserPropertyAssignment[]
+  auditLogs    AuditLog[]               @relation("AuditActor")
+  telegramLinks TelegramLink[] @relation("TelegramLinks")
+  documents    DocumentRegistry[]
+  kioskPinHash String? // §M23 kiosk PIN (scrypt) — clock in/out without a browser session
+  totpSecret   String? // §M27 TOTP shared secret, sealed (AES-256-GCM) with SETTINGS_ENC_KEY
+  attendanceRecords   AttendanceRecord[]
+  attendanceExceptions AttendanceException[]
+  resolvedExceptions  AttendanceException[] @relation("ExceptionResolver")
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  userAgent String?
+  ip        String?
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+}
+
+// ───────────────────────────── M01 RBDC ─────────────────────────────
+
+model Role {
+  id          String           @id @default(cuid())
+  key         String           @unique // SUPER_ADMIN, ADMIN, or slug for custom roles
+  name        String
+  description String?
+  isSystem    Boolean          @default(false)
+  isProtected Boolean          @default(false) // protected roles cannot be deleted (Super Admin)
+  createdAt   DateTime         @default(now())
+  permissions RolePermission[]
+  users       UserRole[]
+}
+
+/// Permission id format: `${module}:${action}` e.g. "M04:create"
+model Permission {
+  id     String           @id
+  module String
+  action String
+  roles  RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  scope        String // GLOBAL | PROPERTY | OWN
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId, scope])
+}
+
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@id([userId, roleId])
+}
+
+model UserPropertyAssignment {
+  userId     String
+  propertyId String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@id([userId, propertyId])
+}
+
+// ───────────────────────── M04 Physical inventory ─────────────────────────
+
+model Property {
+  id            String                   @id @default(cuid())
+  code          String                   @unique
+  name          String
+  address       String?
+  status        String                   @default("active") // active | archived (soft delete only with no lease history)
+  createdAt     DateTime                 @default(now())
+  buildings     Building[]
+  assignedUsers UserPropertyAssignment[]
+  members       MemberProfile[]
+  documents     DocumentRegistry[]
+  leases        Lease[]
+  invoices      Invoice[]
+  ParkingSlot   ParkingSlot[]
+  WifiAccount   WifiAccount[]
+  inspections   Inspection[]
+  tickets       MaintenanceTicket[]
+  complaints    Complaint[]
+  stockItems    StockItem[]
+  posSessions   PosSession[]
+  posSales      PosSale[]
+  stocktakes    Stocktake[]
+  overtimeRule  OvertimeRule?
+  expenseCategories  ExpenseCategory[]
+  expenses           Expense[]
+  recurringExpenses  RecurringExpense[]
+  ownerStatements    OwnerStatement[]
+  announcements      Announcement[]
+  geoLat            Float?
+  geoLng            Float?
+  geofenceRadiusM   Int? // optional kiosk geofence (§M23); punches outside → exception
+  shifts            Shift[]
+  attendanceRecords AttendanceRecord[]
+  attendanceExceptions AttendanceException[]
+}
+
+model Building {
+  id         String          @id @default(cuid())
+  propertyId String
+  property   Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  ownerId    String?
+  owner      OwnerProfile?   @relation(fields: [ownerId], references: [id])
+  name       String
+  address    String?
+  createdAt  DateTime        @default(now())
+  floors     Floor[]
+  contracts  OwnerContract[]
+  statements OwnerStatement[]
+
+  @@unique([propertyId, name])
+}
+
+model Floor {
+  id         String   @id @default(cuid())
+  buildingId String
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  name       String
+  level      Int
+  rooms      Room[]
+
+  @@unique([buildingId, name])
+}
+
+model Room {
+  id             String              @id @default(cuid())
+  floorId        String
+  floor          Floor               @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  number         String
+  type           String              @default("STANDARD") // STANDARD | DELUXE | STUDIO | SUITE
+  status         String              @default("vacant") // vacant | reserved | occupied | cleaning | maintenance (state machine enforced in app)
+  basePriceMinor Int                 @default(0)
+  capacity       Int                 @default(1)
+  notes          String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  beds           Bed[]
+  leases         Lease[]
+  Meter          Meter[]
+  roomMoves      RoomMove[]
+  inspections    Inspection[]
+  tickets        MaintenanceTicket[]
+
+  @@unique([floorId, number])
+}
+
+model Bed {
+  id     String  @id @default(cuid())
+  roomId String
+  room   Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  label  String
+  leases Lease[]
+
+  @@unique([roomId, label])
+}
+
+// ─────────────────────── Cross-cutting kernel tables ───────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id])
+  actorName  String
+  module     String // M00..M28
+  action     String // create | read | update | delete | login | logout | seed | ...
+  entityType String
+  entityId   String?
+  summary    String
+  before     String? // JSON string
+  after      String? // JSON string
+  ip         String?
+  prevHash   String? // §M27 tamper-evident chain: SHA-256 over (prevHash | row fields)
+  hash       String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([module])
+  @@index([createdAt])
+}
+
+model DomainEvent {
+  id         String   @id @default(cuid())
+  type       String // e.g. room.status_changed, property.created
+  payload    String // JSON string
+  propertyId String?
+  occurredAt DateTime @default(now())
+
+  @@index([type])
+}
+
+model Setting {
+  key       String   @id
+  value     String // JSON string
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+model NumberSequence {
+  key   String @id
+  value Int    @default(0)
+}
+
+// ─────────────────────── M02 Members ───────────────────────
+
+/// Tenant/resident record. One per party; lifecycle machine enforced in app:
+/// prospect → verified → active → notice → moved_out. `active` requires an
+/// active lease (M05); KYC checklist must complete before move-in.
+model MemberProfile {
+  id                 String              @id @default(cuid())
+  partyId            String              @unique
+  party              Party               @relation(fields: [partyId], references: [id])
+  status             String              @default("prospect") // prospect | verified | active | notice | moved_out
+  blacklisted        Boolean             @default(false)
+  blacklistReason    String?
+  /// Property the member is being onboarded for; drives PROPERTY-scope checks
+  /// until a lease exists (then lease room's property becomes authoritative).
+  homePropertyId     String?
+  homeProperty       Property?           @relation(fields: [homePropertyId], references: [id])
+  nationality        String?
+  idNumber           String?
+  occupation         String?
+  monthlyIncomeMinor Int?
+  notes              String?
+  kycCompletedAt     DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  emergencyContacts  EmergencyContact[]
+  leases             Lease[]
+  invoices           Invoice[]
+  payments           Payment[]
+  deposits           Deposit[]           @relation("DepositMember")
+  roomMoves          RoomMove[]
+  tickets            MaintenanceTicket[]
+  complaints         Complaint[]
+  posSales           PosSale[]
+  otpCodes           MemberOtp[]
+  telegramLinkCodes  TelegramLinkCode[] @relation("TelegramLinkCodes")
+  telegramLinks      TelegramLink[]     @relation("TelegramLinks")
+
+  @@index([status])
+  @@index([homePropertyId])
+}
+
+model EmergencyContact {
+  id              String        @id @default(cuid())
+  memberProfileId String
+  member          MemberProfile @relation(fields: [memberProfileId], references: [id], onDelete: Cascade)
+  name            String
+  relationship    String
+  phone           String
+  email           String?
+  isPrimary       Boolean       @default(false)
+
+  @@index([memberProfileId])
+}
+
+// ─────────────────────── M17 Documents (core) ───────────────────────
+
+model DocType {
+  id             String             @id // slug, e.g. "passport"
+  name           String
+  kycRequired    Boolean            @default(false)
+  requiresExpiry Boolean            @default(false)
+  sortOrder      Int                @default(0)
+  documents      DocumentRegistry[]
+}
+
+/// Polymorphic file registry: entity ∈ MEMBER | LEASE | ROOM | OWNER | CONTRACT.
+/// Objects live in private storage; access only via short-TTL signed URLs
+/// issued after an RBDC + property-scope check.
+model DocumentRegistry {
+  id           String    @id @default(cuid())
+  docTypeId    String
+  docType      DocType   @relation(fields: [docTypeId], references: [id])
+  entity       String
+  entityId     String
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  storageKey   String    @unique
+  version      Int       @default(1)
+  expiryDate   DateTime?
+  notes        String?
+  propertyId   String?
+  property     Property? @relation(fields: [propertyId], references: [id])
+  uploadedById String?
+  uploadedBy   User?     @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime  @default(now())
+  expense      Expense?
+
+  @@index([entity, entityId])
+}
+
+// ─────────────────────── M03 Owners ───────────────────────
+
+/// Landlord record. Reuses the party model; portal login = a User holding the
+/// OWNER role bound to the same party. Buildings point here (Building.ownerId)
+/// as the current-ownership link; M05 owner contracts become the authoritative
+/// source in Phase 5 and keep the pointer in sync.
+model OwnerProfile {
+  id            String              @id @default(cuid())
+  partyId       String              @unique
+  party         Party               @relation(fields: [partyId], references: [id])
+  status        String              @default("active") // active | archived
+  companyName   String?
+  notes         String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  payoutMethods OwnerPayoutMethod[]
+  telegramLinkCodes TelegramLinkCode[] @relation("TelegramLinkCodes")
+  telegramLinks     TelegramLink[]     @relation("TelegramLinks")
+  buildings     Building[]
+  contracts     OwnerContract[]
+  statements    OwnerStatement[]
+}
+
+model OwnerPayoutMethod {
+  id             String       @id @default(cuid())
+  ownerProfileId String
+  owner          OwnerProfile @relation(fields: [ownerProfileId], references: [id], onDelete: Cascade)
+  kind           String // BANK | MOBILE_MONEY | CASH | OTHER
+  bankName       String?
+  accountName    String
+  accountNumber  String
+  isPrimary      Boolean      @default(false)
+  notes          String?
+  createdAt      DateTime     @default(now())
+
+  @@index([ownerProfileId])
+}
+
+// ─────────────────────── M05 Leases & Owner Contracts ───────────────────────
+
+/// Member occupancy lease (M05). Rent terms are snapshotted on the lease at
+/// signing; M06 rent plans (Phase 6) become the catalog these reference.
+/// Status machine: draft → active → notice → terminated | completed.
+model Lease {
+  id                  String              @id @default(cuid())
+  code                String              @unique // LSE-0001 (number_sequences:LEASE)
+  memberProfileId     String
+  member              MemberProfile       @relation(fields: [memberProfileId], references: [id])
+  roomId              String
+  room                Room                @relation(fields: [roomId], references: [id])
+  bedId               String? // null = whole-room lease
+  bed                 Bed?                @relation(fields: [bedId], references: [id])
+  propertyId          String // denormalized for PROPERTY-scope checks
+  property            Property            @relation(fields: [propertyId], references: [id])
+  status              String              @default("draft") // draft | active | notice | terminated | completed
+  startDate           DateTime
+  endDate             DateTime? // open-ended when null
+  rentAmountMinor     Int
+  billingCycleDay     Int                 @default(1) // 1..28
+  prorationBasis      String              @default("calendar") // calendar | thirty_day (M06)
+  depositTotalMinor   Int                 @default(0)
+  depositInstallments Int                 @default(1)
+  noticeDays          Int                 @default(30)
+  autoRenew           Boolean             @default(false)
+  escalationPercent   Int? // annual rent escalation %, nullable
+  rentPlanId          String? // M06 catalog reference (terms remain snapshotted on the lease)
+  rentPlan            RentPlan?           @relation(fields: [rentPlanId], references: [id])
+  nextBillingDate     DateTime? // set on activation; consumed by the M07 generation job
+  invoices            Invoice[]
+  deposit             Deposit?
+  moveOutInspectionId String?             @unique // completed move_out inspection (M18) — hard gate for lease end (§15 v1.1)
+  moveOutInspection   Inspection?         @relation("LeaseMoveOutInspection", fields: [moveOutInspectionId], references: [id])
+  terminationReason   String?
+  terminatedAt        DateTime?
+  createdById         String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  services            LeaseService[]
+  movesFrom           RoomMove[]          @relation("RoomMoveFromLease")
+  moveInto            RoomMove?           @relation("RoomMoveNewLease")
+  serviceAssignments  ServiceAssignment[]
+  serviceUsages       ServiceUsage[]
+  utilityCharges      UtilityCharge[]
+  inspections         Inspection[]
+
+  @@index([memberProfileId])
+  @@index([roomId])
+  @@index([status])
+  @@index([propertyId])
+}
+
+/// Add-on services attached to a lease (billing snapshot; the M12 catalog
+/// with parking slots / WiFi accounts lands in Phase 10 and links here).
+model LeaseService {
+  id            String    @id @default(cuid())
+  leaseId       String
+  lease         Lease     @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  name          String
+  amountMinor   Int
+  pricingModel  String    @default("fixed_monthly") // fixed_monthly | per_use | metered
+  activeFrom    DateTime? // M12 window start (default: lease start)
+  activeThrough DateTime? // M12 window end — set on suspend/end → engine prorates
+  createdAt     DateTime  @default(now())
+
+  @@index([leaseId])
+}
+
+/// Owner contract (M05): master lease or revenue-share agreement per building.
+/// When active it is the authoritative ownership source and keeps
+/// Building.ownerId in sync (INTENT §15 v1.1).
+model OwnerContract {
+  id                   String       @id @default(cuid())
+  code                 String       @unique // OWC-0001 (number_sequences:OWC)
+  ownerProfileId       String
+  owner                OwnerProfile @relation(fields: [ownerProfileId], references: [id])
+  buildingId           String
+  building             Building     @relation(fields: [buildingId], references: [id])
+  model                String // FIXED_RENT | REVENUE_SHARE
+  sharePercent         Int? // REVENUE_SHARE: owner share 1..100
+  fixedRentMinor       Int? // FIXED_RENT: monthly master rent
+  managementFeePercent Int          @default(0) // operator fee deducted in M24
+  startDate            DateTime
+  endDate              DateTime?
+  payoutCycleDay       Int          @default(1) // 1..28
+  status               String       @default("draft") // draft | active | terminated | expired
+  terminatedAt         DateTime?
+  terminationReason    String?
+  notes                String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  statements OwnerStatement[]
+
+  @@index([ownerProfileId])
+  @@index([buildingId])
+}
+
+// ─────────────────────── M06 Rent Engine ───────────────────────
+
+/// Billing plan catalog (M06). Leases snapshot their terms at signing; plans
+/// are the catalog new leases pick from.
+model RentPlan {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  amountMinor    Int
+  cycleDay       Int      @default(1)
+  prorationBasis String   @default("calendar") // calendar | thirty_day
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  leases         Lease[]
+
+  @@index([isActive])
+}
+
+/// Late-fee rule (M06): applied by the daily job after the grace period.
+/// FIXED → amountMinor; PERCENT → percentBps of the outstanding amount, capped.
+model LateFeeRule {
+  id          String  @id @default(cuid())
+  name        String
+  type        String // FIXED | PERCENT
+  amountMinor Int?
+  percentBps  Int? // basis points of outstanding (1000 = 10%)
+  capMinor    Int?
+  graceDays   Int     @default(3)
+  isActive    Boolean @default(true)
+}
+
+model TaxRule {
+  id         String  @id @default(cuid())
+  name       String
+  percentBps Int     @default(0) // 10000 = 100%
+  isDefault  Boolean @default(false)
+  isActive   Boolean @default(true)
+}
+
+/// Discount catalog (M06) — rules that compose invoice-level discounts;
+/// v1 applies a single discountMinor per invoice composed by the engine.
+model DiscountRule {
+  id          String  @id @default(cuid())
+  name        String
+  type        String // FIXED | PERCENT
+  percentBps  Int?
+  amountMinor Int?
+  isActive    Boolean @default(true)
+}
+
+// ─────────────────────── M07 Invoices ───────────────────────
+
+/// Billing document. States: draft → issued → partial_paid → paid ·
+/// issued/partial_paid → overdue; void with reason. Issued invoices are
+/// immutable except system-applied late fees and status changes;
+/// corrections only via credit notes. Numbering `{PROP}-{YEAR}-{SEQ}`
+/// allocated gapless at issue time.
+model Invoice {
+  id                  String              @id @default(cuid())
+  code                String              @unique
+  propertyId          String
+  property            Property            @relation(fields: [propertyId], references: [id])
+  leaseId             String?
+  lease               Lease?              @relation(fields: [leaseId], references: [id])
+  memberProfileId     String
+  member              MemberProfile       @relation(fields: [memberProfileId], references: [id])
+  status              String              @default("draft") // draft|issued|partial_paid|paid|overdue|void
+  periodStart         DateTime
+  periodEnd           DateTime
+  issuedAt            DateTime?
+  dueDate             DateTime?
+  subtotalMinor       Int                 @default(0)
+  discountMinor       Int                 @default(0)
+  taxMinor            Int                 @default(0)
+  totalMinor          Int                 @default(0)
+  amountPaidMinor     Int                 @default(0) // Phase 8 writes this
+  amountCreditedMinor Int                 @default(0)
+  /// Maintained derived value: total − paid − credited (≥ 0). The members
+  /// list "owing" badge and arrears reporting aggregate this.
+  amountDueMinor      Int                 @default(0)
+  dunningStage        Int                 @default(0) // 0 none · 1/2/3 = +3/+7/+14 reminders sent
+  voidReason          String?
+  voidedAt            DateTime?
+  notes               String?
+  createdById         String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  items               InvoiceItem[]
+  creditNotes         CreditNote[]
+  allocations         PaymentAllocation[]
+  depositFor          Deposit?            @relation("DepositInvoice")
+  roomMove            RoomMove?
+  posSale             PosSale?            @relation("PosSaleInvoice")
+  isDeposit           Boolean             @default(false) // deposit invoice — excluded from the billing-period chain
+
+  @@index([leaseId, periodStart]) // uniqueness for live invoices enforced in the service tx (voided periods may be re-billed)
+  @@index([status])
+  @@index([memberProfileId])
+  @@index([propertyId])
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  kind        String // rent | service | utility | one_time | late_fee | credit
+  name        String
+  qty         Int     @default(1)
+  unitMinor   Int
+  amountMinor Int
+
+  @@index([invoiceId])
+}
+
+model CreditNote {
+  id          String   @id @default(cuid())
+  code        String   @unique // CN-0001
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+  amountMinor Int
+  reason      String
+  issuedAt    DateTime @default(now())
+  createdById String?
+
+  @@index([invoiceId])
+}
+
+// ─────────────────────── M08 Ledger ───────────────────────
+
+/// System chart of accounts (fixed codes per INTENT.md M08). Seeded only —
+/// no CRUD endpoints this phase (custom accounts arrive with M28 settings).
+model LedgerAccount {
+  id       String  @id @default(cuid())
+  code     String  @unique // 1100, 1300, 4000 …
+  name     String
+  type     String // ASSET | LIABILITY | INCOME | EXPENSE | EQUITY
+  isSystem Boolean @default(true)
+  isActive Boolean @default(true)
+
+  entries LedgerEntry[]
+
+  @@index([type])
+}
+
+/// A balanced posting: Σ debit = Σ credit (DB CHECK + service + CI test).
+/// Append-only — corrections point back via `reversalOfId`; nothing is ever
+/// updated or deleted (DB triggers raise ABORT).
+model LedgerTransaction {
+  id           String              @id @default(cuid())
+  postedAt     DateTime            @default(now())
+  memo         String
+  refType      String // invoice | late_fee | credit_note | invoice_void | payment | refund | deposit | expense | payout | opening | adjustment
+  refId        String?
+  propertyId   String?
+  memberId     String? // MemberProfile id, when the posting belongs to a member account
+  totalDebit   Int
+  totalCredit  Int
+  reversalOfId String?
+  reversalOf   LedgerTransaction?  @relation("LedgerReversals", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversals    LedgerTransaction[] @relation("LedgerReversals")
+  createdById  String?
+  createdAt    DateTime            @default(now())
+
+  entries LedgerEntry[]
+
+  @@index([refType, refId])
+  @@index([postedAt])
+  @@index([propertyId])
+  @@index([memberId])
+  @@index([reversalOfId])
+}
+
+/// One account movement inside a posting — exactly one of debit/credit > 0
+/// (DB CHECK). Never updated or deleted (DB triggers).
+model LedgerEntry {
+  id            String            @id @default(cuid())
+  transactionId String
+  transaction   LedgerTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  accountId     String
+  account       LedgerAccount     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  debit         Int               @default(0)
+  credit        Int               @default(0)
+  memo          String?
+  propertyId    String?
+  memberId      String?
+  createdAt     DateTime          @default(now())
+
+  @@index([accountId])
+  @@index([transactionId])
+  @@index([propertyId])
+  @@index([memberId])
+}
+
+// ─────────────────────── M09 Payments ───────────────────────
+
+/// Money in (INTENT.md M09). Rows are append-only (DB trigger blocks DELETE);
+/// the status machine pending → confirmed → refunded | failed is enforced in
+/// app + trigger-checked transitions. Unallocated remainder = member credit.
+model Payment {
+  id              String        @id @default(cuid())
+  code            String        @unique // PMT-2026-0001
+  memberProfileId String
+  member          MemberProfile @relation(fields: [memberProfileId], references: [id], onDelete: Restrict)
+  propertyId      String?
+  method          String // cash | bank_transfer | qr | card | cheque
+  status          String        @default("pending") // pending | confirmed | refunded | failed
+  amountMinor     Int
+  remainingMinor  Int           @default(0) // unallocated = member credit
+  refundedMinor   Int           @default(0)
+  gatewayRef      String?       @unique // gateway transaction id (webhook dedupe)
+  idempotencyKey  String?       @unique // client/webhook idempotency (§9.6)
+  failReason      String?
+  refundReason    String?
+  receiptCode     String?       @unique // RCP-2026-0001, allocated at confirmation
+  receivedAt      DateTime      @default(now())
+  confirmedAt     DateTime?
+  refundedAt      DateTime?
+  failedAt        DateTime?
+  createdById     String?
+  createdAt       DateTime      @default(now())
+
+  allocations PaymentAllocation[]
+
+  @@index([memberProfileId])
+  @@index([propertyId])
+  @@index([status])
+  @@index([method])
+}
+
+/// Payment → invoice application (§9.5: Σ allocations ≤ payment amount;
+/// the remainder stays member credit). Immutable after creation.
+model PaymentAllocation {
+  id          String   @id @default(cuid())
+  paymentId   String
+  payment     Payment  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  amountMinor Int
+  createdAt   DateTime @default(now())
+
+  @@unique([paymentId, invoiceId])
+  @@index([invoiceId])
+}
+
+// ─────────────────────── M10 Deposits ───────────────────────
+
+/// Security deposit per lease (INTENT.md M10). Collection rides the invoice
+/// pipeline (a `deposit`-kind invoice whose credit side posts to 2100 Deposit
+/// Liability); settlement = deductions (with evidence) + refund of the
+/// remainder, each posting against 2100 until it nets 0.
+model Deposit {
+  id              String        @id @default(cuid())
+  leaseId         String        @unique
+  lease           Lease         @relation(fields: [leaseId], references: [id], onDelete: Restrict)
+  memberProfileId String
+  member          MemberProfile @relation("DepositMember", fields: [memberProfileId], references: [id], onDelete: Restrict)
+  propertyId      String?
+  requiredMinor   Int // snapshot of lease.depositTotalMinor
+  status          String        @default("pending") // pending | billed | held | settled
+  invoiceId       String?       @unique
+  invoice         Invoice?      @relation("DepositInvoice", fields: [invoiceId], references: [id], onDelete: Restrict)
+  createdById     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  transactions DepositTransaction[]
+
+  @@index([memberProfileId])
+  @@index([propertyId])
+  @@index([status])
+}
+
+/// Settlement movements against the deposit liability. Append-only —
+/// collections arrive as invoice payments (M09); corrections are impossible
+/// by trigger (post a compensating movement instead).
+model DepositTransaction {
+  id            String   @id @default(cuid())
+  depositId     String
+  deposit       Deposit  @relation(fields: [depositId], references: [id], onDelete: Restrict)
+  type          String // deduction | refund
+  amountMinor   Int
+  reason        String? // damage | cleaning | unpaid_rent | other (deductions)
+  evidenceDocId String? // M17 document registry id — required for deductions
+  note          String
+  method        String? // refund settlement method
+  ledgerTxId    String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+
+  @@index([depositId])
+}
+
+// ─────────────────────── M11 Utilities ───────────────────────
+
+/// Meter (M11): elec/water/gas, bound to a room. Readings are integers in
+/// milli-units (×1000) so consumption math stays exact.
+model Meter {
+  id        String   @id @default(cuid())
+  code      String   @unique // ELEC-A101
+  type      String // elec | water | gas
+  unitLabel String   @default("kWh") // display unit: kWh / m³
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id])
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  readings MeterReading[]
+  charges  UtilityCharge[]
+
+  @@index([roomId])
+}
+
+model MeterReading {
+  id          String   @id @default(cuid())
+  meterId     String
+  meter       Meter    @relation(fields: [meterId], references: [id])
+  valueMilli  Int // units × 1000
+  readAt      DateTime
+  estimated   Boolean  @default(false) // estimated readings are flagged (§M11)
+  source      String   @default("manual") // manual | csv | estimate
+  note        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  charge UtilityCharge?
+
+  @@unique([meterId, readAt]) // one reading per meter per day
+  @@index([meterId, readAt])
+}
+
+/// Tariff (M11): price per unit, optional progressive tiers
+/// (tiers JSON: [{ upToMilli: number | null, ratePerUnitMinor: number }]).
+model Tariff {
+  id            String   @id @default(cuid())
+  utilityType   String // elec | water | gas
+  name          String
+  propertyId    String? // null = organisation-wide default
+  unitRateMinor Int // minor per 1 unit (flat)
+  tiers         Json?
+  effectiveFrom DateTime
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  @@index([utilityType, effectiveFrom])
+}
+
+/// Computed charge for one reading: (reading − previous) × tariff. Pending
+/// charges attach to the lease's next generated invoice automatically and
+/// flip to billed (§M11); voiding that invoice reverts them to pending.
+model UtilityCharge {
+  id               String       @id @default(cuid())
+  leaseId          String
+  lease            Lease        @relation(fields: [leaseId], references: [id])
+  roomId           String
+  meterId          String
+  meter            Meter        @relation(fields: [meterId], references: [id])
+  readingId        String       @unique
+  reading          MeterReading @relation(fields: [readingId], references: [id])
+  periodStart      DateTime
+  periodEnd        DateTime
+  consumptionMilli Int
+  amountMinor      Int
+  tariffName       String
+  status           String       @default("pending") // pending | billed
+  invoiceId        String?
+  invoiceItemId    String?
+  anomaly          Boolean      @default(false) // consumption > 2× recent average
+  note             String?
+  createdAt        DateTime     @default(now())
+
+  @@index([leaseId, status])
+}
+
+// ─────────────────────── M12 Services ───────────────────────
+
+/// Billable add-on catalog (M12): WiFi, parking, laundry, general services.
+model ServiceCatalog {
+  id             String   @id @default(cuid())
+  code           String   @unique // WIFI / PARK-A / LAUNDRY
+  name           String
+  pricingModel   String // fixed_monthly | per_use | metered
+  unitPriceMinor Int // monthly price, or price per unit for per_use
+  unitLabel      String? // "kg", "session" (per_use display)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  assignments ServiceAssignment[]
+  usages      ServiceUsage[]
+}
+
+/// Assignment of a catalog service to a lease. fixed_monthly assignments are
+/// mirrored into the lease's LeaseService billing snapshot (with optional
+/// activeFrom/activeThrough window → mid-month suspend prorates); per_use is
+/// billed from ServiceUsage entries; metered rides on M11 meters.
+model ServiceAssignment {
+  id            String         @id @default(cuid())
+  serviceId     String
+  service       ServiceCatalog @relation(fields: [serviceId], references: [id])
+  leaseId       String
+  lease         Lease          @relation(fields: [leaseId], references: [id])
+  status        String         @default("active") // active | suspended | ended
+  startDate     DateTime
+  suspendedAt   DateTime?
+  endedAt       DateTime?
+  parkingSlotId String?        @unique
+  parkingSlot   ParkingSlot?   @relation(fields: [parkingSlotId], references: [id])
+  wifiAccountId String?        @unique
+  wifiAccount   WifiAccount?   @relation(fields: [wifiAccountId], references: [id])
+  snapshotId    String? // LeaseService row driving billing (fixed_monthly)
+  note          String?
+  createdAt     DateTime       @default(now())
+
+  @@index([leaseId, status])
+}
+
+/// Per-use entry (laundry kg, visitor parking…) → one-time line on the next
+/// invoice (§M12).
+model ServiceUsage {
+  id             String         @id @default(cuid())
+  serviceId      String
+  service        ServiceCatalog @relation(fields: [serviceId], references: [id])
+  leaseId        String
+  lease          Lease          @relation(fields: [leaseId], references: [id])
+  qtyMilli       Int // units × 1000 (2.5 kg = 2500)
+  unitLabel      String?
+  unitPriceMinor Int // snapshot at entry time
+  usedAt         DateTime
+  status         String         @default("pending") // pending | billed
+  invoiceId      String?
+  invoiceItemId  String?
+  note           String?
+  createdById    String?
+  createdAt      DateTime       @default(now())
+
+  @@index([leaseId, status])
+}
+
+model ParkingSlot {
+  id              String   @id @default(cuid())
+  code            String   @unique // P-A01
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  monthlyFeeMinor Int
+  status          String   @default("free") // free | assigned
+  createdAt       DateTime @default(now())
+
+  assignment ServiceAssignment?
+}
+
+model WifiAccount {
+  id         String   @id @default(cuid())
+  ssid       String   @unique
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id])
+  speedLabel String?
+  status     String   @default("free") // free | assigned | suspended
+  createdAt  DateTime @default(now())
+
+  assignment ServiceAssignment?
+}
+
+// ─────────────────────── M16 Room Moves ───────────────────────
+
+/// Room move (M16): request → approve → execute. Execution ends the old
+/// lease, starts a new one on the target room, issues ONE adjustment invoice
+/// (new rent prorated + move fee − unused old-rent credit as discount) and
+/// flips both room statuses. The deposit follows the member (row repointed —
+/// the 2100 liability is untouched).
+model RoomMove {
+  id                  String        @id @default(cuid())
+  code                String        @unique // MOV-2026-0001 (number_sequences:ROOMMOVE)
+  memberProfileId     String
+  member              MemberProfile @relation(fields: [memberProfileId], references: [id])
+  fromLeaseId         String
+  fromLease           Lease         @relation("RoomMoveFromLease", fields: [fromLeaseId], references: [id])
+  toRoomId            String
+  toRoom              Room          @relation(fields: [toRoomId], references: [id])
+  effectiveAt         DateTime
+  status              String        @default("requested") // requested | approved | executed | cancelled
+  requestedByRole     String        @default("staff") // member | staff (portal vs back office)
+  requestedById       String?
+  approvedById        String?
+  approvedAt          DateTime?
+  executedById        String?
+  executedAt          DateTime?
+  cancelledById       String?
+  cancelledAt         DateTime?
+  cancelReason        String?
+  newLeaseId          String?       @unique
+  newLease            Lease?        @relation("RoomMoveNewLease", fields: [newLeaseId], references: [id])
+  adjustmentInvoiceId String?       @unique
+  adjustmentInvoice   Invoice?      @relation(fields: [adjustmentInvoiceId], references: [id])
+  // Computed money snapshot (recomputed at execution — source of truth)
+  oldRentMinor        Int?
+  newRentMinor        Int?
+  rentCreditMinor     Int? // unused old-rent credit for the overlap window
+  newRentChargeMinor  Int? // prorated new rent on the adjustment invoice
+  moveFeeMinor        Int?
+  netMinor            Int?
+  depositDeltaMinor   Int? // new room deposit requirement − transferred deposit
+  inspectionsNote     String? // optional move-out/move-in inspection links (M18)
+  note                String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([memberProfileId, status])
+  @@index([fromLeaseId])
+}
+
+// ─────────────────────── M18 Inspections ───────────────────────
+
+/// Checklist template per room type (§M18): sections of check items as JSON
+/// [{ title, items: string[] }]. Managed (CRU) by M18:M holders.
+model InspectionTemplate {
+  id          String       @id @default(cuid())
+  name        String
+  roomType    String // STANDARD | DELUXE | STUDIO | SUITE (matches Room.type)
+  sections    Json
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  inspections Inspection[]
+
+  @@unique([name, roomType])
+}
+
+/// One room condition check (move_in | move_out | periodic). Items are
+/// captured as JSON at completion (immutable afterwards); failures become
+/// InspectionFinding rows that can open a ticket (M19) and propose a deposit
+/// deduction (M10). The PDF report auto-files to the M17 registry.
+model Inspection {
+  id              String              @id @default(cuid())
+  code            String              @unique // INSP-YYYY-NNNN (number_sequences:INSP)
+  type            String // move_in | move_out | periodic
+  status          String              @default("draft") // draft | completed | cancelled
+  leaseId         String
+  lease           Lease               @relation(fields: [leaseId], references: [id])
+  roomId          String
+  room            Room                @relation(fields: [roomId], references: [id])
+  propertyId      String
+  property        Property            @relation(fields: [propertyId], references: [id])
+  templateId      String?
+  template        InspectionTemplate? @relation(fields: [templateId], references: [id])
+  scheduledAt     DateTime?
+  completedAt     DateTime?
+  inspectorById   String? // User id (audit pointer)
+  items           Json? // completed: [{ section, item, result: pass|fail|na, severity?, note?, photoDocId? }]
+  overallScore    Int? // 0..100 — share of non-NA items that passed
+  summaryNote     String?
+  reportDocId     String? // M17 registry (inspection_report PDF)
+  findings        InspectionFinding[]
+  moveOutForLease Lease?              @relation("LeaseMoveOutInspection")
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([leaseId])
+  @@index([roomId])
+  @@index([propertyId, type])
+}
+
+/// A failed checklist item — the actionable output of an inspection.
+/// Cross-links (matrix row 13): finding → M19 ticket, finding → M10 deduction.
+model InspectionFinding {
+  id              String             @id @default(cuid())
+  inspectionId    String
+  inspection      Inspection         @relation(fields: [inspectionId], references: [id])
+  itemLabel       String
+  severity        String             @default("minor") // minor | major | critical
+  note            String
+  photoDocId      String? // M17 evidence
+  ticketId        String?            @unique
+  ticket          MaintenanceTicket? @relation("FindingTicket", fields: [ticketId], references: [id])
+  deductionMinor  Int? // proposed deposit deduction (move_out findings)
+  deductionStatus String? // proposed | approved | dismissed
+  deductionTxId   String? // M10 depositTransaction id once approved
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([inspectionId])
+}
+
+// ─────────────────────── M19 Maintenance ───────────────────────
+
+/// Repair ticket (§M19): open → assigned → in_progress → resolved →
+/// verified/closed. SLA target derived from priority at creation; breach is
+/// flagged by the daily sweep (escalation notifications arrive with M21).
+model MaintenanceTicket {
+  id              String             @id @default(cuid())
+  code            String             @unique // TK-YYYY-NNNN (number_sequences:TK)
+  propertyId      String
+  property        Property           @relation(fields: [propertyId], references: [id])
+  roomId          String?
+  room            Room?              @relation(fields: [roomId], references: [id])
+  leaseId         String? // reporter's lease (member-raised tickets)
+  memberProfileId String?
+  member          MemberProfile?     @relation(fields: [memberProfileId], references: [id])
+  category        String // plumbing | electrical | appliance | furniture | internet | other
+  priority        String             @default("medium") // low | medium | high | urgent
+  status          String             @default("open") // open | assigned | in_progress | resolved | verified | closed | cancelled
+  title           String
+  description     String
+  source          String             @default("staff") // portal | telegram | staff
+  reportedById    String? // User id (staff/owner raising on behalf)
+  slaDueAt        DateTime // createdAt + SLA hours by priority
+  slaBreachedAt   DateTime?
+  escalatedAt     DateTime?
+  assignedToId    String? // technician (User id)
+  assignedAt      DateTime?
+  vendorName      String? // external vendor assignment
+  resolvedAt      DateTime?
+  resolutionNote  String?
+  verifiedById    String?
+  verifiedAt      DateTime?
+  closedAt        DateTime?
+  finding         InspectionFinding? @relation("FindingTicket")
+  costs           MaintenanceCost[]
+  complaints      Complaint[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([propertyId, status])
+  @@index([slaDueAt])
+}
+
+/// Ticket cost line — labor or materials. Materials reference M15 stock
+/// (consumption wiring lands with Phase 14); chargeTo routes the cost to the
+/// owner P&L (M24) or operating expense (M20) once those phases land.
+model MaintenanceCost {
+  id          String            @id @default(cuid())
+  ticketId    String
+  ticket      MaintenanceTicket @relation(fields: [ticketId], references: [id])
+  kind        String // labor | material
+  label       String
+  amountMinor Int
+  stockItemId String? // M15 consumption link (Phase 14)
+  stockItem   StockItem?        @relation(fields: [stockItemId], references: [id])
+  chargeTo    String            @default("expense") // expense (M20) | owner (M24)
+  createdById String?
+  createdAt   DateTime          @default(now())
+
+  @@index([ticketId])
+}
+
+// ─────────────────────── M22 Complaints ───────────────────────
+
+/// Grievance (§M22): new → acknowledged → in_progress → resolved → closed.
+/// The member confirms resolution and rates (1–5) on close. One-click
+/// conversion to a maintenance ticket keeps the cross-link (matrix row 13).
+model Complaint {
+  id              String             @id @default(cuid())
+  code            String             @unique // CMP-YYYY-NNNN (number_sequences:CMP)
+  propertyId      String
+  property        Property           @relation(fields: [propertyId], references: [id])
+  memberProfileId String
+  member          MemberProfile      @relation(fields: [memberProfileId], references: [id])
+  leaseId         String?
+  category        String // noise | cleanliness | neighbor | staff | facility | billing | other
+  priority        String             @default("medium") // low | medium | high
+  source          String             @default("portal") // portal | telegram | staff
+  status          String             @default("new") // new | acknowledged | in_progress | resolved | closed
+  subject         String
+  description     String
+  slaDueAt        DateTime // createdAt + SLA hours by priority
+  slaBreachedAt   DateTime?
+  escalatedAt     DateTime?
+  assignedToId    String? // handling User id
+  ticketId        String?            @unique
+  ticket          MaintenanceTicket? @relation(fields: [ticketId], references: [id])
+  resolvedAt      DateTime?
+  resolutionNote  String?
+  rating          Int? // 1..5 — required from the member to close
+  ratingNote      String?
+  closedAt        DateTime?
+  comments        ComplaintComment[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([propertyId, status])
+  @@index([memberProfileId])
+}
+
+model ComplaintComment {
+  id          String    @id @default(cuid())
+  complaintId String
+  complaint   Complaint @relation(fields: [complaintId], references: [id])
+  authorById  String? // User id
+  byMember    Boolean   @default(false)
+  body        String
+  photoDocId  String?
+  createdAt   DateTime  @default(now())
+
+  @@index([complaintId])
+}
+
+// ─────────────────────── M15 Stock / Inventory ───────────────────────
+
+/// Quantities are integers in milli-units (1 unit = 1000) so fractional stock
+/// (kg, liters) stays exact; costs are minor units × 1000 (avgCostMilli).
+/// On-hand is NEVER edited directly — only via StockMovement rows (§M15).
+model StockItem {
+  id             String             @id @default(cuid())
+  name           String
+  category       String // beverage | snack | grocery | supply | part | other
+  unit           String // pcs | kg | l | box …
+  qtyMilli       Int                @default(0) // on-hand (milli units)
+  avgCostMilli   Int                @default(0) // moving-average unit cost (minor×1000)
+  minQtyMilli    Int                @default(0) // low-stock alert threshold
+  supplierId     String?
+  supplier       Supplier?          @relation(fields: [supplierId], references: [id])
+  propertyId     String
+  property       Property           @relation(fields: [propertyId], references: [id])
+  isActive       Boolean            @default(true)
+  movements      StockMovement[]    @relation("StockMovements")
+  transfersIn    StockMovement[]    @relation("StockTransferTarget")
+  stocktakeLines StocktakeLine[]
+  posProducts    PosProduct[]
+  ticketCosts    MaintenanceCost[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([name, propertyId])
+  @@index([propertyId, category])
+}
+
+model Supplier {
+  id         String      @id @default(cuid())
+  name       String      @unique
+  phone      String?
+  email      String?
+  notes      String?
+  stockItems StockItem[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+/// Append-only stock movements (purchase, sale, consumption, maintenance_use,
+/// adjustment, transfer) — the only way on-hand changes. qtyMilli is signed
+/// (+ increases / − decreases on-hand at the source item).
+model StockMovement {
+  id             String       @id @default(cuid())
+  stockItemId    String
+  stockItem      StockItem    @relation("StockMovements", fields: [stockItemId], references: [id])
+  type           String // purchase | sale | consumption | maintenance_use | adjustment | transfer
+  qtyMilli       Int // signed delta applied to stockItem (transfers: negative here)
+  qtyAfterMilli  Int // on-hand snapshot after applying
+  avgCostAfterMilli Int // moving-average snapshot after applying
+  valueMilli     Int // signed stock-value delta (minor×1000)
+  unitCostMilli  Int? // purchase: per-unit cost
+  saleId         String? // POS sale (type sale)
+  sale           PosSale?     @relation(fields: [saleId], references: [id])
+  ticketId       String? // maintenance_use: consuming ticket (MaintenanceCost link)
+  stocktakeId    String? // adjustment produced by a stocktake
+  targetItemId   String? // transfer: destination item
+  targetItem     StockItem?   @relation("StockTransferTarget", fields: [targetItemId], references: [id])
+  note           String?
+  createdById    String?
+  createdAt      DateTime     @default(now())
+
+  @@index([stockItemId, createdAt])
+  @@index([type])
+}
+
+/// Counted inventory (§M15 "stocktake variance posts adjustment"). Creating a
+/// stocktake with counted quantities writes adjustment movements for every
+/// variance ≠ 0 and snapshots the valuation delta.
+model Stocktake {
+  id          String          @id @default(cuid())
+  code        String          @unique // STK-YYYY-NNNN
+  propertyId  String
+  property    Property        @relation(fields: [propertyId], references: [id])
+  status      String          @default("completed") // completed | cancelled
+  valueDeltaMilli Int         @default(0) // Σ adjustment value (minor×1000)
+  note        String?
+  lines       StocktakeLine[]
+  createdById String?
+  createdAt   DateTime        @default(now())
+
+  @@index([propertyId])
+}
+
+model StocktakeLine {
+  id             String    @id @default(cuid())
+  stocktakeId    String
+  stocktake      Stocktake @relation(fields: [stocktakeId], references: [id])
+  stockItemId    String
+  stockItem      StockItem @relation(fields: [stockItemId], references: [id])
+  expectedMilli  Int
+  countedMilli   Int
+  varianceMilli  Int
+  createdAt      DateTime  @default(now())
+
+  @@unique([stocktakeId, stockItemId])
+}
+
+// ─────────────────────── M14 POS ───────────────────────
+
+/// Canteen/store product — optionally linked to a stock item so sales
+/// decrement inventory (§M14).
+model PosProduct {
+  id          String        @id @default(cuid())
+  name        String        @unique
+  priceMinor  Int
+  category    String?
+  stockItemId String? // sales decrement this stock item
+  stockItem   StockItem?    @relation(fields: [stockItemId], references: [id])
+  isActive    Boolean       @default(true)
+  saleItems   PosSaleItem[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+/// Cash-drawer session: open → close with expected-vs-counted variance (§M14).
+model PosSession {
+  id                 String    @id @default(cuid())
+  propertyId         String
+  property           Property  @relation(fields: [propertyId], references: [id])
+  status             String    @default("open") // open | closed
+  openingFloatMinor  Int        @default(0)
+  expectedCashMinor  Int        @default(0) // float + Σ cash sales (server-side)
+  countedCashMinor   Int?
+  varianceMinor      Int?
+  closeNote          String?
+  openedById         String
+  openedAt           DateTime  @default(now())
+  closedById         String?
+  closedAt           DateTime?
+  sales              PosSale[]
+
+  @@index([propertyId, status])
+}
+
+/// One POS sale (§M14): cash/qr/card settle immediately; `room_charge` posts
+/// the total to the member's account as a one-time invoice line. Every sale
+/// gets a receipt PDF auto-filed to M17.
+model PosSale {
+  id              String        @id @default(cuid())
+  code            String        @unique // SAL-YYYY-NNNN
+  sessionId       String
+  session         PosSession    @relation(fields: [sessionId], references: [id])
+  propertyId      String
+  property        Property      @relation(fields: [propertyId], references: [id])
+  method          String // cash | qr | card | room_charge
+  totalMinor      Int
+  memberProfileId String? // room_charge target member
+  member          MemberProfile? @relation(fields: [memberProfileId], references: [id])
+  invoiceId       String?  @unique // room_charge: the issued one-time invoice
+  invoice         Invoice? @relation("PosSaleInvoice", fields: [invoiceId], references: [id])
+  ref             String? // qr/card reference
+  receiptDocId    String? // M17 registry (receipt PDF)
+  soldById        String
+  createdAt       DateTime      @default(now())
+  items           PosSaleItem[]
+  stockMovements  StockMovement[]
+
+  @@index([sessionId])
+  @@index([propertyId, createdAt])
+}
+
+model PosSaleItem {
+  id             String     @id @default(cuid())
+  saleId         String
+  sale           PosSale    @relation(fields: [saleId], references: [id])
+  productId      String
+  product        PosProduct @relation(fields: [productId], references: [id])
+  name           String // snapshot
+  qtyMilli       Int
+  unitPriceMinor Int
+  lineMinor      Int
+  stockItemId    String? // snapshot of the product's stock link at sale time
+
+  @@index([saleId])
+}
+
+/// ── Phase 15 · M23 Attendance ────────────────────────────────────────────────
+
+/// Named shift template per property. Minutes are offsets from local midnight;
+/// endMinute may exceed 1440 (night shift crossing midnight).
+model Shift {
+  id           String   @id @default(cuid())
+  propertyId   String
+  property     Property @relation(fields: [propertyId], references: [id])
+  name         String
+  startMinute  Int // 0..1439
+  endMinute    Int // start+1..2879 (>1440 crosses midnight)
+  graceMinutes Int      @default(10) // late if clock-in > start + grace
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  records      AttendanceRecord[]
+
+  @@unique([propertyId, name])
+}
+
+/// Simple overtime multipliers (§M23): minutes beyond the shift span count as
+/// overtime at multiplierBp basis points (15000 = ×1.5). One active rule per property.
+model OvertimeRule {
+  id             String   @id @default(cuid())
+  propertyId     String   @unique
+  property       Property @relation(fields: [propertyId], references: [id])
+  afterMinutes   Int      @default(0) // OT only beyond this much unscheduled time
+  multiplierBp   Int      @default(15000) // ×1.5 payroll multiplier
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+/// One punch pair per staff per day (workDate = UTC midnight of clock-in).
+/// Clock in/out via kiosk PIN, mobile session, or a manager's manual entry —
+/// every edit carries who/why and is audited (§M23 "no edit without audit").
+model AttendanceRecord {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  propertyId      String
+  property        Property  @relation(fields: [propertyId], references: [id])
+  shiftId         String?
+  shift           Shift?    @relation(fields: [shiftId], references: [id])
+  workDate        DateTime // UTC midnight of the clock-in day
+  clockInAt       DateTime
+  clockOutAt      DateTime?
+  inLat           Float?
+  inLng           Float?
+  inGeoStatus     String? // inside | outside | unknown
+  outLat          Float?
+  outLng          Float?
+  outGeoStatus    String?
+  minutesWorked   Int?
+  overtimeMinutes Int?
+  source          String // kiosk | mobile | manual
+  note            String?
+  editedById      String?
+  editedAt        DateTime?
+  editReason      String?
+  createdById     String? // set on manual creation
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  exceptions      AttendanceException[]
+
+  @@unique([userId, workDate])
+  @@index([propertyId, workDate])
+}
+
+/// Derived punch problems (§M23 "exception report flags missed punches"):
+/// late_clock_in | early_clock_out | missed_clock_in | missed_clock_out |
+/// overtime | geofence_violation. Open exceptions surface on the report;
+/// resolving is M23:update and audited.
+model AttendanceException {
+  id           String            @id @default(cuid())
+  recordId     String?
+  record       AttendanceRecord? @relation(fields: [recordId], references: [id], onDelete: SetNull)
+  userId       String
+  user         User              @relation(fields: [userId], references: [id])
+  propertyId   String
+  property     Property          @relation(fields: [propertyId], references: [id])
+  workDate     DateTime // UTC midnight
+  type         String
+  detail       String
+  status       String            @default("open") // open | resolved
+  resolvedById String?
+  resolvedBy   User?             @relation("ExceptionResolver", fields: [resolvedById], references: [id])
+  resolvedAt   DateTime?
+  resolution   String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([propertyId, workDate])
+  @@index([status])
+}
+
+/// ── Phase 16 · M20 Expenses & P&L ────────────────────────────────────────────
+
+/// Expense category mapped to a ledger expense account (§M20): 5000 Operating
+/// or 5100 Bank Fees — validated app-level against SYSTEM_ACCOUNTS.
+model ExpenseCategory {
+  id          String   @id @default(cuid())
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+  name        String
+  accountCode String // 5000 | 5100
+  chargeTo    String   @default("company") // company | passthrough | owner_maintenance (M24 statement deduction)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  expenses    Expense[]
+  budgets     ExpenseBudget[]
+  recurrings  RecurringExpense[]
+
+  @@unique([propertyId, name])
+}
+
+/// Vendor bill / operating cost. Approval is required above the configurable
+/// threshold (setting `expenses.approvalThresholdMinor`, default $500) — below
+/// it the expense auto-approves on create. Approval posts the ledger
+/// (DR category account / CR cash|bank); void posts a reversal. Status machine:
+/// pending → approved | rejected; approved → voided.
+model Expense {
+  id            String            @id @default(cuid())
+  code          String            @unique // EXP-YYYY-NNNN
+  propertyId    String
+  property      Property          @relation(fields: [propertyId], references: [id])
+  categoryId    String
+  category      ExpenseCategory   @relation(fields: [categoryId], references: [id])
+  vendorName    String
+  description   String?
+  expenseDate   DateTime
+  amountMinor   Int
+  paidVia       String // cash | bank_transfer (§M20 "paid_via M09")
+  status        String            @default("pending")
+  autoApproved  Boolean           @default(false)
+  submittedById String // who recorded it
+  approvedById  String?
+  approvedAt    DateTime?
+  rejectReason  String?
+  voidedById    String?
+  voidedAt      DateTime?
+  voidReason    String?
+  receiptDocId  String?           @unique // M17 attachment (§M20 "attachment")
+  receiptDoc    DocumentRegistry? @relation(fields: [receiptDocId], references: [id])
+  ledgerTxId    String?           @unique
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([propertyId, expenseDate])
+  @@index([status])
+}
+
+/// Monthly budget per category (§M20 "budgets per property/category/month");
+/// variance vs actual appears on the P&L.
+model ExpenseBudget {
+  id          String          @id @default(cuid())
+  categoryId  String
+  category    ExpenseCategory @relation(fields: [categoryId], references: [id])
+  month       String // YYYY-MM
+  amountMinor Int
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([categoryId, month])
+}
+
+/// Recurring expense template — materializes one expense per month on/after
+/// dayOfMonth via the run endpoint (same approval rules apply).
+model RecurringExpense {
+  id           String          @id @default(cuid())
+  propertyId   String
+  property     Property        @relation(fields: [propertyId], references: [id])
+  categoryId   String
+  category     ExpenseCategory @relation(fields: [categoryId], references: [id])
+  vendorName   String
+  description  String?
+  amountMinor  Int
+  paidVia      String
+  dayOfMonth   Int // 1..28
+  lastRunMonth String?
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+/// ── Phase 17 · M24 Owner Statements ──────────────────────────────────────────
+
+/// Monthly payout accounting to owners (§M24). One per contract+month.
+/// Formula (per contract model): collected revenue for the owner's units
+/// × revenue share (or fixed master rent) − management fee − pass-through
+/// expenses − owner-borne maintenance ± adjustments = net payout.
+/// Flow: generation job (contract payoutCycleDay) → draft → approved
+/// (accrual DR 3900 / CR 2200) → paid (payout DR 2200 / CR cash|bank,
+/// refType `payout` — Owner Payable nets to 0). PDF auto-files to M17.
+model OwnerStatement {
+  id                     String        @id @default(cuid())
+  code                   String        @unique // STM-YYYY-NNNN
+  ownerProfileId         String
+  ownerProfile           OwnerProfile  @relation(fields: [ownerProfileId], references: [id])
+  contractId             String
+  contract               OwnerContract @relation(fields: [contractId], references: [id])
+  buildingId             String
+  building               Building      @relation(fields: [buildingId], references: [id])
+  propertyId             String
+  property               Property      @relation(fields: [propertyId], references: [id])
+  month                  String // YYYY-MM
+  status                 String        @default("draft")
+  collectedMinor         Int // collections confirmed in the month against the building's leases
+  grossShareMinor        Int // collected × share% | fixedRentMinor
+  managementFeeMinor     Int
+  passthroughMinor       Int // approved M20 expenses chargeTo=passthrough (building, month)
+  ownerMaintenanceMinor  Int // approved M20 expenses chargeTo=owner_maintenance
+  adjustmentsMinor       Int           @default(0)
+  netMinor               Int
+  adjustmentsReason      String?
+  lineSnapshot           String // JSON audit snapshot of the computation
+  ledgerTxId             String?       @unique // approval accrual
+  paidVia                String? // cash | bank_transfer
+  paidAt                 DateTime?
+  paidById               String?
+  statementDocId         String?       @unique // M17 PDF
+  generatedById          String?
+  approvedById           String?
+  approvedAt             DateTime?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  @@unique([contractId, month])
+  @@index([ownerProfileId, month])
+  @@index([propertyId, month])
+  @@index([status])
+}
+
+// ─────────────────────────── M25 Tenant Portal ───────────────────────────
+
+/// OTP login codes (§M25 "mobile-first web/PWA, OTP login"). Members have no
+/// password — an identifier (party email or phone) receives a 6-digit code;
+/// verification materializes the member's User (role MEMBER) and opens a
+/// normal M01 session. Codes are stored hashed, single-use, max 5 attempts.
+model MemberOtp {
+  id             String    @id @default(cuid())
+  identifier     String // normalized: lowercased email, or phone as given
+  channel        String    @default("email") // email | sms (delivery v1 = dev echo)
+  codeHash       String
+  memberProfileId String
+  memberProfile  MemberProfile @relation(fields: [memberProfileId], references: [id], onDelete: Cascade)
+  expiresAt      DateTime
+  attempts       Int       @default(0)
+  consumedAt     DateTime?
+  requestedIp    String?
+  createdAt      DateTime  @default(now())
+
+  @@index([identifier, consumedAt, createdAt])
+}
+
+/// Portal announcements (§M25 dashboard). propertyId null = all properties.
+/// Managed by M25:update holders (Admin+); read by members in scope.
+model Announcement {
+  id          String   @id @default(cuid())
+  propertyId  String?
+  property    Property? @relation(fields: [propertyId], references: [id])
+  title       String
+  body        String
+  publishedAt DateTime @default(now())
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([propertyId, publishedAt])
+}
+
+/// M21 Telegram bot — one-time link codes (§M21 "one-time link code in app →
+/// bot /link <code>"). Short-lived, single-use, bound to a member or owner
+/// profile; verification happens in the signed bot webhook.
+model TelegramLinkCode {
+  id             String    @id @default(cuid())
+  code           String    @unique // 8 chars A-Z2-9 (no 0/O/1/I)
+  principalType  String // member | owner
+  memberProfileId String?
+  memberProfile  MemberProfile? @relation("TelegramLinkCodes", fields: [memberProfileId], references: [id], onDelete: Cascade)
+  ownerProfileId String?
+  ownerProfile   OwnerProfile?  @relation("TelegramLinkCodes", fields: [ownerProfileId], references: [id], onDelete: Cascade)
+  expiresAt      DateTime
+  consumedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([principalType, memberProfileId, consumedAt])
+  @@index([principalType, ownerProfileId, consumedAt])
+}
+
+/// A bound bot chat (§M21 linking). chatId unique per bot; principal is the
+/// RBDC owner whose own data commands return. prefs = JSON template toggles
+/// (§M21 "per-user preference toggles").
+model TelegramLink {
+  id              String    @id @default(cuid())
+  chatId          String    @unique // Telegram chat id (string — may exceed int53 in theory)
+  telegramUserId  String?
+  displayName     String? // from.first_name / @username for the admin UI
+  principalType   String // member | owner | user
+  memberProfileId String?
+  memberProfile   MemberProfile? @relation("TelegramLinks", fields: [memberProfileId], references: [id], onDelete: Cascade)
+  ownerProfileId  String?
+  ownerProfile    OwnerProfile?  @relation("TelegramLinks", fields: [ownerProfileId], references: [id], onDelete: Cascade)
+  userId          String?
+  linkedUser      User?          @relation("TelegramLinks", fields: [userId], references: [id], onDelete: Cascade)
+  prefs           String    @default("{}") // JSON: {invoiceIssued,paymentReceived,overdueReminder,ticketUpdates,complaintUpdates,lowStock,statementReady,occupancyDigest}
+  linkedAt        DateTime  @default(now())
+  unlinkedAt      DateTime?
+
+  @@index([principalType, memberProfileId])
+  @@index([principalType, ownerProfileId])
+}
+
+/// Delivery record for every notification the bot attempted (§M21 events →
+/// templates). status: sent | mocked (dev token) | failed. Acceptance
+/// evidence ("member gets receipt message") reads this table.
+model TelegramOutbox {
+  id        String   @id @default(cuid())
+  chatId    String
+  template  String // invoice_issued | payment_received | overdue_reminder | ticket_update | complaint_update | low_stock | statement_ready | occupancy_digest | command_reply
+  body      String
+  status    String // sent | mocked | failed
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([chatId, createdAt])
+  @@index([template, createdAt])
+}

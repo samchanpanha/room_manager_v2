@@ -1,0 +1,49 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# RentManager — Docker Compose (local development)
+# ──────────────────────────────────────────────────────────────────────────────
+# Usage:
+#   docker compose up --build          # build + start (foreground)
+#   docker compose up -d --build       # build + start (detached)
+#   docker compose down                # stop + remove container
+#   docker compose logs -f rentmanager # follow logs
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+  rentmanager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rentmanager
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=file:/app/data/rentmanager.db
+      - NODE_ENV=production
+      - SESSION_TTL_DAYS=30
+      - FILE_SIGNING_SECRET=docker-file-signing-secret-change-me-in-prod
+      - PAYMENT_WEBHOOK_SECRET=docker-webhook-secret-change-me-in-prod
+      - TELEGRAM_BOT_TOKEN=dev-telegram-token
+      - TELEGRAM_WEBHOOK_SECRET=dev-telegram-secret
+      - TELEGRAM_BOT_USERNAME=RentManagerBot
+      - APP_BASE_URL=http://localhost:3000
+      - SETTINGS_ENC_KEY=docker-settings-enc-key-change-me-32b
+      - COOKIE_SECURE=false
+    volumes:
+      # Persistent SQLite database
+      - rentmanager-data:/app/data
+      # File storage (dev-disk driver)
+      - rentmanager-storage:/app/storage
+      # Backup snapshots
+      - rentmanager-backups:/app/backups
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)throw 1}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  rentmanager-data:
+  rentmanager-storage:
+  rentmanager-backups:

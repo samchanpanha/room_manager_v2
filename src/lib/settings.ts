@@ -1,0 +1,264 @@
+/// M28 Settings — typed, grouped, audited, forward-only.
+/// Non-secret config lives as JSON in `Setting` rows (group keys `m28.*`).
+/// Secret-typed values (payment credentials, Telegram bot token) are sealed
+/// with AES-256-GCM before storage and only ever leave the server masked
+/// (§15 v1.4b); reads fall back to the env var when no DB value is set.
+/// Rules (§M28): every change audited; financial-affecting groups require
+/// ADMIN (enforced by callers via hasModuleAccess M28:update); changes apply
+/// forward-only — posted history is never rewritten.
+import { prisma } from "@/lib/db";
+import { seal, open, maskSecret } from "@/lib/crypto/sealed";
+import { logAudit } from "@/lib/audit";
+import { env } from "@/lib/env";
+
+export interface ActorRef {
+  id?: string | null;
+  name: string;
+}
+
+interface GroupDefLike {
+  key: string;
+  defaults: object;
+}
+
+export interface OrgSettings {
+  name: string;
+  legalName: string;
+  address: string;
+  invoiceFooterNote: string;
+}
+
+export interface LocaleSettings {
+  currency: string;
+  timezone: string;
+  locale: string;
+}
+
+export interface BillingSettings {
+  invoicePrefix: string;
+  graceDays: number;
+  dunningDays: number[];
+}
+
+export interface LateFeeSettings {
+  mode: "none" | "flat" | "percent";
+  flatMinor: number;
+  monthlyPctBps: number;
+  maxMinor: number;
+}
+
+export interface RetentionSettings {
+  outboxDays: number;
+  eventDays: number;
+  otpDays: number;
+  sessionDays: number;
+}
+
+/// §M28 notification templates: per-event overrides for the Telegram notifier.
+/// Values support {var} placeholders (code, total, due, receipt, …); events
+/// without an override use the code-level default template.
+export type TemplateSettings = Record<string, string>;
+
+export const TEMPLATE_EVENTS = [
+  "invoice.issued",
+  "payment.confirmed",
+  "invoice.dunning_reminder"
+] as const;
+
+export type FeatureFlags = Record<string, boolean>;
+
+export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
+  M14: true, // POS
+  M15: true, // Stock
+  M21: true // Telegram bot
+};
+
+const ORG: GroupDefLike & { defaults: OrgSettings } = {
+  key: "m28.org",
+  defaults: { name: "RentManager Demo", legalName: "RentManager Demo Co., Ltd", address: "Phnom Penh, Cambodia", invoiceFooterNote: "Thank you for your tenancy." }
+};
+const LOCALE: GroupDefLike & { defaults: LocaleSettings } = {
+  key: "m28.locale",
+  defaults: { currency: "USD", timezone: "Asia/Phnom_Penh", locale: "en" }
+};
+const BILLING: GroupDefLike & { defaults: BillingSettings } = {
+  key: "m28.billing",
+  defaults: { invoicePrefix: "", graceDays: 3, dunningDays: [3, 7, 14] }
+};
+const LATE_FEE: GroupDefLike & { defaults: LateFeeSettings } = {
+  key: "m28.lateFee",
+  defaults: { mode: "none", flatMinor: 0, monthlyPctBps: 0, maxMinor: 0 }
+};
+const RETENTION: GroupDefLike & { defaults: RetentionSettings } = {
+  key: "m28.retention",
+  defaults: { outboxDays: 90, eventDays: 365, otpDays: 7, sessionDays: 30 }
+};
+const FEATURES: GroupDefLike & { defaults: FeatureFlags } = { key: "m28.features", defaults: DEFAULT_FEATURE_FLAGS };
+const TEMPLATES: GroupDefLike & { defaults: TemplateSettings } = { key: "m28.templates", defaults: {} };
+const PROVIDERS: GroupDefLike & { defaults: Record<string, string> } = { key: "m28.providers", defaults: {} };
+
+const GROUPS: Record<SettingsGroupName, GroupDefLike> = { org: ORG, locale: LOCALE, billing: BILLING, lateFee: LATE_FEE, retention: RETENTION, features: FEATURES, templates: TEMPLATES };
+
+export type SettingsGroupName = "org" | "locale" | "billing" | "lateFee" | "retention" | "features" | "templates";
+
+async function readGroup<T extends object>(def: GroupDefLike): Promise<T> {
+  const row = await prisma.setting.findUnique({ where: { key: def.key } });
+  if (!row) return { ...def.defaults } as T;
+  try {
+    return { ...def.defaults, ...(JSON.parse(row.value) as object) } as T;
+  } catch {
+    return { ...def.defaults } as T;
+  }
+}
+
+async function writeGroup<T extends object>(def: GroupDefLike, value: T, actor: ActorRef, ip: string | null, summary: string): Promise<void> {
+  const before = await readGroup(def);
+  await prisma.setting.upsert({
+    where: { key: def.key },
+    create: { key: def.key, value: JSON.stringify(value), updatedBy: actor.id ?? actor.name },
+    update: { value: JSON.stringify(value), updatedBy: actor.id ?? actor.name }
+  });
+  await logAudit({
+    actorId: actor.id ?? null,
+    actorName: actor.name,
+    module: "M28",
+    action: "update",
+    entityType: "setting",
+    entityId: def.key,
+    summary,
+    before,
+    after: value,
+    ip
+  });
+}
+
+export async function getSettings(): Promise<{
+  org: OrgSettings;
+  locale: LocaleSettings;
+  billing: BillingSettings;
+  lateFee: LateFeeSettings;
+  retention: RetentionSettings;
+  features: FeatureFlags;
+  templates: TemplateSettings;
+  providers: { paymentCredentials: { configured: boolean; last4: string | null }; telegramBotToken: { configured: boolean; last4: string | null } };
+}> {
+  const [org, locale, billing, lateFee, retention, features, templates, providers] = await Promise.all([
+    readGroup<OrgSettings>(ORG),
+    readGroup<LocaleSettings>(LOCALE),
+    readGroup<BillingSettings>(BILLING),
+    readGroup<LateFeeSettings>(LATE_FEE),
+    readGroup<RetentionSettings>(RETENTION),
+    readGroup<FeatureFlags>(FEATURES),
+    readGroup<TemplateSettings>(TEMPLATES),
+    readGroup<Record<string, string>>(PROVIDERS)
+  ]);
+  return {
+    org,
+    locale,
+    billing,
+    lateFee,
+    retention,
+    features,
+    templates,
+    providers: {
+      paymentCredentials: maskSecret(providers.paymentCredentials ?? null),
+      telegramBotToken: maskSecret(providers.telegramBotToken ?? null)
+    }
+  };
+}
+
+export async function updateSettings(
+  group: SettingsGroupName,
+  patch: Record<string, unknown>,
+  actor: ActorRef,
+  ip: string | null
+): Promise<void> {
+  const def = GROUPS[group];
+  const current = await readGroup<Record<string, unknown>>(def);
+  if (group === "templates") {
+    const next: TemplateSettings = { ...(current as TemplateSettings) };
+    for (const [k, v] of Object.entries(patch)) {
+      if (TEMPLATE_EVENTS.includes(k as (typeof TEMPLATE_EVENTS)[number]) && typeof v === "string") {
+        if (v.trim().length === 0) delete next[k];
+        else next[k] = v.slice(0, 300);
+      }
+    }
+    await writeGroup(def, next, actor, ip, `Notification templates updated (${Object.keys(patch).join(", ") || "none"})`);
+    return;
+  }
+  if (group === "features") {
+    const next: FeatureFlags = { ...DEFAULT_FEATURE_FLAGS, ...(current as FeatureFlags), ...(patch as FeatureFlags) };
+    for (const k of Object.keys(next)) if (typeof next[k] !== "boolean") delete next[k];
+    await writeGroup(def, next, actor, ip, `Feature flags updated (${Object.keys(patch).join(", ") || "none"})`);
+    return;
+  }
+  const next = { ...current, ...patch };
+  await writeGroup(def, next, actor, ip, `Settings group "${group}" updated (${Object.keys(patch).join(", ")})`);
+}
+
+/// Secret-typed provider settings: `m28.providers` holds sealed values only.
+export async function setProviderSecret(
+  name: "paymentCredentials" | "telegramBotToken",
+  plaintext: string,
+  actor: ActorRef,
+  ip: string | null
+): Promise<void> {
+  const providers = await readGroup<Record<string, string>>(PROVIDERS);
+  const before = { [name]: maskSecret(providers[name] ?? null) };
+  providers[name] = seal(plaintext);
+  await prisma.setting.upsert({
+    where: { key: PROVIDERS.key },
+    create: { key: PROVIDERS.key, value: JSON.stringify(providers), updatedBy: actor.id ?? actor.name },
+    update: { value: JSON.stringify(providers), updatedBy: actor.id ?? actor.name }
+  });
+  await logAudit({
+    actorId: actor.id ?? null,
+    actorName: actor.name,
+    module: "M28",
+    action: "update",
+    entityType: "setting",
+    entityId: PROVIDERS.key,
+    summary: `Provider secret "${name}" rotated (value sealed, not logged)`,
+    before,
+    after: { [name]: maskSecret(providers[name]) },
+    ip
+  });
+}
+
+/// Plaintext accessor used by the runtime (Telegram sender, payment provider).
+/// DB value (sealed) wins over the env fallback.
+export async function getProviderSecret(name: "paymentCredentials" | "telegramBotToken"): Promise<string | null> {
+  const row = await prisma.setting.findUnique({ where: { key: PROVIDERS.key } });
+  if (row) {
+    try {
+      const providers = JSON.parse(row.value) as Record<string, string>;
+      if (providers[name]) {
+        const plain = open(providers[name]);
+        if (plain !== null) return plain;
+      }
+    } catch {
+      // fall through to env
+    }
+  }
+  if (name === "telegramBotToken") return env.TELEGRAM_BOT_TOKEN;
+  if (name === "paymentCredentials") return env.PAYMENT_WEBHOOK_SECRET;
+  return null;
+}
+
+/// §M28 notification templates: the override for an event with {var}
+/// placeholders filled from `vars`, or null when no override is configured.
+export async function getTemplateOverride(event: string, vars: Record<string, string | number>): Promise<string | null> {
+  const templates = await readGroup<TemplateSettings>(TEMPLATES);
+  const tpl = templates[event];
+  if (!tpl) return null;
+  return tpl.replace(/\{(\w+)\}/g, (m, key: string) => (key in vars ? String(vars[key]) : m));
+}
+
+export async function isModuleEnabled(moduleKey: string): Promise<boolean> {
+  const flags = await readGroup<FeatureFlags>(FEATURES);
+  return flags[moduleKey] !== false;
+}
+
+export async function getFeatureFlags(): Promise<FeatureFlags> {
+  return readGroup<FeatureFlags>(FEATURES);
+}

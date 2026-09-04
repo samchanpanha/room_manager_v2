@@ -1,0 +1,11 @@
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+npm-debug.log*
+storage/
+
+# M27 backups
+backups/

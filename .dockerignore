@@ -1,0 +1,59 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# RentManager — Docker ignore
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Dependencies (reinstalled in container)
+node_modules
+
+# Build output (rebuilt in container)
+.next
+
+# Git
+.git
+.gitignore
+
+# IDE / Editor
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation (not needed in image)
+docs/
+*.md
+!README.md
+
+# Tests
+tests/
+vitest.config.ts
+__snapshots__/
+
+# Dev/test databases (seed creates fresh data)
+prisma/dev.db
+prisma/test-billing.db
+test-billing.db
+
+# Storage objects (mounted as volume)
+storage/objects/
+
+# Backups (mounted as volume)
+backups/
+
+# Environment files (passed via docker-compose)
+.env
+.env.*
+
+# CI/CD
+.github/
+
+# Scripts not needed at runtime
+scripts/
+p22_ids.mts
+
+# TypeScript build info
+tsconfig.tsbuildinfo
