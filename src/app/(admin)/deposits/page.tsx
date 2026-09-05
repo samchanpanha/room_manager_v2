@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState, PageHeader, StatCard } from "@/components/ui/misc";
 import { formatMinor } from "@/lib/money";
 import { DepositActions } from "./deposit-actions";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 export const dynamic = "force-dynamic";
 
@@ -90,12 +91,20 @@ export default async function DepositsPage({
       <form method="get" className="mb-4 flex items-end gap-3 text-sm">
         <div className="space-y-1">
           <label htmlFor="df-status" className="text-xs text-muted-foreground">Status</label>
-          <select id="df-status" name="status" defaultValue={sp.status ?? ""} className="h-9 rounded-md border bg-background px-2">
-            <option value="">All</option>
-            {["pending", "billed", "held", "settled"].map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+          <SearchableSelect
+            id="df-status"
+            name="status"
+            defaultValue={sp.status ?? ""}
+            options={[
+              { value: "", label: "All" },
+              { value: "pending", label: "pending" },
+              { value: "billed", label: "billed" },
+              { value: "held", label: "held" },
+              { value: "settled", label: "settled" }
+            ]}
+            className="h-9 rounded-md border bg-background px-2"
+            placeholder="All"
+          />
         </div>
         <button type="submit" className="h-9 rounded-md bg-primary px-3 font-medium text-primary-foreground hover:bg-primary/90">
           Filter

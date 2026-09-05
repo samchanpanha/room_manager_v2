@@ -99,10 +99,24 @@ export type TemplateSettings = Record<string, string>;
 export const TEMPLATE_EVENTS = [
   "invoice.issued",
   "payment.confirmed",
-  "invoice.dunning_reminder"
+  "invoice.dunning_reminder",
+  "rent.reminder",
+  "rent.overdue"
 ] as const;
 
 export type FeatureFlags = Record<string, boolean>;
+
+/// Default page size for list tables (overridable per user session).
+export interface TableSettings {
+  pageSize: number;
+}
+
+/// Rent repayment alert horizons (M33): `aheadDays` = remind N days before
+/// the due date, `overdueDays` = flag as overdue N days after it passes.
+export interface RentAlertSettings {
+  aheadDays: number;
+  overdueDays: number;
+}
 
 export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
   M14: true, // POS
@@ -161,10 +175,12 @@ const UNITS: GroupDefLike & { defaults: UnitsSettings } = {
 const FEATURES: GroupDefLike & { defaults: FeatureFlags } = { key: "m28.features", defaults: DEFAULT_FEATURE_FLAGS };
 const TEMPLATES: GroupDefLike & { defaults: TemplateSettings } = { key: "m28.templates", defaults: {} };
 const PROVIDERS: GroupDefLike & { defaults: Record<string, string> } = { key: "m28.providers", defaults: {} };
+const TABLE: GroupDefLike & { defaults: TableSettings } = { key: "m28.table", defaults: { pageSize: 25 } };
+const RENT_ALERTS: GroupDefLike & { defaults: RentAlertSettings } = { key: "m28.alerts", defaults: { aheadDays: 3, overdueDays: 1 } };
 
-const GROUPS: Record<SettingsGroupName, GroupDefLike> = { org: ORG, locale: LOCALE, billing: BILLING, lateFee: LATE_FEE, retention: RETENTION, features: FEATURES, templates: TEMPLATES, printer: PRINTER, telegram: TELEGRAM_BOT, menu: MENU, units: UNITS };
+const GROUPS: Record<SettingsGroupName, GroupDefLike> = { org: ORG, locale: LOCALE, billing: BILLING, lateFee: LATE_FEE, retention: RETENTION, features: FEATURES, templates: TEMPLATES, printer: PRINTER, telegram: TELEGRAM_BOT, menu: MENU, units: UNITS, table: TABLE, alerts: RENT_ALERTS };
 
-export type SettingsGroupName = "org" | "locale" | "billing" | "lateFee" | "retention" | "features" | "templates" | "printer" | "telegram" | "menu" | "units";
+export type SettingsGroupName = "org" | "locale" | "billing" | "lateFee" | "retention" | "features" | "templates" | "printer" | "telegram" | "menu" | "units" | "table" | "alerts";
 
 async function readGroup<T extends object>(def: GroupDefLike): Promise<T> {
   const row = await prisma.setting.findUnique({ where: { key: def.key } });
@@ -209,9 +225,11 @@ export async function getSettings(): Promise<{
   telegram: TelegramBotSettings;
   menu: MenuSettings;
   units: UnitsSettings;
+  table: TableSettings;
+  rentAlerts: RentAlertSettings;
   providers: { paymentCredentials: { configured: boolean; last4: string | null }; telegramBotToken: { configured: boolean; last4: string | null } };
 }> {
-  const [org, locale, billing, lateFee, retention, features, templates, printer, telegram, menu, units, providers] = await Promise.all([
+  const [org, locale, billing, lateFee, retention, features, templates, printer, telegram, menu, units, table, rentAlerts, providers] = await Promise.all([
     readGroup<OrgSettings>(ORG),
     readGroup<LocaleSettings>(LOCALE),
     readGroup<BillingSettings>(BILLING),
@@ -223,6 +241,8 @@ export async function getSettings(): Promise<{
     readGroup<TelegramBotSettings>(TELEGRAM_BOT),
     readGroup<MenuSettings>(MENU),
     readGroup<UnitsSettings>(UNITS),
+    readGroup<TableSettings>(TABLE),
+    readGroup<RentAlertSettings>(RENT_ALERTS),
     readGroup<Record<string, string>>(PROVIDERS)
   ]);
   return {
@@ -237,6 +257,8 @@ export async function getSettings(): Promise<{
     telegram,
     menu,
     units,
+    table,
+    rentAlerts,
     providers: {
       paymentCredentials: maskSecret(providers.paymentCredentials ?? null),
       telegramBotToken: maskSecret(providers.telegramBotToken ?? null)

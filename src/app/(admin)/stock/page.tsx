@@ -95,7 +95,8 @@ export default async function StockPage() {
           supplierId: i.supplierId,
           supplierName: i.supplier?.name ?? null,
           propertyCode: i.property.code,
-          isActive: i.isActive
+          isActive: i.isActive,
+          imageDocId: i.imageDocId
         }))}
         categories={categories.map((c) => ({
           id: c.id,

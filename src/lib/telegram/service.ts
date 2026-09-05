@@ -26,7 +26,8 @@ export const DEFAULT_PREFS = {
   complaintUpdates: true,
   lowStock: true,
   statementReady: true,
-  occupancyDigest: false
+  occupancyDigest: false,
+  rentReminder: true // M33 monthly rent repayment alert
 } as const;
 
 export type Prefs = Partial<Record<keyof typeof DEFAULT_PREFS, boolean>>;
@@ -366,7 +367,9 @@ const MEMBER_EVENT_TEMPLATES = {
   "payment.confirmed": "paymentReceived",
   "invoice.dunning_reminder": "overdueReminder",
   "ticket.transitioned": "ticketUpdates",
-  "complaint.transitioned": "complaintUpdates"
+  "complaint.transitioned": "complaintUpdates",
+  "rent.reminder": "rentReminder",
+  "rent.overdue": "rentReminder"
 } as const;
 
 async function readCursor(): Promise<{ occurredAt: Date; id: string } | null> {
@@ -462,6 +465,33 @@ async function routeEventToChats(type: string, payload: Record<string, unknown>,
       return 0;
     }
     await sendTelegramMessage(link.chatId, body, memberTemplate.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`));
+    return 1;
+  }
+
+  // M33 rent repayment alerts: one message per open rent invoice, due-soon or
+  // overdue. Same member-link + pref gate as the billing events above.
+  if (type === "rent.reminder" || type === "rent.overdue") {
+    const inv = await prisma.invoice.findUnique({
+      where: { id: String(payload.invoiceId ?? "") },
+      select: { memberProfileId: true, code: true, amountDueMinor: true, dueDate: true }
+    });
+    if (!inv) return 0;
+    const dueDate = inv.dueDate ? inv.dueDate.toISOString().slice(0, 10) : "—";
+    const body =
+      type === "rent.reminder"
+        ? `💡 Rent due reminder: ${inv.code} — ${money(inv.amountDueMinor)} due ${dueDate}. Pay by QR in the portal, or send /pay.`
+        : `⚠️ Rent overdue: ${inv.code} — ${money(inv.amountDueMinor)} was due ${dueDate}. Please settle as soon as possible.`;
+    const finalBody = (await getTemplateOverride(type, { code: inv.code, due: money(inv.amountDueMinor), dueDate: dueDate })) ?? body;
+    const link = await prisma.telegramLink.findFirst({ where: { principalType: "member", memberProfileId: inv.memberProfileId, unlinkedAt: null } });
+    if (!link) {
+      skipped.noLink += 1;
+      return 0;
+    }
+    if (!prefEnabled(link, "rentReminder")) {
+      skipped.prefOff += 1;
+      return 0;
+    }
+    await sendTelegramMessage(link.chatId, finalBody, type === "rent.reminder" ? "rent_reminder" : "rent_overdue");
     return 1;
   }
 

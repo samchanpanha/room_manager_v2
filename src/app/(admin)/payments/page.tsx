@@ -9,6 +9,7 @@ import { EmptyState, PageHeader, StatCard } from "@/components/ui/misc";
 import { formatMinor } from "@/lib/money";
 import { timeAgo } from "@/lib/utils";
 import { PaymentActions, RecordPaymentButton } from "./payment-jobs";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 export const dynamic = "force-dynamic";
 
@@ -74,21 +75,38 @@ export default async function PaymentsPage({
       <form method="get" className="mb-4 flex flex-wrap items-end gap-3 text-sm">
         <div className="space-y-1">
           <label htmlFor="pf-status" className="text-xs text-muted-foreground">Status</label>
-          <select id="pf-status" name="status" defaultValue={sp.status ?? ""} className="h-9 rounded-md border bg-background px-2">
-            <option value="">All</option>
-            {["pending", "confirmed", "refunded", "failed"].map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+          <SearchableSelect
+            id="pf-status"
+            name="status"
+            defaultValue={sp.status ?? ""}
+            options={[
+              { value: "", label: "All" },
+              { value: "pending", label: "pending" },
+              { value: "confirmed", label: "confirmed" },
+              { value: "refunded", label: "refunded" },
+              { value: "failed", label: "failed" }
+            ]}
+            className="h-9 rounded-md border bg-background px-2"
+            placeholder="All"
+          />
         </div>
         <div className="space-y-1">
           <label htmlFor="pf-method" className="text-xs text-muted-foreground">Method</label>
-          <select id="pf-method" name="method" defaultValue={sp.method ?? ""} className="h-9 rounded-md border bg-background px-2">
-            <option value="">All</option>
-            {["cash", "bank_transfer", "qr", "card", "cheque"].map((m) => (
-              <option key={m} value={m}>{m.replaceAll("_", " ")}</option>
-            ))}
-          </select>
+          <SearchableSelect
+            id="pf-method"
+            name="method"
+            defaultValue={sp.method ?? ""}
+            options={[
+              { value: "", label: "All" },
+              { value: "cash", label: "cash" },
+              { value: "bank_transfer", label: "bank transfer" },
+              { value: "qr", label: "qr" },
+              { value: "card", label: "card" },
+              { value: "cheque", label: "cheque" }
+            ]}
+            className="h-9 rounded-md border bg-background px-2"
+            placeholder="All"
+          />
         </div>
         <button type="submit" className="h-9 rounded-md bg-primary px-3 font-medium text-primary-foreground hover:bg-primary/90">
           Filter

@@ -69,6 +69,24 @@ export const REPORTS: ReportDef[] = [
     ]
   },
   {
+    key: "overdue-not-paid",
+    title: "Overdue & not paid (rent)",
+    category: "finance",
+    source: "Invoice — open rent line items (issued/partial_paid/overdue) with amountDueMinor > 0; dueDate < today = overdue. Σ rows = Σ open rent dues (traceable to the 1300 Rent Receivable ledger balance)",
+    dateFiltered: false,
+    columns: [
+      { key: "invoice", label: "Invoice" },
+      { key: "member", label: "Member" },
+      { key: "property", label: "Property" },
+      { key: "lease", label: "Lease" },
+      { key: "rentMinor", label: "Rent due", numeric: true },
+      { key: "dueDate", label: "Due date" },
+      { key: "daysLate", label: "Days late", numeric: true },
+      { key: "dunningStage", label: "Dunning", numeric: true },
+      { key: "status", label: "Status" }
+    ]
+  },
+  {
     key: "move-pipeline",
     title: "Move-in / move-out pipeline",
     category: "ops",

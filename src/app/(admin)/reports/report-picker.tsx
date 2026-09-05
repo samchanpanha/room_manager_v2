@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input, Label, Select } from "@/components/ui/input";
+import { Input, Label } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 export interface ReportMeta {
   key: string;
@@ -52,14 +53,15 @@ export function ReportPicker({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="space-y-1.5">
           <Label htmlFor="rp-key">Report</Label>
-          <Select id="rp-key" value={key} onChange={(e) => setKey(e.target.value)}>
-            {reports.map((r) => (
-              <option key={r.key} value={r.key}>
-                {r.category === "ops" ? "OPS · " : "FIN · "}
-                {r.title}
-              </option>
-            ))}
-          </Select>
+          <SearchableSelect
+            id="rp-key"
+            aria-label="Report"
+            value={key}
+            onChange={setKey}
+            options={reports.map((r) => ({ value: r.key, label: `${r.category === "ops" ? "OPS" : "FIN"} · ${r.title}` }))}
+            placeholder="Search reports…"
+            emptyText="No matching report"
+          />
         </div>
         {meta?.dateFiltered ? (
           key === "pnl" || key === "expense-vs-budget" ? (
@@ -82,14 +84,15 @@ export function ReportPicker({
         ) : null}
         <div className="space-y-1.5">
           <Label htmlFor="rp-prop">Property</Label>
-          <Select id="rp-prop" value={propertyId} onChange={(e) => setPropertyId(e.target.value)}>
-            <option value="">All in your scope</option>
-            {properties.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
+          <SearchableSelect
+            id="rp-prop"
+            aria-label="Property"
+            value={propertyId}
+            onChange={setPropertyId}
+            options={[{ value: "", label: "All in your scope" }, ...properties.map((p) => ({ value: p.id, label: p.name }))]}
+            placeholder="Search property…"
+            emptyText="No matching property"
+          />
         </div>
       </div>
       <div className="flex items-center gap-2">

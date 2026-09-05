@@ -31,7 +31,9 @@ async function seedSettings(): Promise<void> {
     ["m28.templates", {}],
     ["billing.generation", { leadDays: 3 }],
     ["moves.moveFeeMinor", 2000],
-    ["features.modules", {}]
+    ["features.modules", {}],
+    ["m28.table", { pageSize: 25 }],
+    ["m28.alerts", { aheadDays: 3, overdueDays: 1 }]
   ];
   for (const [key, value] of settings) {
     await db.setting.upsert({
@@ -259,7 +261,8 @@ async function seedDocTypes(): Promise<void> {
     { id: "invoice", name: "Invoice PDF", kycRequired: false, requiresExpiry: false, sortOrder: 21 },
     { id: "receipt", name: "Receipt", kycRequired: false, requiresExpiry: false, sortOrder: 22 },
     { id: "inspection_report", name: "Inspection report", kycRequired: false, requiresExpiry: false, sortOrder: 23 },
-    { id: "statement", name: "Owner statement", kycRequired: false, requiresExpiry: false, sortOrder: 24 }
+    { id: "statement", name: "Owner statement", kycRequired: false, requiresExpiry: false, sortOrder: 24 },
+    { id: "stock_photo", name: "Stock item photo", kycRequired: false, requiresExpiry: false, sortOrder: 30 }
   ];
   for (const dt of docTypes) {
     await db.docType.upsert({ where: { id: dt.id }, create: dt, update: dt });
@@ -898,6 +901,51 @@ async function seedPortal(): Promise<void> {
   await db.announcement.create({ data: { title: "Welcome to the resident portal", body: "Pay rent by QR, raise maintenance tickets and track complaints right from your phone." } });
 }
 
+/// M32: default global rent modules + progressive rate ladders. Idempotent by
+/// unique slug / (moduleId, toMinutes, scope) — re-seeding never duplicates.
+async function seedStay(): Promise<void> {
+  const existing = await db.rentModule.count();
+  if (existing > 0) return;
+
+  const hourly = await db.rentModule.create({
+    data: {
+      name: "Hourly", slug: "hourly",
+      billingStrategy: "progressive",
+      minDurationMinutes: 120, maxDurationMinutes: 1440,
+      minGuests: 1, maxGuests: 4, sortOrder: 10
+    }
+  });
+  const overnight = await db.rentModule.create({
+    data: {
+      name: "Overnight", slug: "overnight",
+      billingStrategy: "progressive",
+      minDurationMinutes: 720, maxDurationMinutes: 2160,
+      minGuests: 1, maxGuests: 3, sortOrder: 20
+    }
+  });
+  const dayuse = await db.rentModule.create({
+    data: {
+      name: "Day-use", slug: "dayuse",
+      billingStrategy: "blended",
+      minDurationMinutes: 1440, maxDurationMinutes: 10080,
+      defaultDepositMinor: 2000,
+      minGuests: 1, maxGuests: 6, sortOrder: 30
+    }
+  });
+
+  const ladders: Record<string, Array<[number, number]>> = {
+    hourly: [[240, 2200], [480, 3800], [720, 5200], [960, 6400], [1200, 7600], [1440, 8800]],
+    overnight: [[1440, 12000], [2160, 18000]],
+    dayuse: [[720, 6800], [1440, 12000], [2880, 21600], [4320, 31200], [5760, 40800], [7200, 50400], [8640, 60000], [10080, 69600]]
+  };
+  for (const [slug, ladder] of Object.entries(ladders)) {
+    const mod = slug === "hourly" ? hourly : slug === "overnight" ? overnight : dayuse;
+    await db.stayRateRule.createMany({
+      data: ladder.map(([toMinutes, priceMinor]) => ({ moduleId: mod.id, toMinutes, priceMinor, effectiveFrom: new Date("2026-01-01T00:00:00.000Z") }))
+    });
+  }
+}
+
 async function main(): Promise<void> {
   const cellsUsed = Object.values(MATRIX).reduce((n, m) => n + Object.keys(m).length, 0);
   await seedSettings();
@@ -918,6 +966,7 @@ async function main(): Promise<void> {
   await seedExpenses();
   await seedStatements();
   await seedPortal();
+  await seedStay();
   await db.auditLog.create({
     data: {
       actorName: "system",

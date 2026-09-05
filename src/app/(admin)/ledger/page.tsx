@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, PageHeader, StatCard } from "@/components/ui/misc";
 import { formatMinor } from "@/lib/money";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 export const dynamic = "force-dynamic";
 
@@ -128,21 +129,39 @@ export default async function LedgerPage({
             <form method="get" className="mb-4 flex flex-wrap items-end gap-2 text-sm">
               <div className="space-y-1">
                 <label htmlFor="jf-account" className="text-xs text-muted-foreground">Account</label>
-                <select id="jf-account" name="account" defaultValue={sp.account ?? ""} className="h-9 rounded-md border bg-background px-2">
-                  <option value="">All</option>
-                  {ACCOUNT_OPTIONS.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  id="jf-account"
+                  name="account"
+                  defaultValue={sp.account ?? ""}
+                  options={[
+                    { value: "", label: "All" },
+                    ...ACCOUNT_OPTIONS.map((c) => ({ value: c, label: c }))
+                  ]}
+                  className="h-9 rounded-md border bg-background px-2"
+                  placeholder="All"
+                />
               </div>
               <div className="space-y-1">
                 <label htmlFor="jf-ref" className="text-xs text-muted-foreground">Ref type</label>
-                <select id="jf-ref" name="refType" defaultValue={sp.refType ?? ""} className="h-9 rounded-md border bg-background px-2">
-                  <option value="">All</option>
-                  {["invoice", "late_fee", "credit_note", "invoice_void", "payment", "refund", "deposit", "expense", "payout"].map((r) => (
-                    <option key={r} value={r}>{r.replaceAll("_", " ")}</option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  id="jf-ref"
+                  name="refType"
+                  defaultValue={sp.refType ?? ""}
+                  options={[
+                    { value: "", label: "All" },
+                    { value: "invoice", label: "invoice" },
+                    { value: "late_fee", label: "late fee" },
+                    { value: "credit_note", label: "credit note" },
+                    { value: "invoice_void", label: "invoice void" },
+                    { value: "payment", label: "payment" },
+                    { value: "refund", label: "refund" },
+                    { value: "deposit", label: "deposit" },
+                    { value: "expense", label: "expense" },
+                    { value: "payout", label: "payout" }
+                  ]}
+                  className="h-9 rounded-md border bg-background px-2"
+                  placeholder="All"
+                />
               </div>
               <div className="space-y-1">
                 <label htmlFor="jf-from" className="text-xs text-muted-foreground">From</label>

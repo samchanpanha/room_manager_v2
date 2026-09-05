@@ -133,3 +133,29 @@ export async function memberDashboard(memberId: string) {
   ]);
   return { lease, balanceMinor, deposit, openTickets, openComplaints, announcements, pendingMove };
 }
+
+/// M33 portal card: the member's own open *rent* invoices, nearest due-date
+/// first (`daysUntil` negative = overdue). Kept small and scoped to the member.
+export async function memberRentDue(memberId: string) {
+  const day = 24 * 60 * 60 * 1000;
+  const invs = await prisma.invoice.findMany({
+    where: {
+      memberProfileId: memberId,
+      status: { in: ["issued", "partial_paid", "overdue"] },
+      amountDueMinor: { gt: 0 },
+      isDeposit: false
+    },
+    include: { items: { where: { kind: "rent" }, select: { kind: true }, take: 1 } },
+    orderBy: { dueDate: "asc" }
+  });
+  const rows = invs
+    .filter((i) => i.items.length > 0)
+    .map((i) => ({
+      code: i.code,
+      amountDueMinor: i.amountDueMinor,
+      dueDate: i.dueDate?.toISOString().slice(0, 10) ?? null,
+      status: i.status,
+      daysUntil: i.dueDate ? Math.round((i.dueDate.getTime() - Date.now()) / day) : 0
+    }));
+  return { rows, totalMinor: rows.reduce((s, r) => s + r.amountDueMinor, 0) };
+}

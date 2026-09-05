@@ -18,6 +18,17 @@ const HEAVY_TX = { timeout: 20000, maxWait: 10000 };
 
 const DRAIN_ACCOUNT: Record<string, string> = { cash: ACC.CASH, qr: ACC.BANK, card: ACC.BANK };
 
+/// M32 stay tab target: booking must be confirmed/checked-in with posMode "tab".
+async function loadStayForTab(id: string) {
+  const booking = await prisma.stayBooking.findUnique({
+    where: { id },
+    select: { id: true, memberProfileId: true, posMode: true, status: true, tabInvoiceId: true }
+  });
+  if (!booking) return null;
+  if (booking.posMode !== "tab" || (booking.status !== "confirmed" && booking.status !== "checked_in")) return null;
+  return booking;
+}
+
 /// Open a cash-drawer session (one open session per property at a time).
 export async function openSession(
   input: { propertyId: string; openingFloatMinor: number },
@@ -102,6 +113,7 @@ export async function recordSale(
     method: string;
     lines: SaleLineInput[];
     memberProfileId?: string;
+    stayBookingId?: string;
     ref?: string;
     discountMinor?: number;
     discountLabel?: string;
@@ -142,11 +154,19 @@ export async function recordSale(
   const netMinor = totalMinor - discountMinor;
 
   let memberProfileId: string | null = null;
+  let stayBooking: Awaited<ReturnType<typeof loadStayForTab>> | null = null;
   if (input.method === "room_charge") {
-    if (!input.memberProfileId) return { ok: false, code: "MEMBER_REQUIRED", message: "room_charge needs the member to charge" };
-    const member = await prisma.memberProfile.findUnique({ where: { id: input.memberProfileId } });
-    if (!member) return { ok: false, code: "NOT_FOUND", message: "Member not found" };
-    memberProfileId = member.id;
+    if (!input.memberProfileId && !input.stayBookingId) return { ok: false, code: "MEMBER_REQUIRED", message: "room_charge needs a member or a stay tab to charge" };
+    const stayTab = input.stayBookingId ? await loadStayForTab(input.stayBookingId) : null;
+    if (input.stayBookingId && !stayTab) return { ok: false, code: "TAB_NOT_FOUND", message: "Stay tab not found or not charged via POS yet" };
+    if (stayTab) {
+      memberProfileId = stayTab.memberProfileId;
+      stayBooking = stayTab;
+    } else {
+      const member = await prisma.memberProfile.findUnique({ where: { id: input.memberProfileId! } });
+      if (!member) return { ok: false, code: "NOT_FOUND", message: "Member not found" };
+      memberProfileId = member.id;
+    }
   }
   if (input.method !== "room_charge" && input.ref != null && input.ref.trim().length === 0) input.ref = undefined;
 
@@ -192,6 +212,29 @@ export async function recordSale(
         }
       }
       if (input.method === "room_charge") {
+        if (stayBooking) {
+          // §M32 stay tab: F&B streams onto the booking's one settlement
+          // invoice (no ledger posting yet — the 1300/4900 entry happens once
+          // at checkout issue). Discount accumulates invoice-level.
+          const { appendTabLinesTx } = await import("./stay-service");
+          const invoiceId = await appendTabLinesTx(
+            tx,
+            stayBooking.id,
+            {
+              lines: computed.map((c) => ({
+                name: `${c.product.name} × ${c.qtyMilli / 1000} (POS ${code})`,
+                kind: "one_time",
+                qty: 1,
+                unitMinor: c.lineMinor,
+                amountMinor: c.lineMinor
+              })),
+              discountMinor
+            }
+          );
+          await tx.posSale.update({ where: { id: created.id }, data: { invoiceId } });
+          const tabInvoice = await tx.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+          return { created, invoiceCode: tabInvoice.code };
+        }
         // §M14 "charge to room": one-time line on the member's account —
         // a standalone issued invoice (append-only, no mutation of existing
         // invoices), posted 1300 / 4900 like every invoice issue.

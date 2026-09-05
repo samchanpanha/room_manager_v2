@@ -10,8 +10,8 @@ import {
 } from "@/lib/rbac/catalog";
 
 describe("RBDC default permission matrix (INTENT.md §5)", () => {
-  it("covers all 29 modules for Super Admin with F", () => {
-    expect(MODULES).toHaveLength(29);
+  it("covers all 31 modules for Super Admin with F", () => {
+    expect(MODULES).toHaveLength(31);
     for (const m of MODULES) expect(MATRIX.SUPER_ADMIN[m.key]).toBe("F");
   });
 
@@ -86,8 +86,8 @@ describe("RBDC default permission matrix (INTENT.md §5)", () => {
     ]);
   });
 
-  it("generates 261 permissions (29 modules × 9 actions)", () => {
-    expect(MODULES.length * ACTIONS.length).toBe(261);
+  it("generates 279 permissions (31 modules × 9 actions)", () => {
+    expect(MODULES.length * ACTIONS.length).toBe(279);
     // every expanded grant references a module×action that exists
     for (const role of DEFAULT_ROLES) {
       for (const p of expandRole(role.key)) {

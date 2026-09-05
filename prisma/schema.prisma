@@ -153,6 +153,9 @@ model Property {
   shifts               Shift[]
   attendanceRecords    AttendanceRecord[]
   attendanceExceptions AttendanceException[]
+  rentModules          RentModule[]
+  stayRateRules        StayRateRule[]
+  stayBookings         StayBooking[]
 }
 
 model Building {
@@ -200,6 +203,7 @@ model Room {
   roomMoves      RoomMove[]
   inspections    Inspection[]
   tickets        MaintenanceTicket[]
+  stays          StayBooking[]
 
   @@unique([floorId, number])
 }
@@ -294,6 +298,7 @@ model MemberProfile {
   complaints         Complaint[]
   posSales           PosSale[]
   otpCodes           MemberOtp[]
+  stays              StayBooking[]
   telegramLinkCodes  TelegramLinkCode[]  @relation("TelegramLinkCodes")
   telegramLinks      TelegramLink[]      @relation("TelegramLinks")
 
@@ -581,6 +586,8 @@ model Invoice {
   roomMove            RoomMove?
   posSale             PosSale?            @relation("PosSaleInvoice")
   isDeposit           Boolean             @default(false) // deposit invoice — excluded from the billing-period chain
+  stayBookingId       String?             @unique
+  stayBooking         StayBooking?        @relation("StayTabInvoice", fields: [stayBookingId], references: [id])
 
   @@index([leaseId, periodStart]) // uniqueness for live invoices enforced in the service tx (voided periods may be re-billed)
   @@index([status])
@@ -612,6 +619,99 @@ model CreditNote {
   createdById String?
 
   @@index([invoiceId])
+}
+
+// ─────────────────────── M32 Short Stays (rent modules) ───────────────────────
+
+/// Sellable room-occupancy catalogs: "hourly", "overnight", "day-use", "weekly".
+/// A module defines the min/max stay envelope and guest limits; pricing lives in
+/// StayRateRule progressive buckets. propertyId null = global catalog.
+model RentModule {
+  id              String           @id @default(cuid())
+  name            String
+  slug            String           @unique // stable, e.g. "hourly"
+  billingStrategy String           @default("progressive") // progressive (bucket table) | blended (bucket + full-day carry)
+  minDurationMinutes Int           @default(120)
+  maxDurationMinutes Int           @default(1440)
+  defaultDepositMinor Int          @default(0)
+  minGuests       Int              @default(1)
+  maxGuests       Int              @default(4)
+  sortOrder       Int              @default(0)
+  isActive        Boolean          @default(true)
+  propertyId      String?
+  property        Property?        @relation(fields: [propertyId], references: [id])
+  rates           StayRateRule[]
+  bookings        StayBooking[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([isActive])
+}
+
+/// Progressive duration-pricing bucket. Bucket rows are scoped progressively:
+/// each row covers [0 → toMinutes] and the engine takes the FIRST row whose
+/// toMinutes ≥ stay minutes (a 6h stay priced by the ≤12h bucket beats ≤4h×2).
+/// Blended overflow beyond the last bucket bills whole days at the day price
+/// (the bucket covering exactly 1440 minutes) + the remainder bucket. Scoped by
+/// property (null = global) and roomType (null = all types), effective-dated.
+model StayRateRule {
+  id             String      @id @default(cuid())
+  moduleId       String
+  module         RentModule  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  propertyId     String?
+  property       Property?   @relation(fields: [propertyId], references: [id])
+  roomType       String?     // null = applies to all room types; else STANDARD | DELUXE | STUDIO | SUITE
+  effectiveFrom  DateTime    @default(now())
+  effectiveThrough DateTime?
+  toMinutes      Int         // cumulative coverage upper bound (bucket boundary)
+  priceMinor     Int
+  isActive       Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([moduleId, toMinutes])
+}
+
+/// A short-stay booking: interval [checkIn, checkOut) over one room, priced by
+/// the module's rate buckets. Status machine (service-enforced):
+/// requested → confirmed → checked_in → checked_out; cancelled | no_show | void.
+/// Walk-in guests are resolved to a MemberProfile (auto-created when needed);
+/// guestName/phone are a human-readable snapshot. Every booking carries one
+/// settlement Invoice (tab): F&B streams in via POS room_charge when posMode=tab.
+model StayBooking {
+  id                String        @id @default(cuid())
+  code              String        @unique // STY-2026-0001
+  moduleId          String
+  module            RentModule    @relation(fields: [moduleId], references: [id])
+  roomId            String
+  room              Room          @relation(fields: [roomId], references: [id])
+  propertyId        String
+  property          Property      @relation(fields: [propertyId], references: [id])
+  memberProfileId   String
+  member            MemberProfile @relation(fields: [memberProfileId], references: [id])
+  guestName         String
+  guestPhone        String?
+  guestIdNumber     String?
+  checkIn           DateTime
+  checkOut          DateTime
+  guests            Int           @default(1)
+  status            String        @default("requested") // requested|confirmed|checked_in|checked_out|no_show|cancelled|void
+  priceSnapshotMinor Int          @default(0) // locked at confirm; recomputed on extend
+  dayPriceMinor     Int           @default(0)
+  depositMinor      Int           @default(0) // collected upfront; credited at checkout
+  posMode           String        @default("direct") // direct | tab
+  tabInvoiceId      String?       @unique
+  tabInvoice        Invoice?      @relation("StayTabInvoice")
+  checkedOutAt      DateTime?
+  voidReason        String?
+  notes             String?
+  createdById       String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([roomId, checkIn, checkOut])
+  @@index([memberProfileId])
+  @@index([status])
 }
 
 // ─────────────────────── M08 Ledger ───────────────────────
@@ -1198,6 +1298,9 @@ model StockItem {
   qtyMilli       Int                 @default(0) // on-hand (milli units)
   avgCostMilli   Int                 @default(0) // moving-average unit cost (minor×1000)
   minQtyMilli    Int                 @default(0) // low-stock alert threshold
+  /// Optional product photo — a DocumentRegistry row (entity STOCK_ITEM). The
+  /// blob itself lives in object storage; only the registry id is stored here.
+  imageDocId     String?
   supplierId     String?
   supplier       Supplier?           @relation(fields: [supplierId], references: [id])
   propertyId     String

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireMember, memberDashboard } from "@/lib/portal";
+import { requireMember, memberDashboard, memberRentDue } from "@/lib/portal";
 
 const money = (minor: number) => `$${(minor / 100).toFixed(2)}`;
 
@@ -9,6 +9,7 @@ const money = (minor: number) => `$${(minor / 100).toFixed(2)}`;
 export default async function PortalDashboardPage() {
   const { member } = await requireMember();
   const { lease, balanceMinor, deposit, openTickets, openComplaints, announcements, pendingMove } = await memberDashboard(member.id);
+  const rentDue = await memberRentDue(member.id);
 
   return (
     <div className="space-y-4">
@@ -28,6 +29,37 @@ export default async function PortalDashboardPage() {
           <span className={`text-2xl font-semibold tabular-nums ${balanceMinor > 0 ? "text-destructive" : "text-success"}`}>{money(balanceMinor)}</span>
           <Link href="/portal/invoices" className="text-sm underline underline-offset-4">
             {balanceMinor > 0 ? "Pay now →" : "View invoices →"}
+          </Link>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Rent repayment</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {rentDue.rows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No rent invoice is due right now.</p>
+          ) : (
+            <ul className="space-y-1.5 text-sm">
+              {rentDue.rows.slice(0, 3).map((r) => (
+                <li key={r.code} className="flex items-center justify-between gap-3">
+                  <span className="min-w-0 truncate">
+                    {r.code}
+                    <span className="text-xs text-muted-foreground"> · {r.dueDate ?? "no due date"}</span>
+                  </span>
+                  <span className="shrink-0 tabular-nums">
+                    {money(r.amountDueMinor)}{" "}
+                    <Badge variant={r.daysUntil < 0 ? "destructive" : r.daysUntil <= 3 ? "warning" : "secondary"}>
+                      {r.daysUntil < 0 ? `${Math.abs(r.daysUntil)}d late` : r.daysUntil === 0 ? "due today" : `in ${r.daysUntil}d`}
+                    </Badge>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Link href="/portal/invoices" className="inline-block text-xs underline underline-offset-4">
+            All invoices →
           </Link>
         </CardContent>
       </Card>

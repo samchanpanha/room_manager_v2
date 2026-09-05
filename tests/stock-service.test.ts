@@ -56,7 +56,7 @@ describe("M15 stock integrity", () => {
     if (!runnable) ctx.skip();
     const item = await prisma.stockItem.findUniqueOrThrow({ where: { id: colaItemId } });
     baseline = item.qtyMilli;
-    expect(item.unit).toBe("pcs");
+    expect(item.unit).toBe("can");
   });
 
   let afterPurchase = { qty: 0, avg: 0 };

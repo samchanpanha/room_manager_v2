@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useToast } from "@/components/toast";
 import { cn } from "@/lib/utils";
 
@@ -121,17 +122,13 @@ export function PoManager({ canWrite, defaultPropertyId, visibleProperties }: Po
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {visibleProperties.length > 1 && (
-            <select
-              className="h-9 rounded-md border bg-transparent px-2 text-sm"
+            <SearchableSelect
               value={propertyId ?? ""}
-              onChange={(e) => setPropertyId(e.target.value || null)}
-            >
-              {visibleProperties.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.code} · {p.name}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setPropertyId(v || null)}
+              options={visibleProperties.map((p) => ({ value: p.id, label: `${p.code} · ${p.name}` }))}
+              className="h-9 rounded-md border bg-transparent px-2 text-sm"
+              placeholder="Select property"
+            />
           )}
           {(["all", "draft", "placed", "received", "void"] as const).map((s) => (
             <Button key={s} size="sm" variant={status === s ? "default" : "outline"} onClick={() => setStatus(s)}>
@@ -271,10 +268,16 @@ function NewPoDialog({ open, onClose, propertyId, stockItems, suppliers, busy, o
         <div className="grid grid-cols-2 gap-2">
           <label className="space-y-1 text-sm">
             <span className="text-muted-foreground">Supplier (saved)</span>
-            <select className="h-9 w-full rounded-md border bg-transparent px-2 text-sm" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-              <option value="">— none —</option>
-              {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+            <SearchableSelect
+              value={supplierId}
+              onChange={setSupplierId}
+              options={[
+                { value: "", label: "— none —" },
+                ...suppliers.map((s) => ({ value: s.id, label: s.name }))
+              ]}
+              className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+              placeholder="Select supplier"
+            />
           </label>
           <label className="space-y-1 text-sm">
             <span className="text-muted-foreground">Or supplier name (free text)</span>
@@ -285,17 +288,20 @@ function NewPoDialog({ open, onClose, propertyId, stockItems, suppliers, busy, o
         <div className="space-y-2">
           {lines.map((l, i) => (
             <div key={i} className="flex items-center gap-2">
-              <select className="h-9 flex-1 rounded-md border bg-transparent px-2 text-sm" value={l.stockItemId} onChange={(e) => setLine(i, { stockItemId: e.target.value })}>
-                <option value="">— stock item —</option>
-                {stockItems.map((s) => {
-                  const usedElsewhere = lines.some((ll, li) => li !== i && ll.stockItemId === s.id);
-                  return (
-                    <option key={s.id} value={s.id} disabled={usedElsewhere}>
-                      {s.name} · on hand {qty(s.qtyMilli, s.unit)}
-                    </option>
-                  );
-                })}
-              </select>
+              <SearchableSelect
+                value={l.stockItemId}
+                onChange={(v) => setLine(i, { stockItemId: v })}
+                options={[
+                  { value: "", label: "— stock item —" },
+                  ...stockItems.map((s) => ({
+                    value: s.id,
+                    label: `${s.name} · on hand ${qty(s.qtyMilli, s.unit)}`,
+                    disabled: lines.some((ll, li) => li !== i && ll.stockItemId === s.id)
+                  }))
+                ]}
+                className="h-9 flex-1 rounded-md border bg-transparent px-2 text-sm"
+                placeholder="Select stock item"
+              />
               <Input type="number" className="w-28" min={1} value={l.qtyMilli === 0 ? "" : l.qtyMilli} placeholder="qty (milli)" onChange={(e) => setLine(i, { qtyMilli: Math.max(0, Math.round(Number(e.target.value) || 0)) })} />
               <Input type="number" className="w-28" min={0} value={l.unitCostMinor} placeholder="unit cost" onChange={(e) => setLine(i, { unitCostMinor: Math.max(0, Math.round(Number(e.target.value) || 0)) })} />
               <Button size="sm" variant="ghost" disabled={lines.length <= 1} onClick={() => setLines((prev) => prev.filter((_, xi) => xi !== i))}>

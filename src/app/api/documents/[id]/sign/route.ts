@@ -22,15 +22,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     resource = { propertyId: doc.propertyId };
   }
 
-  const g = await authorize("read", "M17", resource);
+  // Stock item photos are read under M15 (Stock) scope, not the documents
+  // module — any staff that can view a property's stock can fetch the photo.
+  const g = doc.entity === "STOCK_ITEM" ? await authorize("read", "M15", resource) : await authorize("read", "M17", resource);
   if (g.response) return g.response;
+
+  const auditModule = doc.entity === "STOCK_ITEM" ? "M15" : "M17";
 
   const token = signDownloadToken(doc.id);
   const expiresAt = new Date(Date.now() + SIGNED_URL_TTL_SECONDS * 1000);
   await logAudit({
     actorId: g.user.id,
     actorName: g.user.name,
-    module: "M17",
+    module: auditModule,
     action: "read",
     entityType: "document_signed_url",
     entityId: doc.id,

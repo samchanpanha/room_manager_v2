@@ -197,6 +197,45 @@ export async function runReport(key: string, filters: ReportFilters, scope: { gl
       break;
     }
 
+    case "overdue-not-paid": {
+      // Rent invoices overdue & unpaid (as-of now). Only invoices carrying a
+      // rent line item count — deposits and one-off charges are excluded.
+      const now = Date.now();
+      const invs = await prisma.invoice.findMany({
+        where: {
+          status: { in: ["issued", "partial_paid", "overdue"] },
+          amountDueMinor: { gt: 0 },
+          dueDate: { lt: new Date(now) },
+          propertyId: { in: propertyIds },
+          isDeposit: false
+        },
+        include: {
+          member: { include: { party: true, leases: { where: { status: { in: ["active", "notice"] } }, select: { code: true }, take: 1 } } },
+          property: true,
+          items: { where: { kind: "rent" }, select: { kind: true }, take: 1 }
+        },
+        orderBy: { dueDate: "asc" }
+      });
+      rows = invs
+        .filter((i) => i.items.length > 0 && i.dueDate)
+        .map((i) => ({
+          invoice: i.code,
+          member: i.member.party.name,
+          property: i.property.name,
+          lease: i.member.leases[0]?.code ?? "—",
+          rentMinor: money(i.amountDueMinor),
+          dueDate: i.dueDate!.toISOString().slice(0, 10),
+          daysLate: Math.floor((now - i.dueDate!.getTime()) / DAY),
+          dunningStage: i.dunningStage,
+          status: i.status
+        }));
+      summary.invoices = rows.length;
+      summary.overdueMinor = money(invs.filter((i) => i.items.length > 0 && i.dueDate).reduce((s, i) => s + i.amountDueMinor, 0));
+      const maxLate = rows.reduce((m, r) => Math.max(m, Number(r.daysLate)), 0);
+      summary.oldestInvoiceDaysLate = rows.length === 0 ? null : maxLate;
+      break;
+    }
+
     case "move-pipeline": {
       const propFilter = { propertyId: { in: propertyIds } };
       const [drafts, notice, prospects, roomMoves] = await Promise.all([

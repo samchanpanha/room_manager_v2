@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Input, Label, Select, Textarea } from "@/components/ui/input";
+import { Input, Label, Textarea } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useToast } from "@/components/toast";
 
 interface Props {
@@ -77,29 +78,26 @@ function PurchaseDialog({ busy, items, onDone }: { busy: boolean; items: { id: s
         >
           <div className="space-y-1.5">
             <Label htmlFor="po-item">Item</Label>
-            <Select
+            <SearchableSelect
               id="po-item"
               value={itemId}
-              onChange={(e) => {
-                setItemId(e.target.value);
+              onChange={(v) => {
+                setItemId(v);
                 setBuyUnit("unit");
               }}
               required
-            >
-              {items.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.label}
-                </option>
-              ))}
-            </Select>
+              options={items.map((i) => ({ value: i.id, label: i.label }))}
+            />
           </div>
           {pack ? (
             <div className="space-y-1.5">
               <Label htmlFor="po-buyunit">Purchase unit</Label>
-              <Select id="po-buyunit" value={buyUnit} onChange={(e) => setBuyUnit(e.target.value as "unit" | "pack")}>
-                <option value="unit">per {item!.unit}</option>
-                <option value="pack">per {pack.unit}</option>
-              </Select>
+              <SearchableSelect
+                id="po-buyunit"
+                value={buyUnit}
+                onChange={(v) => setBuyUnit(v as "unit" | "pack")}
+                options={[{ value: "unit", label: `per ${item!.unit}` }, { value: "pack", label: `per ${pack.unit}` }]}
+              />
               <p className="text-xs text-muted-foreground">
                 1 {pack.unit} = {pack.size} {item!.unit}
               </p>
@@ -151,13 +149,7 @@ function ConsumeDialog({ busy, items, onDone }: { busy: boolean; items: { id: st
         >
           <div className="space-y-1.5">
             <Label htmlFor="cn-item">Item</Label>
-            <Select id="cn-item" name="stockItemId" defaultValue={items[0]?.id} required>
-              {items.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.label}
-                </option>
-              ))}
-            </Select>
+            <SearchableSelect id="cn-item" name="stockItemId" defaultValue={items[0]?.id} required options={items.map((i) => ({ value: i.id, label: i.label }))} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="cn-qty">Quantity</Label>
@@ -200,23 +192,11 @@ function TransferDialog({ busy, items, onDone }: { busy: boolean; items: { id: s
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="tr-from">From</Label>
-              <Select id="tr-from" name="fromItemId" defaultValue={items[0]?.id} required>
-                {items.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.label}
-                  </option>
-                ))}
-              </Select>
+              <SearchableSelect id="tr-from" name="fromItemId" defaultValue={items[0]?.id} required options={items.map((i) => ({ value: i.id, label: i.label }))} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="tr-to">To</Label>
-              <Select id="tr-to" name="toItemId" defaultValue={items[1]?.id ?? items[0]?.id} required>
-                {items.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.label}
-                  </option>
-                ))}
-              </Select>
+              <SearchableSelect id="tr-to" name="toItemId" defaultValue={items[1]?.id ?? items[0]?.id} required options={items.map((i) => ({ value: i.id, label: i.label }))} />
             </div>
           </div>
           <div className="space-y-1.5">
@@ -274,14 +254,12 @@ function NewitemDialog({ busy, suppliers, properties, categories, units, onDone 
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ni-cat">Category</Label>
-              <Select id="ni-cat" name="categoryId" defaultValue="">
-                <option value="">— uncategorized</option>
-                {categories.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </Select>
+              <SearchableSelect
+                id="ni-cat"
+                name="categoryId"
+                defaultValue=""
+                options={[{ value: "", label: "— uncategorized" }, ...categories.map((c) => ({ value: c.value, label: c.label }))]}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ni-unit">Unit</Label>
@@ -311,24 +289,16 @@ function NewitemDialog({ busy, suppliers, properties, categories, units, onDone 
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ni-sup">Supplier</Label>
-              <Select id="ni-sup" name="supplierId" defaultValue="">
-                <option value="">—</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                  </option>
-                ))}
-              </Select>
+              <SearchableSelect
+                id="ni-sup"
+                name="supplierId"
+                defaultValue=""
+                options={[{ value: "", label: "—" }, ...suppliers.map((s) => ({ value: s.id, label: s.label }))]}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ni-prop">Property</Label>
-              <Select id="ni-prop" name="propertyId" defaultValue={properties[0]} required>
-                {properties.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </Select>
+              <SearchableSelect id="ni-prop" name="propertyId" defaultValue={properties[0]} required options={properties.map((p) => ({ value: p, label: p }))} />
             </div>
           </div>
           <div className="flex justify-end gap-2">
@@ -428,23 +398,11 @@ function PartDialog({
         >
           <div className="space-y-1.5">
             <Label htmlFor="pt-ticket">Ticket</Label>
-            <Select id="pt-ticket" name="ticketId" defaultValue={tickets[0]?.id} required>
-              {tickets.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </Select>
+            <SearchableSelect id="pt-ticket" name="ticketId" defaultValue={tickets[0]?.id} required options={tickets.map((t) => ({ value: t.id, label: t.label }))} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="pt-item">Part</Label>
-            <Select id="pt-item" name="stockItemId" defaultValue={items[0]?.id} required>
-              {items.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.label}
-                </option>
-              ))}
-            </Select>
+            <SearchableSelect id="pt-item" name="stockItemId" defaultValue={items[0]?.id} required options={items.map((i) => ({ value: i.id, label: i.label }))} />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">

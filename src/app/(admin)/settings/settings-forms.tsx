@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { getSettings } from "@/lib/settings";
 
 type Settings = Awaited<ReturnType<typeof getSettings>>;
@@ -56,6 +57,12 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
     "invoice.dunning_reminder": settings.templates["invoice.dunning_reminder"] ?? ""
   });
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("pageSize:global", String(settings.table.pageSize));
+    }
+  }, [settings.table.pageSize]);
+
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <Card>
@@ -74,15 +81,17 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
             <Input value={org.logo} disabled={!canWrite} onChange={(e) => setOrg({ ...org, logo: e.target.value })} />
           </Field>
           <Field label="Invoice layout template">
-            <select
-              className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+            <SearchableSelect
               value={org.invoiceTemplate}
+              onChange={(v) => setOrg({ ...org, invoiceTemplate: v })}
+              options={[
+                { value: "classic", label: "Classic (A4, black & white)" },
+                { value: "modern", label: "Modern (branded header card)" }
+              ]}
+              className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
               disabled={!canWrite}
-              onChange={(e) => setOrg({ ...org, invoiceTemplate: e.target.value })}
-            >
-              <option value="classic">Classic (A4, black &amp; white)</option>
-              <option value="modern">Modern (branded header card)</option>
-            </select>
+              placeholder="Select template"
+            />
           </Field>
           <Field label="Invoice / receipt footer note"><Input value={org.invoiceFooterNote} disabled={!canWrite} onChange={(e) => setOrg({ ...org, invoiceFooterNote: e.target.value })} /></Field>
           {canWrite && <Button size="sm" disabled={busy} onClick={() => void save("org", org, "Org profile saved")}>Save org</Button>}
@@ -142,15 +151,17 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
         <CardContent className="space-y-3">
           <p className="text-xs text-muted-foreground">Receipt and barcode-label printing. Paper width controls thermal slip sizing for printed PDFs / browser window.print().</p>
           <Field label="Receipt paper width">
-            <select
+            <SearchableSelect
+              value={String(printer.paperWidthMm)}
+              onChange={(v) => setPrinter({ ...printer, paperWidthMm: Number(v) })}
+              options={[
+                { value: "58", label: "58 mm (2¼″)" },
+                { value: "80", label: "80 mm (3″)" }
+              ]}
               className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-              value={printer.paperWidthMm}
               disabled={!canWrite}
-              onChange={(e) => setPrinter({ ...printer, paperWidthMm: Number(e.target.value) })}
-            >
-              <option value={58}>58 mm (2¼″)</option>
-              <option value={80}>80 mm (3″)</option>
-            </select>
+              placeholder="Select width"
+            />
           </Field>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={printer.autoPrintReceipt} disabled={!canWrite} onChange={(e) => setPrinter({ ...printer, autoPrintReceipt: e.target.checked })} />
@@ -268,6 +279,36 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
           </div>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Table defaults</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <Field label="Default page size">
+            <select
+              className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+              value={settings.table.pageSize}
+              disabled={!canWrite}
+              onChange={(e) => void save("table", { pageSize: Number(e.target.value) }, "Table defaults saved")}
+            >
+              {[10, 25, 50, 100].map((n) => (
+                <option key={n} value={n}>{n} rows</option>
+              ))}
+            </select>
+          </Field>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Rent repayment alerts (M33)</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <Field label="Remind ahead (days)">
+            <Input type="number" value={settings.rentAlerts.aheadDays} disabled={!canWrite} onChange={(e) => void save("alerts", { aheadDays: Number(e.target.value) }, "Alert horizon saved")} />
+          </Field>
+          <Field label="Flag overdue after (days)">
+            <Input type="number" value={settings.rentAlerts.overdueDays} disabled={!canWrite} onChange={(e) => void save("alerts", { overdueDays: Number(e.target.value) }, "Alert horizon saved")} />
+          </Field>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -332,16 +373,26 @@ export function OpeningBalanceForm({ accounts, canWrite }: { accounts: Array<{ c
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">Posts one balanced <code>opening</code> ledger transaction. Forward-only — mistakes are corrected by a reversing adjustment, never a rewrite.</p>
         <div className="flex items-center gap-2">
-          <select className="h-9 rounded-md border bg-transparent px-2 text-sm" value={c1} disabled={!canWrite} onChange={(e) => setC1(e.target.value)}>
-            {accounts.map((a) => <option key={a.code} value={a.code}>{a.code} {a.name}</option>)}
-          </select>
+          <SearchableSelect
+            value={c1}
+            onChange={setC1}
+            options={accounts.map((a) => ({ value: a.code, label: `${a.code} ${a.name}` }))}
+            className="h-9 rounded-md border bg-transparent px-2 text-sm"
+            disabled={!canWrite}
+            placeholder="Select account"
+          />
           <Input type="number" className="w-28" value={a1} disabled={!canWrite} onChange={(e) => setA1(e.target.value)} />
           <span className="text-sm text-muted-foreground">debit</span>
         </div>
         <div className="flex items-center gap-2">
-          <select className="h-9 rounded-md border bg-transparent px-2 text-sm" value={c2} disabled={!canWrite} onChange={(e) => setC2(e.target.value)}>
-            {accounts.map((a) => <option key={a.code} value={a.code}>{a.code} {a.name}</option>)}
-          </select>
+          <SearchableSelect
+            value={c2}
+            onChange={setC2}
+            options={accounts.map((a) => ({ value: a.code, label: `${a.code} ${a.name}` }))}
+            className="h-9 rounded-md border bg-transparent px-2 text-sm"
+            disabled={!canWrite}
+            placeholder="Select account"
+          />
           <Input type="number" className="w-28" value={a2} disabled={!canWrite} onChange={(e) => setA2(e.target.value)} />
           <span className="text-sm text-muted-foreground">credit</span>
         </div>

@@ -72,6 +72,7 @@ export function moduleIcon(key?: string): IconName {
     case "M27": return "shield";
     case "M28": return "sliders";
     case "M29": return "file-plus";
+    case "M32": return "clock";
     case "OWNER_PORTAL": return "external";
     case "HOME": return "home";
     default: return "sparkle";

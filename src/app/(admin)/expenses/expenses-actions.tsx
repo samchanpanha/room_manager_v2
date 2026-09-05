@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Input, Label, Select } from "@/components/ui/input";
+import { Input, Label } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useToast } from "@/components/toast";
 
 async function post(url: string, body: unknown): Promise<{ ok: boolean; message?: string }> {
@@ -87,23 +88,11 @@ function NewExpense({ busy, properties, categories, onDone }: { busy: boolean; p
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="ex-prop">Property</Label>
-              <Select id="ex-prop" name="propertyId" defaultValue={properties[0]?.id} required>
-                {properties.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </Select>
+              <SearchableSelect id="ex-prop" name="propertyId" defaultValue={properties[0]?.id} required options={properties.map((p) => ({ value: p.id, label: p.label }))} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ex-cat">Category</Label>
-              <Select id="ex-cat" name="categoryId" defaultValue={categories[0]?.id} required>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </Select>
+              <SearchableSelect id="ex-cat" name="categoryId" defaultValue={categories[0]?.id} required options={categories.map((c) => ({ value: c.id, label: c.label }))} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ex-vendor">Vendor</Label>
@@ -119,10 +108,7 @@ function NewExpense({ busy, properties, categories, onDone }: { busy: boolean; p
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ex-via">Paid via</Label>
-              <Select id="ex-via" name="paidVia" defaultValue="cash">
-                <option value="cash">Cash</option>
-                <option value="bank_transfer">Bank transfer</option>
-              </Select>
+              <SearchableSelect id="ex-via" name="paidVia" defaultValue="cash" options={[{ value: "cash", label: "Cash" }, { value: "bank_transfer", label: "Bank transfer" }]} />
             </div>
           </div>
           <div className="space-y-1.5">
@@ -160,13 +146,7 @@ function ApproveDialog({ busy, pending, onDone }: { busy: boolean; pending: { id
         >
           <div className="space-y-1.5">
             <Label htmlFor="exap-exp">Pending expense</Label>
-            <Select id="exap-exp" value={id} onChange={(e) => setId(e.target.value)} required>
-              {pending.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </Select>
+            <SearchableSelect id="exap-exp" value={id} onChange={setId} required options={pending.map((p) => ({ value: p.id, label: p.label }))} />
           </div>
           <Button type="submit" disabled={busy}>
             Approve + post
@@ -196,13 +176,7 @@ function RejectDialog({ busy, pending, onDone }: { busy: boolean; pending: { id:
         >
           <div className="space-y-1.5">
             <Label htmlFor="exre-exp">Pending expense</Label>
-            <Select id="exre-exp" value={id} onChange={(e) => setId(e.target.value)} required>
-              {pending.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </Select>
+            <SearchableSelect id="exre-exp" value={id} onChange={setId} required options={pending.map((p) => ({ value: p.id, label: p.label }))} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="exre-reason">Reason</Label>
@@ -236,13 +210,7 @@ function VoidDialog({ busy, approved, onDone }: { busy: boolean; approved: { id:
         >
           <div className="space-y-1.5">
             <Label htmlFor="exvo-exp">Approved expense</Label>
-            <Select id="exvo-exp" value={id} onChange={(e) => setId(e.target.value)} required>
-              {approved.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.label}
-                </option>
-              ))}
-            </Select>
+            <SearchableSelect id="exvo-exp" value={id} onChange={setId} required options={approved.map((a) => ({ value: a.id, label: a.label }))} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="exvo-reason">Reason</Label>
@@ -275,13 +243,7 @@ function NewCategory({ busy, properties, onDone }: { busy: boolean; properties: 
         >
           <div className="space-y-1.5">
             <Label htmlFor="exc-prop">Property</Label>
-            <Select id="exc-prop" name="propertyId" defaultValue={properties[0]?.id} required>
-              {properties.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </Select>
+            <SearchableSelect id="exc-prop" name="propertyId" defaultValue={properties[0]?.id} required options={properties.map((p) => ({ value: p.id, label: p.label }))} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="exc-name">Name</Label>
@@ -289,10 +251,7 @@ function NewCategory({ busy, properties, onDone }: { busy: boolean; properties: 
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="exc-acc">Ledger account</Label>
-            <Select id="exc-acc" name="accountCode" defaultValue="5000">
-              <option value="5000">5000 · Operating expenses</option>
-              <option value="5100">5100 · Bank fees</option>
-            </Select>
+            <SearchableSelect id="exc-acc" name="accountCode" defaultValue="5000" options={[{ value: "5000", label: "5000 · Operating expenses" }, { value: "5100", label: "5100 · Bank fees" }]} />
           </div>
           <Button type="submit" disabled={busy}>
             Create
@@ -321,13 +280,7 @@ function BudgetDialog({ busy, categories, month, onDone }: { busy: boolean; cate
         >
           <div className="space-y-1.5">
             <Label htmlFor="exb-cat">Category</Label>
-            <Select id="exb-cat" name="categoryId" defaultValue={categories[0]?.id} required>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </Select>
+            <SearchableSelect id="exb-cat" name="categoryId" defaultValue={categories[0]?.id} required options={categories.map((c) => ({ value: c.id, label: c.label }))} />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
@@ -375,23 +328,11 @@ function RecurringDialog({ busy, properties, categories, onDone }: { busy: boole
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="exr-prop">Property</Label>
-              <Select id="exr-prop" name="propertyId" defaultValue={properties[0]?.id} required>
-                {properties.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </Select>
+              <SearchableSelect id="exr-prop" name="propertyId" defaultValue={properties[0]?.id} required options={properties.map((p) => ({ value: p.id, label: p.label }))} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="exr-cat">Category</Label>
-              <Select id="exr-cat" name="categoryId" defaultValue={categories[0]?.id} required>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </Select>
+              <SearchableSelect id="exr-cat" name="categoryId" defaultValue={categories[0]?.id} required options={categories.map((c) => ({ value: c.id, label: c.label }))} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="exr-vendor">Vendor</Label>
@@ -403,10 +344,7 @@ function RecurringDialog({ busy, properties, categories, onDone }: { busy: boole
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="exr-via">Paid via</Label>
-              <Select id="exr-via" name="paidVia" defaultValue="bank_transfer">
-                <option value="cash">Cash</option>
-                <option value="bank_transfer">Bank transfer</option>
-              </Select>
+              <SearchableSelect id="exr-via" name="paidVia" defaultValue="bank_transfer" options={[{ value: "cash", label: "Cash" }, { value: "bank_transfer", label: "Bank transfer" }]} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="exr-day">Run day (1–28)</Label>
@@ -440,13 +378,7 @@ function RunRecurring({ busy, recurring, onDone }: { busy: boolean; recurring: {
         >
           <div className="space-y-1.5">
             <Label htmlFor="exrr-rec">Template</Label>
-            <Select id="exrr-rec" value={id} onChange={(e) => setId(e.target.value)} required>
-              {recurring.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.label}
-                </option>
-              ))}
-            </Select>
+            <SearchableSelect id="exrr-rec" value={id} onChange={setId} required options={recurring.map((r) => ({ value: r.id, label: r.label }))} />
           </div>
           <Button type="submit" disabled={busy}>
             Run now

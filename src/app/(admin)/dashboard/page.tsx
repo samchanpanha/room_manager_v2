@@ -11,6 +11,7 @@ import { can } from "@/lib/rbac/can";
 import { ROOM_STATUSES } from "@/lib/rooms/status";
 import { getDashboardKpis } from "@/lib/reports/service";
 import { reportScope } from "@/lib/reports/scope";
+import { rentDuesForScopes } from "@/lib/alerts/service";
 import { getFeatureFlags, getSettings } from "@/lib/settings";
 import { moduleAccent } from "@/lib/tabs";
 import { navIcon } from "@/lib/icons";
@@ -50,6 +51,9 @@ export default async function DashboardPage() {
 
   const stubCount = NAV.flatMap((g) => g.items).filter((i) => i.phase).length;
 
+  const canReadAlerts = dashUser ? can(dashUser, "read", "M33") : false;
+  const rentDues = dashUser && dashScope.allowed && canReadAlerts ? await rentDuesForScopes(dashScope.propertyIds, settings.rentAlerts.aheadDays) : null;
+
   const quickLaunch = NAV.flatMap((g) => g.items).filter(
     (i) => i.href && (!i.module || (dashUser && can(dashUser, "read", i.module) && flags[i.module] !== false))
   );
@@ -87,6 +91,63 @@ export default async function DashboardPage() {
           <StatCard label="Open tickets" value={kpis.openTickets} sub="maintenance (M19)" />
           <StatCard label="Occupancy (M26)" value={`${kpis.occupancyPct}%`} sub="same room-status source" />
         </div>
+      ) : null}
+
+      {rentDues ? (
+        <Card className="mt-4" data-tour="rent-dues">
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-base">Rent dues (M33)</CardTitle>
+            <span className="text-xs text-muted-foreground">
+              within next {settings.rentAlerts.aheadDays} days · upcoming {formatMinor(rentDues.upcomingTotalMinor, settings.locale.currency)} · overdue {formatMinor(rentDues.overdueTotalMinor, settings.locale.currency)}
+            </span>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <p className="mb-2 text-xs font-medium text-muted-foreground">Due soon</p>
+                {rentDues.upcoming.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nothing due in the next {settings.rentAlerts.aheadDays} days.</p>
+                ) : (
+                  <ul className="space-y-1.5 text-sm">
+                    {rentDues.upcoming.slice(0, 5).map((d) => (
+                      <li key={d.invoiceId} className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate">
+                          {d.memberName} · {d.invoiceCode}
+                          {d.leaseCode ? ` · ${d.leaseCode}` : ""}
+                        </span>
+                        <span className="shrink-0 tabular-nums">
+                          {formatMinor(d.amountDueMinor, settings.locale.currency)} <Badge variant={d.daysUntil <= 1 ? "warning" : "outline"}>{d.daysUntil === 0 ? "due today" : `in ${d.daysUntil}d`}</Badge>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-medium text-muted-foreground">Overdue</p>
+                {rentDues.overdue.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No overdue rent invoices.</p>
+                ) : (
+                  <ul className="space-y-1.5 text-sm">
+                    {rentDues.overdue.slice(0, 5).map((d) => (
+                      <li key={d.invoiceId} className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate">
+                          {d.memberName} · {d.invoiceCode} · {d.propertyName}
+                        </span>
+                        <span className="shrink-0 tabular-nums">
+                          {formatMinor(d.amountDueMinor, settings.locale.currency)} <Badge variant="destructive">{Math.abs(d.daysUntil)}d late</Badge>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <Link href="/reports?key=overdue-not-paid" className="mt-3 inline-block text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground">
+              Open the overdue-not-paid report →
+            </Link>
+          </CardContent>
+        </Card>
       ) : null}
 
       <Card className="mt-6" data-tour="launch">

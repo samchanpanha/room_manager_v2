@@ -8,7 +8,7 @@ import { canSeeReport, reportScope } from "@/lib/reports/scope";
 import { ReportPdf } from "@/lib/reports/report-pdf";
 
 const querySchema = z.object({
-  format: z.enum(["csv", "pdf"]).default("csv"),
+  format: z.enum(["csv", "pdf", "xlsx"]).default("csv"),
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
@@ -41,6 +41,29 @@ export async function GET(req: Request, ctx: { params: Promise<{ key: string }> 
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="${key}-${stamp}.csv"`
+      }
+    });
+  }
+
+  if (parsed.data.format === "xlsx") {
+    const { utils, write } = await import("xlsx");
+    const header = result.columns.map((c) => c.label);
+    const body = result.rows.map((r) => result.columns.map((c) => r[c.key]));
+    const sheet = utils.aoa_to_sheet([header, ...body, ...Object.entries(result.summary)]);
+    try {
+      sheet["!cols"] = result.columns.map((c, _i) => ({
+        wch: Math.max(10, c.label.length, ...result.rows.map((r) => String(r[c.key] ?? "").length))
+      }));
+    } catch {
+      // width hinting is best-effort
+    }
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, sheet, key.slice(0, 31));
+    const buffer = write(wb, { type: "buffer", bookType: "xlsx", compression: true }) as Buffer;
+    return new Response(new Uint8Array(buffer), {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="${key}-${stamp}.xlsx"`
       }
     });
   }

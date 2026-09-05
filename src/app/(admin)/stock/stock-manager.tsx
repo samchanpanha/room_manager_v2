@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
-import { Input, Label, Select } from "@/components/ui/input";
+import { Input, Label } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/toast";
 import { formatMinor } from "@/lib/money";
@@ -26,6 +27,7 @@ export interface StockItemRow {
   supplierName: string | null;
   propertyCode: string;
   isActive: boolean;
+  imageDocId: string | null;
 }
 
 export interface MovementRow {
@@ -82,6 +84,8 @@ export function StockManager({ items, categories, suppliers, properties, units, 
   const [catFilter, setCatFilter] = useState("");
   const [lowOnly, setLowOnly] = useState(false);
   const [editItem, setEditItem] = useState<StockItemRow | "new" | null>(null);
+  const [photoRow, setPhotoRow] = useState<StockItemRow | null>(null);
+  const photoUrls = useRef<Record<string, string | null>>({});
   const [catDialog, setCatDialog] = useState<{ action: "create" | "edit"; parentId?: string; category?: CategoryNode } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -124,6 +128,50 @@ export function StockManager({ items, categories, suppliers, properties, units, 
     }
   }
 
+  async function openPhoto(item: StockItemRow) {
+    setPhotoRow(item);
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/stock/items/${item.id}/image`);
+      const data = (await res.json().catch(() => ({}))) as { url?: string };
+      photoUrls.current[item.id] = data.url ?? null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function uploadPhoto(file: File) {
+    if (!photoRow) return;
+    setBusy(true);
+    const fd = new FormData();
+    fd.set("file", file);
+    const res = await fetch(`/api/stock/items/${photoRow.id}/image`, { method: "POST", body: fd });
+    const data = (await res.json().catch(() => ({}))) as { message?: string };
+    if (!res.ok) {
+      push({ title: "Failed", description: data.message, variant: "destructive" });
+      setBusy(false);
+      return;
+    }
+    push({ title: "Photo uploaded", variant: "success" });
+    const urlRes = await fetch(`/api/stock/items/${photoRow.id}/image`);
+    const urlData = (await urlRes.json().catch(() => ({}))) as { url?: string };
+    photoUrls.current[photoRow.id] = urlData.url ?? null;
+    setBusy(false);
+    router.refresh();
+  }
+
+  async function removePhoto() {
+    if (!photoRow) return;
+    setBusy(true);
+    const res = await fetch(`/api/stock/items/${photoRow.id}/image`, { method: "DELETE" });
+    setBusy(false);
+    push(res.ok ? { title: "Photo removed", variant: "success" } : { title: "Failed to remove photo", variant: "destructive" });
+    if (res.ok) {
+      photoUrls.current[photoRow.id] = null;
+      router.refresh();
+    }
+  }
+
   async function deleteCategory(c: CategoryNode) {
     setBusy(true);
     const r = await send(`/api/stock/categories/${c.id}`, "DELETE", {});
@@ -156,14 +204,15 @@ export function StockManager({ items, categories, suppliers, properties, units, 
         <>
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Input className="max-w-64" placeholder="Search name, category, supplier…" value={search} onChange={(e) => setSearch(e.target.value)} />
-            <Select className="max-w-48" value={catFilter} onChange={(e) => setCatFilter(e.target.value)}>
-              <option value="">All categories</option>
-              {catOptions.map((c) => (
-                <option key={c.value} value={c.label.trim()}>
-                  {c.label}
-                </option>
-              ))}
-            </Select>
+            <SearchableSelect
+              aria-label="Filter by category"
+              className="max-w-48"
+              value={catFilter}
+              onChange={setCatFilter}
+              options={[{ value: "", label: "All categories" }, ...catOptions.map((c) => ({ value: c.label.trim(), label: c.label }))]}
+              placeholder="All categories"
+              emptyText="No matching category"
+            />
             <label className="flex items-center gap-1.5 text-xs">
               <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)} /> low only
             </label>
@@ -175,6 +224,7 @@ export function StockManager({ items, categories, suppliers, properties, units, 
                 <TableHeader>
                   <TableRow>
                     <TableHead>Item</TableHead>
+                    <TableHead>Photo</TableHead>
                     <TableHead>Supplier</TableHead>
                     <TableHead className="text-right">On hand</TableHead>
                     <TableHead className="text-right">Low</TableHead>
@@ -195,6 +245,11 @@ export function StockManager({ items, categories, suppliers, properties, units, 
                             {i.packUnit && i.packSize ? ` · 1 ${i.packUnit} = ${i.packSize} ${i.unit}` : ""} · {i.propertyCode}
                             {!i.isActive ? " · archived" : ""}
                           </span>
+                        </TableCell>
+                        <TableCell>
+                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={busy} onClick={() => void openPhoto(i)}>
+                            {i.imageDocId ? "photo ✓" : "photo"}
+                          </Button>
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">{i.supplierName ?? "—"}</TableCell>
                         <TableCell className="text-right tabular-nums">
@@ -220,7 +275,7 @@ export function StockManager({ items, categories, suppliers, properties, units, 
                   })}
                   {filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={canWrite ? 8 : 7} className="py-8 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={canWrite ? 9 : 8} className="py-8 text-center text-sm text-muted-foreground">
                         No stock items match.
                       </TableCell>
                     </TableRow>
@@ -397,6 +452,19 @@ export function StockManager({ items, categories, suppliers, properties, units, 
         </Card>
       ) : null}
 
+      {photoRow ? (
+        <PhotoDialog
+          item={photoRow}
+          url={photoUrls.current[photoRow.id] ?? null}
+          busy={busy}
+          canWrite={canWrite}
+          hint="PNG / JPEG / WEBP, up to 10 MB. The photo is stored privately and shown only to staff with stock access."
+          onClose={() => setPhotoRow(null)}
+          onUpload={uploadPhoto}
+          onRemove={removePhoto}
+        />
+      ) : null}
+
       {editItem ? (
         <ItemDialog
           item={editItem}
@@ -480,14 +548,14 @@ function ItemDialog({
           </div>
           <div className="space-y-1.5">
             <Label>Category</Label>
-            <Select value={catValue} onChange={(e) => setCatValue(e.target.value)}>
-              <option value="">— uncategorized</option>
-              {categories.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </Select>
+            <SearchableSelect
+              aria-label="Item category"
+              value={catValue}
+              onChange={setCatValue}
+              options={[{ value: "", label: "— uncategorized" }, ...categories]}
+              placeholder="Search category…"
+              emptyText="No matching category"
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Unit</Label>
@@ -517,14 +585,14 @@ function ItemDialog({
           </div>
           <div className="space-y-1.5">
             <Label>Supplier</Label>
-            <Select value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-              <option value="">—</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </Select>
+            <SearchableSelect
+              aria-label="Supplier"
+              value={supplierId}
+              onChange={setSupplierId}
+              options={[{ value: "", label: "—" }, ...suppliers.map((s) => ({ value: s.id, label: s.label }))]}
+              placeholder="Search supplier…"
+              emptyText="No matching supplier"
+            />
           </div>
           {!isNew ? (
             <label className="flex items-center gap-2 pt-6 text-sm">
@@ -595,28 +663,26 @@ function CategoryDialog({
           </div>
           <div className="space-y-1.5">
             <Label>{isNew ? "Parent (optional)" : "Parent"}</Label>
-            <Select value={parent} onChange={(e) => setParent(e.target.value)}>
-              <option value="">— root</option>
-              {categories
-                .filter((c) => c.value !== category?.id)
-                .map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-            </Select>
+            <SearchableSelect
+              aria-label="Parent category"
+              value={parent}
+              onChange={setParent}
+              options={[{ value: "", label: "— root" }, ...categories.filter((c) => c.value !== category?.id)]}
+              placeholder="Search parent category…"
+              emptyText="No matching category"
+            />
           </div>
           {isNew ? (
             <div className="space-y-1.5">
               <Label>Scope</Label>
-              <Select value={propertyId} onChange={(e) => setPropertyId(e.target.value)}>
-                <option value="">Shared (all properties / till)</option>
-                {properties.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.code}
-                  </option>
-                ))}
-              </Select>
+              <SearchableSelect
+                aria-label="Category scope"
+                value={propertyId}
+                onChange={setPropertyId}
+                options={[{ value: "", label: "Shared (all properties / till)" }, ...properties.map((p) => ({ value: p.id, label: p.code }))]}
+                placeholder="Search property…"
+                emptyText="No matching property"
+              />
             </div>
           ) : (
             <label className="flex items-center gap-2 pt-6 text-sm">
@@ -634,6 +700,71 @@ function CategoryDialog({
           </Button>
         </div>
       </form>
+    </Dialog>
+  );
+}
+
+function PhotoDialog({
+  item,
+  url,
+  busy,
+  canWrite,
+  hint,
+  onClose,
+  onUpload,
+  onRemove
+}: {
+  item: StockItemRow;
+  url: string | null;
+  busy: boolean;
+  canWrite: boolean;
+  hint: string;
+  onClose: () => void;
+  onUpload: (file: File) => Promise<void>;
+  onRemove: () => Promise<void>;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  return (
+    <Dialog open onClose={onClose} title={`Photo — ${item.name}`} description={hint}>
+      <div className="space-y-4">
+        <div className="flex min-h-40 items-center justify-center rounded-md border bg-muted/40 p-4">
+          {url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={url} alt={item.name} className="max-h-72 rounded-md object-contain" />
+          ) : (
+            <p className="text-sm text-muted-foreground">No photo yet — {canWrite ? "upload one below." : "ask a staff member to add one."}</p>
+          )}
+        </div>
+        {canWrite ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void onUpload(f).then(() => {
+                  if (fileRef.current) fileRef.current.value = "";
+                });
+              }}
+            />
+            <Button size="sm" disabled={busy} onClick={() => fileRef.current?.click()}>
+              {url ? "Replace photo" : "Upload photo"}
+            </Button>
+            {url ? (
+              <Button size="sm" variant="outline" disabled={busy} onClick={() => void onRemove()}>
+                Remove
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
     </Dialog>
   );
 }

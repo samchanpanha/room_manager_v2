@@ -11,6 +11,7 @@ const schema = z.object({
   method: z.enum(["cash", "qr", "card", "room_charge"]),
   lines: z.array(z.object({ productId: z.string().min(1), qty: z.coerce.number().positive().max(10_000) })).min(1).max(50),
   memberProfileId: z.string().min(1).optional(),
+  stayBookingId: z.string().min(1).optional(),
   ref: z.string().max(120).optional(),
   discountMinor: z.number().int().min(0).max(100_000_000).optional(),
   discountLabel: z.string().max(80).optional()
@@ -24,7 +25,7 @@ export async function GET(req: Request) {
   const sessionId = url.searchParams.get("sessionId");
   const sales = await prisma.posSale.findMany({
     where: sessionId ? { sessionId } : {},
-    include: { items: true, member: { include: { party: true } } },
+    include: { items: true, member: { include: { party: true } }, invoice: { select: { stayBooking: { select: { code: true } } } } },
     orderBy: { createdAt: "desc" },
     take: 100
   });
@@ -38,6 +39,7 @@ export async function GET(req: Request) {
       discountLabel: s.discountLabel,
       member: s.member ? s.member.party.name : null,
       invoiceId: s.invoiceId,
+      tabCode: s.invoice?.stayBooking?.code ?? null,
       receiptDocId: s.receiptDocId,
       createdAt: s.createdAt,
       lines: s.items.map((i) => ({ name: i.name, qtyMilli: i.qtyMilli, lineMinor: i.lineMinor }))
@@ -60,6 +62,7 @@ export async function POST(req: Request) {
       method: parsed.data.method,
       lines: parsed.data.lines.map((l) => ({ productId: l.productId, qtyMilli: Math.round(l.qty * 1000) })),
       memberProfileId: parsed.data.memberProfileId,
+      stayBookingId: parsed.data.stayBookingId,
       ref: parsed.data.ref,
       discountMinor: parsed.data.discountMinor,
       discountLabel: parsed.data.discountLabel

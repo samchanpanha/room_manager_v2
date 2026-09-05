@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { storage, isAllowedMime, MAX_UPLOAD_BYTES } from "@/lib/storage";
 
-export const DOC_ENTITIES = ["MEMBER", "LEASE", "ROOM", "OWNER", "CONTRACT", "INVOICE", "PAYMENT", "INSPECTION", "SALE", "EXPENSE", "STATEMENT"] as const;
+export const DOC_ENTITIES = ["MEMBER", "LEASE", "ROOM", "OWNER", "CONTRACT", "INVOICE", "PAYMENT", "INSPECTION", "SALE", "EXPENSE", "STATEMENT", "STOCK_ITEM"] as const;
 export type DocEntity = (typeof DOC_ENTITIES)[number];
 
 export function isDocEntity(v: string): v is DocEntity {
