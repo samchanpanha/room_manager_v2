@@ -1289,6 +1289,9 @@ model PosProduct {
   name        String        @unique
   priceMinor  Int
   category    String?
+  barcode     String?   @unique // EAN-13 / UPC / SKU for scanning + label printing
+  sku         String? // human-friendly stock-keeping unit
+  description String?
   stockItemId String? // sales decrement this stock item
   stockItem   StockItem?    @relation(fields: [stockItemId], references: [id])
   isActive    Boolean       @default(true)

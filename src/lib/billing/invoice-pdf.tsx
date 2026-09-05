@@ -6,6 +6,15 @@ export interface InvoicePdfData {
   code: string;
   status: string;
   orgName: string;
+  orgLegalName?: string;
+  orgAddress?: string;
+  orgPhone?: string;
+  orgEmail?: string;
+  orgWebsite?: string;
+  orgTaxId?: string;
+  orgLogo?: string; // data URL or empty
+  invoiceFooterNote?: string;
+  invoiceTemplate?: string; // "classic" | "modern"
   currency: string;
   memberName: string;
   memberEmail: string | null;
@@ -26,10 +35,15 @@ export interface InvoicePdfData {
 
 const styles = StyleSheet.create({
   page: { padding: 42, fontSize: 10, fontFamily: "Helvetica", color: "#111827" },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 },
+  brandBlock: { flex: 1, paddingRight: 16 },
   brand: { fontSize: 18, fontFamily: "Helvetica-Bold", marginBottom: 2 },
-  tagline: { fontSize: 9, color: "#6B7280", marginBottom: 14 },
+  legal: { fontSize: 9, color: "#6B7280", marginBottom: 2 },
+  contact: { fontSize: 8, color: "#6B7280", marginBottom: 1 },
+  logo: { width: 96, height: 96, objectFit: "contain", marginBottom: 4 },
+  titleBlock: { alignItems: "flex-end" },
   title: { fontSize: 14, fontFamily: "Helvetica-Bold", marginBottom: 2 },
-  code: { fontSize: 9, color: "#6B7280", marginBottom: 12 },
+  code: { fontSize: 9, color: "#6B7280", marginBottom: 12, textAlign: "right" },
   sectionTitle: { fontSize: 10, fontFamily: "Helvetica-Bold", marginTop: 12, marginBottom: 5, paddingBottom: 3, borderBottomWidth: 1, borderBottomColor: "#E5E7EB" },
   row: { flexDirection: "row", marginBottom: 3 },
   label: { width: 110, color: "#6B7280" },
@@ -51,7 +65,14 @@ const styles = StyleSheet.create({
   footer: { position: "absolute", bottom: 24, left: 42, right: 42, textAlign: "center", fontSize: 8, color: "#9CA3AF" },
   payQrWrap: { position: "absolute", bottom: 48, right: 42, alignItems: "center", width: 110 },
   payQr: { width: 84, height: 84 },
-  payQrCaption: { marginTop: 4, fontSize: 6.5, color: "#6B7280", textAlign: "center" }
+  payQrCaption: { marginTop: 4, fontSize: 6.5, color: "#6B7280", textAlign: "center" },
+  modernBand: { backgroundColor: "#111827", borderRadius: 6, padding: 16, paddingBottom: 12, marginBottom: 14 },
+  modernBrand: { fontSize: 17, fontFamily: "Helvetica-Bold", color: "#FFFFFF", marginBottom: 1 },
+  modernLegal: { fontSize: 9, color: "#D1D5DB", marginBottom: 1 },
+  modernContact: { fontSize: 8, color: "#9CA3AF", marginBottom: 1 },
+  modernRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 8 },
+  modernTitle: { fontSize: 15, fontFamily: "Helvetica-Bold", color: "#FFFFFF" },
+  modernCode: { fontSize: 8, color: "#D1D5DB", textAlign: "right" }
 });
 
 function money(minor: number, currency: string): string {
@@ -66,16 +87,68 @@ function fmt(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function InvoicePdf({ data }: { data: InvoicePdfData }) {
+function InvoiceHeader({ data }: { data: InvoicePdfData }) {
+  if (data.invoiceTemplate === "modern") {
+    return (
+      <View style={styles.modernBand}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text style={styles.modernBrand}>{data.orgName}</Text>
+            {data.orgLegalName ? <Text style={styles.modernLegal}>{data.orgLegalName}</Text> : null}
+            {data.orgAddress ? <Text style={styles.modernContact}>{data.orgAddress}</Text> : null}
+            {(data.orgPhone || data.orgEmail || data.orgWebsite) ? (
+              <Text style={styles.modernContact}>
+                {[data.orgPhone, data.orgEmail, data.orgWebsite].filter(Boolean).join(" · ")}
+              </Text>
+            ) : null}
+            {data.orgTaxId ? <Text style={styles.modernContact}>Tax ID: {data.orgTaxId}</Text> : null}
+          </View>
+          {data.orgLogo ? (
+            // eslint-disable-next-line jsx-a11y/alt-text
+            <Image src={data.orgLogo} style={styles.logo} />
+          ) : null}
+        </View>
+        <View style={styles.modernRow}>
+          <Text style={styles.modernTitle}>Invoice</Text>
+          <Text style={styles.modernCode}>
+            {data.code}
+            {"\n"}status: {data.status}
+          </Text>
+        </View>
+      </View>
+    );
+  }
   return (
-    <Document title={`Invoice ${data.code}`} author="RentManager">
-      <Page size="A4" style={styles.page}>
+    <View style={styles.headerRow}>
+      <View style={styles.brandBlock}>
+        {data.orgLogo ? (
+          // eslint-disable-next-line jsx-a11y/alt-text
+          <Image src={data.orgLogo} style={styles.logo} />
+        ) : null}
         <Text style={styles.brand}>{data.orgName}</Text>
-        <Text style={styles.tagline}>Rental &amp; co-living operations — billing document</Text>
+        {data.orgLegalName ? <Text style={styles.legal}>{data.orgLegalName}</Text> : null}
+        {data.orgAddress ? <Text style={styles.contact}>{data.orgAddress}</Text> : null}
+        {data.orgPhone ? <Text style={styles.contact}>{data.orgPhone}</Text> : null}
+        {data.orgEmail ? <Text style={styles.contact}>{data.orgEmail}</Text> : null}
+        {data.orgWebsite ? <Text style={styles.contact}>{data.orgWebsite}</Text> : null}
+        {data.orgTaxId ? <Text style={styles.contact}>Tax ID: {data.orgTaxId}</Text> : null}
+      </View>
+      <View style={styles.titleBlock}>
         <Text style={styles.title}>Invoice</Text>
         <Text style={styles.code}>
-          {data.code} · status: {data.status}
+          {data.code}
+          {"\n"}status: {data.status}
         </Text>
+      </View>
+    </View>
+  );
+}
+
+export function InvoicePdf({ data }: { data: InvoicePdfData }) {
+  return (
+    <Document title={`Invoice ${data.code}`} author={data.orgName}>
+      <Page size="A4" style={styles.page}>
+        <InvoiceHeader data={data} />
 
         <View style={styles.row}>
           <Text style={styles.label}>Billed to</Text>
@@ -157,7 +230,9 @@ export function InvoicePdf({ data }: { data: InvoicePdfData }) {
         ) : null}
 
         <Text style={styles.footer}>
-          {data.orgName} · invoice {data.code} · total = Σ items − discount + tax · generated by RentManager
+          {data.invoiceFooterNote
+            ? `${data.invoiceFooterNote} · ${data.orgName} · ${data.orgPhone ? `tel ${data.orgPhone} · ` : ""}invoice ${data.code}`
+            : `${data.orgName} · invoice ${data.code} · total = Σ items − discount + tax · generated by RentManager`}
         </Text>
       </Page>
     </Document>

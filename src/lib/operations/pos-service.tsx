@@ -8,6 +8,7 @@ import { emitDomainEvent } from "@/lib/events";
 import { nextNumber } from "@/lib/numbering";
 import { postTransaction } from "@/lib/ledger/service";
 import { ACC } from "@/lib/ledger/accounts";
+import { getSettings } from "@/lib/settings";
 import type { ActorCtx } from "@/lib/payments/service";
 import * as React from "react";
 
@@ -252,8 +253,9 @@ export async function recordSale(
   return { ok: true, data: { code, saleId: sale.created.id, totalMinor, invoiceCode: sale.invoiceCode } };
 }
 
-/// Receipt PDF (M17 registry, entity SALE, docType receipt).
-export async function fileSaleReceipt(saleId: string): Promise<void> {
+/// Render the receipt PDF bytes for a sale. `copies` (1–12) repeats the slip
+/// on its own page so a single thermal print job produces N receipts.
+export async function buildSaleReceiptBytes(saleId: string, copies = 1): Promise<Buffer> {
   const { renderToBuffer } = await import("@react-pdf/renderer");
   const { PosReceiptPdf } = await import("./pos-receipt-pdf");
   const sale = await prisma.posSale.findUnique({
@@ -261,14 +263,26 @@ export async function fileSaleReceipt(saleId: string): Promise<void> {
     include: { items: true, property: true, member: { include: { party: true } }, session: true }
   });
   if (!sale) throw new Error("Sale not found");
-  const org = await prisma.setting.findUnique({ where: { key: "org.profile" } });
-  const orgProfile = org ? (JSON.parse(org.value) as { name?: string; currency?: string }) : {};
+  const { org, printer, locale } = await getSettings();
+  const barcode = await prisma.posProduct
+    .findFirst({ where: { id: { in: sale.items.map((i) => i.productId).filter(Boolean) }, barcode: { not: null } }, orderBy: { createdAt: "asc" } })
+    .then((p) => p?.barcode ?? undefined)
+    .catch(() => undefined);
 
-  const buffer = await renderToBuffer(
+  return renderToBuffer(
     <PosReceiptPdf
+      copies={copies}
       data={{
         code: sale.code,
-        orgName: orgProfile.name ?? "RentManager",
+        orgName: org.name ?? "RentManager",
+        orgAddress: org.address || undefined,
+        orgPhone: org.phone || undefined,
+        orgTaxId: org.taxId || undefined,
+        orgLogo: org.logo || undefined,
+        orgFooterNote: org.invoiceFooterNote || "Thank you!",
+        printerWidthMm: printer.paperWidthMm ?? 58,
+        currency: locale.currency ?? "USD",
+        barcode: barcode ? (await import("@/lib/barcode")).ean13PngDataUrl(barcode, { scale: 3, height: 64 }) : undefined,
         propertyName: sale.property.name,
         method: sale.method,
         totalMinor: sale.totalMinor,
@@ -279,8 +293,15 @@ export async function fileSaleReceipt(saleId: string): Promise<void> {
       }}
     />
   );
+}
+
+/// Receipt PDF (M17 registry, entity SALE, docType receipt).
+export async function fileSaleReceipt(saleId: string): Promise<void> {
+  const buffer = await buildSaleReceiptBytes(saleId, 1);
   const existing = await prisma.documentRegistry.findFirst({ where: { entity: "SALE", entityId: saleId, docTypeId: "receipt" } });
   if (existing) return;
+  const sale = await prisma.posSale.findUnique({ where: { id: saleId }, select: { code: true, propertyId: true } });
+  if (!sale) throw new Error("Sale not found");
   const { randomBytes } = await import("node:crypto");
   const storageKey = randomBytes(16).toString("hex");
   const { storage } = await import("@/lib/storage");

@@ -6,6 +6,7 @@
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/db";
 import { createPayment } from "@/lib/payments/service";
+import { getSettings } from "@/lib/settings";
 import { resolveProvider } from "./adapter";
 import type { ActorCtx } from "@/lib/payments/service";
 
@@ -49,8 +50,7 @@ export async function createInvoiceQr(
     idempotencyKey = `QR:${invoice.id}:${due}:r${attempt + 1}`;
   }
 
-  const org = await prisma.setting.findUnique({ where: { key: "org.profile" } });
-  const orgProfile = org ? (JSON.parse(org.value) as { name?: string }) : {};
+  const { org } = await getSettings();
   const gatewayRef = `QRPAY-${randomBytes(5).toString("hex").toUpperCase()}`;
 
   const created = await createPayment(actor, {
@@ -74,7 +74,7 @@ export async function createInvoiceQr(
   const charge = await provider.generateQR({
     amountMinor: due,
     ref: payment.gatewayRef ?? payment.code,
-    orgAccount: orgProfile.name ?? "RentManager"
+    orgAccount: org.name ?? "RentManager"
   });
   return {
     ok: true,

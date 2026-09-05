@@ -1,14 +1,17 @@
 /// Receipt PDF (M09) — A4 payment receipt, mirrors the invoice document style.
 import React from "react";
-import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 
 const fmt = (minor: number, currency: string) =>
   `${(minor / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
 
 const styles = StyleSheet.create({
   page: { padding: 42, fontSize: 10, fontFamily: "Helvetica", color: "#111827" },
-  header: { marginBottom: 18 },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  brandBlock: { flexGrow: 1, paddingRight: 16 },
+  logo: { width: 56, height: 56, objectFit: "contain", marginBottom: 4 },
   org: { fontSize: 16, fontFamily: "Helvetica-Bold" },
+  contact: { fontSize: 8, color: "#6b7280", marginBottom: 1 },
   title: { fontSize: 22, fontFamily: "Helvetica-Bold", marginTop: 24, marginBottom: 4 },
   muted: { color: "#6b7280" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 18 },
@@ -27,6 +30,10 @@ const styles = StyleSheet.create({
 
 export interface ReceiptPdfData {
   orgName: string;
+  orgAddress?: string;
+  orgPhone?: string;
+  orgLogo?: string;
+  orgFooterNote?: string;
   currency: string;
   receiptCode: string;
   paymentCode: string;
@@ -43,12 +50,21 @@ export function ReceiptPdf({ data }: { data: ReceiptPdfData }) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.org}>{data.orgName}</Text>
-          <Text style={styles.muted}>Payment receipt</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.brandBlock}>
+            {data.orgLogo ? (
+              // eslint-disable-next-line jsx-a11y/alt-text
+              <Image src={data.orgLogo} style={styles.logo} />
+            ) : null}
+            <Text style={styles.org}>{data.orgName}</Text>
+            {data.orgAddress ? <Text style={styles.contact}>{data.orgAddress}</Text> : null}
+            {data.orgPhone ? <Text style={styles.contact}>{data.orgPhone}</Text> : null}
+          </View>
+          <View style={{ alignItems: "flex-end" }}>
+            <Text style={styles.title}>{data.receiptCode}</Text>
+            <Text style={styles.muted}>for payment {data.paymentCode} · {data.status}</Text>
+          </View>
         </View>
-        <Text style={styles.title}>{data.receiptCode}</Text>
-        <Text style={styles.muted}>for payment {data.paymentCode} · {data.status}</Text>
 
         <View style={styles.grid}>
           <View style={styles.cell}>
@@ -94,6 +110,9 @@ export function ReceiptPdf({ data }: { data: ReceiptPdfData }) {
         </View>
 
         <Text style={styles.footer}>
+          {data.orgFooterNote
+            ? `${data.orgFooterNote}\n\n`
+            : ""}
           This receipt was generated automatically and is the proof of payment for the applications listed above.
           Corrections appear as separate refund documents — receipts are never edited.
         </Text>

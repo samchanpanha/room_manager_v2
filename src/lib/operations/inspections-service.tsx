@@ -6,6 +6,7 @@ import * as React from "react"; // classic JSX runtime (tsx/vitest) needs React 
 import { prisma } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { emitDomainEvent } from "@/lib/events";
+import { getSettings } from "@/lib/settings";
 import { nextNumber } from "@/lib/numbering";
 import {
   canInspectionTransition,
@@ -190,8 +191,7 @@ export async function fileInspectionPdf(inspectionId: string): Promise<void> {
     }
   });
   if (!inspection) throw new Error("Inspection not found");
-  const org = await prisma.setting.findUnique({ where: { key: "org.profile" } });
-  const orgProfile = org ? (JSON.parse(org.value) as { name?: string }) : {};
+  const { org } = await getSettings();
 
   const parsed = (() => {
     try {
@@ -215,7 +215,7 @@ export async function fileInspectionPdf(inspectionId: string): Promise<void> {
         code: inspection.code,
         type: inspection.type,
         status: inspection.status,
-        orgName: orgProfile.name ?? "RentManager",
+        orgName: org.name ?? "RentManager",
         propertyName: inspection.property.name,
         roomLabel: inspection.room.number,
         memberName: inspection.lease.member.party.name,

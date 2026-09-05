@@ -25,7 +25,34 @@ export interface OrgSettings {
   name: string;
   legalName: string;
   address: string;
+  phone: string;
+  email: string;
+  website: string;
+  taxId: string;
+  logo: string; // base64 data-URL or /storage URL (preview)
   invoiceFooterNote: string;
+  /// Invoice PDF layout variant ("classic" | "modern").
+  invoiceTemplate: string;
+}
+
+export interface PrinterSettings {
+  /// Thermal printer width in mm (58 | 80). Drives receipt/label sizing.
+  paperWidthMm: number;
+  /// Auto-print the receipt (browser) immediately after each POS sale.
+  autoPrintReceipt: boolean;
+  /// Number of receipt copies to print.
+  receiptCopies: number;
+  /// Print barcode labels on the label printer when true.
+  printBarcodeByDefault: boolean;
+}
+
+export interface TelegramBotSettings {
+  /// Friendly display name shown to tenants (defaults to the bot username).
+  botName: string;
+  /// Welcome / help message text on /start.
+  welcomeMessage: string;
+  /// Whether member self-link codes are enabled for this tenant.
+  allowMemberLinking: boolean;
 }
 
 export interface LocaleSettings {
@@ -75,7 +102,26 @@ export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
 
 const ORG: GroupDefLike & { defaults: OrgSettings } = {
   key: "m28.org",
-  defaults: { name: "RentManager Demo", legalName: "RentManager Demo Co., Ltd", address: "Phnom Penh, Cambodia", invoiceFooterNote: "Thank you for your tenancy." }
+  defaults: {
+    name: "RentManager Demo",
+    legalName: "RentManager Demo Co., Ltd",
+    address: "Phnom Penh, Cambodia",
+    phone: "",
+    email: "",
+    website: "",
+    taxId: "",
+    logo: "",
+    invoiceFooterNote: "Thank you for your tenancy.",
+    invoiceTemplate: "classic"
+  }
+};
+const PRINTER: GroupDefLike & { defaults: PrinterSettings } = {
+  key: "m28.printer",
+  defaults: { paperWidthMm: 80, autoPrintReceipt: false, receiptCopies: 1, printBarcodeByDefault: false }
+};
+const TELEGRAM_BOT: GroupDefLike & { defaults: TelegramBotSettings } = {
+  key: "m28.telegram",
+  defaults: { botName: "", welcomeMessage: "", allowMemberLinking: true }
 };
 const LOCALE: GroupDefLike & { defaults: LocaleSettings } = {
   key: "m28.locale",
@@ -97,9 +143,9 @@ const FEATURES: GroupDefLike & { defaults: FeatureFlags } = { key: "m28.features
 const TEMPLATES: GroupDefLike & { defaults: TemplateSettings } = { key: "m28.templates", defaults: {} };
 const PROVIDERS: GroupDefLike & { defaults: Record<string, string> } = { key: "m28.providers", defaults: {} };
 
-const GROUPS: Record<SettingsGroupName, GroupDefLike> = { org: ORG, locale: LOCALE, billing: BILLING, lateFee: LATE_FEE, retention: RETENTION, features: FEATURES, templates: TEMPLATES };
+const GROUPS: Record<SettingsGroupName, GroupDefLike> = { org: ORG, locale: LOCALE, billing: BILLING, lateFee: LATE_FEE, retention: RETENTION, features: FEATURES, templates: TEMPLATES, printer: PRINTER, telegram: TELEGRAM_BOT };
 
-export type SettingsGroupName = "org" | "locale" | "billing" | "lateFee" | "retention" | "features" | "templates";
+export type SettingsGroupName = "org" | "locale" | "billing" | "lateFee" | "retention" | "features" | "templates" | "printer" | "telegram";
 
 async function readGroup<T extends object>(def: GroupDefLike): Promise<T> {
   const row = await prisma.setting.findUnique({ where: { key: def.key } });
@@ -140,9 +186,11 @@ export async function getSettings(): Promise<{
   retention: RetentionSettings;
   features: FeatureFlags;
   templates: TemplateSettings;
+  printer: PrinterSettings;
+  telegram: TelegramBotSettings;
   providers: { paymentCredentials: { configured: boolean; last4: string | null }; telegramBotToken: { configured: boolean; last4: string | null } };
 }> {
-  const [org, locale, billing, lateFee, retention, features, templates, providers] = await Promise.all([
+  const [org, locale, billing, lateFee, retention, features, templates, printer, telegram, providers] = await Promise.all([
     readGroup<OrgSettings>(ORG),
     readGroup<LocaleSettings>(LOCALE),
     readGroup<BillingSettings>(BILLING),
@@ -150,6 +198,8 @@ export async function getSettings(): Promise<{
     readGroup<RetentionSettings>(RETENTION),
     readGroup<FeatureFlags>(FEATURES),
     readGroup<TemplateSettings>(TEMPLATES),
+    readGroup<PrinterSettings>(PRINTER),
+    readGroup<TelegramBotSettings>(TELEGRAM_BOT),
     readGroup<Record<string, string>>(PROVIDERS)
   ]);
   return {
@@ -160,6 +210,8 @@ export async function getSettings(): Promise<{
     retention,
     features,
     templates,
+    printer,
+    telegram,
     providers: {
       paymentCredentials: maskSecret(providers.paymentCredentials ?? null),
       telegramBotToken: maskSecret(providers.telegramBotToken ?? null)

@@ -14,6 +14,7 @@ import { canPaymentTransition, isPaymentMethod, settlementAccountCode, type Paym
 import { allocateOldestFirst, validateExplicitAllocations } from "./allocation";
 import { recomputeAmountsTx } from "@/lib/billing/service";
 import { refreshDepositStatusTx } from "@/lib/deposits/service";
+import { getSettings } from "@/lib/settings";
 
 type PrismaTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 type Tx = PrismaTx | typeof prisma;
@@ -380,13 +381,16 @@ export async function fileReceiptPdf(paymentId: string, refile = false): Promise
   });
   if (!payment) throw new Error("Payment not found");
 
-  const org = await prisma.setting.findUnique({ where: { key: "org.profile" } });
-  const orgProfile = org ? (JSON.parse(org.value) as { name?: string; currency?: string }) : {};
+  const { org, locale } = await getSettings();
   const buffer = await renderToBuffer(
     <ReceiptPdf
       data={{
-        orgName: orgProfile.name ?? "RentManager",
-        currency: orgProfile.currency ?? "USD",
+        orgName: org.name ?? "RentManager",
+        orgAddress: org.address || undefined,
+        orgPhone: org.phone || undefined,
+        orgLogo: org.logo || undefined,
+        orgFooterNote: org.invoiceFooterNote || undefined,
+        currency: locale.currency ?? "USD",
         receiptCode: payment.receiptCode ?? "—",
         paymentCode: payment.code,
         status: payment.status,

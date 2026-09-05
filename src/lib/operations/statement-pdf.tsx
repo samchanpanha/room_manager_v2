@@ -1,9 +1,14 @@
 /// Owner statement PDF (§M24: "PDF to M17").
 import React from "react";
-import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 
 const styles = StyleSheet.create({
   page: { padding: 32, fontSize: 10, fontFamily: "Helvetica" },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 },
+  brandBlock: { flex: 1, paddingRight: 16 },
+  logo: { width: 56, height: 56, objectFit: "contain", marginBottom: 3 },
+  brand: { fontSize: 15, marginBottom: 1 },
+  contact: { color: "#666", fontSize: 8, marginBottom: 1 },
   h1: { fontSize: 16, marginBottom: 2 },
   sub: { color: "#555", marginBottom: 14 },
   table: { width: "100%" },
@@ -23,6 +28,12 @@ export interface StatementPdfData {
   month: string;
   status: string;
   orgName: string;
+  orgLegalName?: string;
+  orgAddress?: string;
+  orgPhone?: string;
+  orgEmail?: string;
+  orgTaxId?: string;
+  orgLogo?: string;
   propertyName: string;
   buildingName: string;
   ownerName: string;
@@ -53,7 +64,23 @@ export function OwnerStatementPdf({ data }: { data: StatementPdfData }) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <Text style={styles.h1}>Owner Statement {data.code}</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.brandBlock}>
+            {data.orgLogo ? (
+              // eslint-disable-next-line jsx-a11y/alt-text
+              <Image src={data.orgLogo} style={styles.logo} />
+            ) : null}
+            <Text style={styles.brand}>{data.orgName}</Text>
+            {data.orgLegalName ? <Text style={styles.contact}>{data.orgLegalName}</Text> : null}
+            {data.orgAddress ? <Text style={styles.contact}>{data.orgAddress}</Text> : null}
+            {data.orgPhone ? <Text style={styles.contact}>{data.orgPhone}</Text> : null}
+            {data.orgEmail ? <Text style={styles.contact}>{data.orgEmail}</Text> : null}
+            {data.orgTaxId ? <Text style={styles.contact}>Tax ID: {data.orgTaxId}</Text> : null}
+          </View>
+          <View style={{ alignItems: "flex-end" }}>
+            <Text style={styles.h1}>Owner Statement {data.code}</Text>
+          </View>
+        </View>
         <Text style={styles.sub}>
           {data.month} · {data.buildingName} ({data.propertyName}) · {data.ownerName} · contract {data.contractCode} ({data.model})
         </Text>

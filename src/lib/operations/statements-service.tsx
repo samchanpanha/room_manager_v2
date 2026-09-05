@@ -11,6 +11,7 @@ import { emitDomainEvent } from "@/lib/events";
 import { nextNumber } from "@/lib/numbering";
 import { postTransaction } from "@/lib/ledger/service";
 import { ACC } from "@/lib/ledger/accounts";
+import { getSettings } from "@/lib/settings";
 import type { ActorCtx } from "@/lib/payments/service";
 import {
   computeStatementLines,
@@ -378,15 +379,20 @@ export async function fileStatementPdf(statementId: string): Promise<void> {
       property: { select: { code: true, name: true } }
     }
   });
-  const org = await prisma.setting.findUnique({ where: { key: "org.profile" } });
-  const orgProfile = org ? (JSON.parse(org.value) as { name?: string }) : {};
+  const { org } = await getSettings();
   const buffer = await renderToBuffer(
     <OwnerStatementPdf
       data={{
         code: st.code,
         month: st.month,
         status: st.status,
-        orgName: orgProfile.name ?? "RentManager",
+        orgName: org.name ?? "RentManager",
+        orgLegalName: org.legalName || undefined,
+        orgAddress: org.address || undefined,
+        orgPhone: org.phone || undefined,
+        orgEmail: org.email || undefined,
+        orgTaxId: org.taxId || undefined,
+        orgLogo: org.logo || undefined,
         propertyName: st.property.name,
         buildingName: st.building.name,
         ownerName: st.ownerProfile.party.name,

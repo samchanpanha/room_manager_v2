@@ -10,6 +10,7 @@ import { MODULE_BY_KEY } from "@/lib/rbac/catalog";
 import { ROOM_STATUSES } from "@/lib/rooms/status";
 import { getDashboardKpis } from "@/lib/reports/service";
 import { reportScope } from "@/lib/reports/scope";
+import { getSettings } from "@/lib/settings";
 import { timeAgo, titleCase } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export default async function DashboardPage() {
   const dashUser = await getAuthUser();
   const dashScope = dashUser ? await reportScope(dashUser) : { allowed: false, global: true, propertyIds: [] };
   const kpis = dashUser && dashScope.allowed ? await getDashboardKpis(dashScope) : null;
-  const [propertyCount, buildingCount, roomCount, bedCount, userCount, memberCount, rooms, recentAudit, org] = await Promise.all([
+  const [propertyCount, buildingCount, roomCount, bedCount, userCount, memberCount, rooms, recentAudit, settings] = await Promise.all([
     prisma.property.count(),
     prisma.building.count(),
     prisma.room.count(),
@@ -27,13 +28,12 @@ export default async function DashboardPage() {
     prisma.memberProfile.count(),
     prisma.room.findMany({ select: { status: true, basePriceMinor: true } }),
     prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
-    prisma.setting.findUnique({ where: { key: "org.profile" } })
+    getSettings()
   ]);
 
   const byStatus = Object.fromEntries(ROOM_STATUSES.map((s) => [s, rooms.filter((r) => r.status === s).length])) as Record<string, number>;
   const occupied = byStatus.occupied ?? 0;
   const occupancy = roomCount > 0 ? Math.round((occupied / roomCount) * 100) : 0;
-  const orgProfile = org ? (JSON.parse(org.value) as { name: string; currency: string; timezone: string }) : null;
   const portfolioValue = rooms.reduce((sum, r) => sum + r.basePriceMinor, 0);
 
   const stubCount = NAV.flatMap((g) => g.items).filter((i) => i.phase).length;
@@ -43,8 +43,7 @@ export default async function DashboardPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {orgProfile ? `${orgProfile.name} · ${orgProfile.currency} · ${orgProfile.timezone}` : "Organization"} — phases 0–3 live
-          (kernel, RBDC, properties, members & documents)
+          {`${settings.org.name} · ${settings.locale.currency} · ${settings.locale.timezone}`} — phases 0–3 live          (kernel, RBDC, properties, members & documents)
         </p>
       </div>
 
@@ -52,7 +51,7 @@ export default async function DashboardPage() {
         <StatCard label="Occupancy" value={`${occupancy}%`} sub={`${occupied} of ${roomCount} rooms occupied`} />
         <StatCard label="Properties" value={propertyCount} sub={`${buildingCount} buildings`} />
         <StatCard label="Rooms / Beds" value={`${roomCount} / ${bedCount}`} />
-        <StatCard label="Monthly book value" value={formatMinor(portfolioValue, orgProfile?.currency)} sub="Σ room base prices" />
+        <StatCard label="Monthly book value" value={formatMinor(portfolioValue, settings.locale.currency)} sub="Σ room base prices" />
         <StatCard label="Users" value={userCount} />
         <StatCard label="Members" value={memberCount} sub="prospects + residents" />
       </div>

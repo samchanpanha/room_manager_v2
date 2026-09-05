@@ -45,6 +45,8 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
   const [locale, setLocale] = useState(settings.locale);
   const [billing, setBilling] = useState({ ...settings.billing, dunningDays: settings.billing.dunningDays.join(",") });
   const [lateFee, setLateFee] = useState(settings.lateFee);
+  const [printer, setPrinter] = useState(settings.printer);
+  const [telegram, setTelegram] = useState(settings.telegram);
   const [templates, setTemplates] = useState({
     "invoice.issued": settings.templates["invoice.issued"] ?? "",
     "payment.confirmed": settings.templates["payment.confirmed"] ?? "",
@@ -59,7 +61,27 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
           <Field label="Name"><Input value={org.name} disabled={!canWrite} onChange={(e) => setOrg({ ...org, name: e.target.value })} /></Field>
           <Field label="Legal name"><Input value={org.legalName} disabled={!canWrite} onChange={(e) => setOrg({ ...org, legalName: e.target.value })} /></Field>
           <Field label="Address"><Input value={org.address} disabled={!canWrite} onChange={(e) => setOrg({ ...org, address: e.target.value })} /></Field>
-          <Field label="Invoice footer note"><Input value={org.invoiceFooterNote} disabled={!canWrite} onChange={(e) => setOrg({ ...org, invoiceFooterNote: e.target.value })} /></Field>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Phone"><Input value={org.phone} disabled={!canWrite} onChange={(e) => setOrg({ ...org, phone: e.target.value })} /></Field>
+            <Field label="Email"><Input value={org.email} disabled={!canWrite} onChange={(e) => setOrg({ ...org, email: e.target.value })} /></Field>
+            <Field label="Website"><Input value={org.website} disabled={!canWrite} onChange={(e) => setOrg({ ...org, website: e.target.value })} /></Field>
+            <Field label="Tax ID"><Input value={org.taxId} disabled={!canWrite} onChange={(e) => setOrg({ ...org, taxId: e.target.value })} /></Field>
+          </div>
+          <Field label="Logo (image URL or data URL — shown on PDFs)">
+            <Input value={org.logo} disabled={!canWrite} onChange={(e) => setOrg({ ...org, logo: e.target.value })} />
+          </Field>
+          <Field label="Invoice layout template">
+            <select
+              className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+              value={org.invoiceTemplate}
+              disabled={!canWrite}
+              onChange={(e) => setOrg({ ...org, invoiceTemplate: e.target.value })}
+            >
+              <option value="classic">Classic (A4, black &amp; white)</option>
+              <option value="modern">Modern (branded header card)</option>
+            </select>
+          </Field>
+          <Field label="Invoice / receipt footer note"><Input value={org.invoiceFooterNote} disabled={!canWrite} onChange={(e) => setOrg({ ...org, invoiceFooterNote: e.target.value })} /></Field>
           {canWrite && <Button size="sm" disabled={busy} onClick={() => void save("org", org, "Org profile saved")}>Save org</Button>}
         </CardContent>
       </Card>
@@ -109,6 +131,50 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
             </Field>
           ))}
           {canWrite && <Button size="sm" disabled={busy} onClick={() => void save("templates", templates, "Templates saved")}>Save templates</Button>}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Printers</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">Receipt and barcode-label printing. Paper width controls thermal slip sizing for printed PDFs / browser window.print().</p>
+          <Field label="Receipt paper width">
+            <select
+              className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+              value={printer.paperWidthMm}
+              disabled={!canWrite}
+              onChange={(e) => setPrinter({ ...printer, paperWidthMm: Number(e.target.value) })}
+            >
+              <option value={58}>58 mm (2¼″)</option>
+              <option value={80}>80 mm (3″)</option>
+            </select>
+          </Field>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={printer.autoPrintReceipt} disabled={!canWrite} onChange={(e) => setPrinter({ ...printer, autoPrintReceipt: e.target.checked })} />
+            Auto-print the receipt right after each POS sale
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={printer.printBarcodeByDefault} disabled={!canWrite} onChange={(e) => setPrinter({ ...printer, printBarcodeByDefault: e.target.checked })} />
+            Offer barcode label printing by default
+          </label>
+          <Field label="Receipt copies"><Input type="number" min={1} max={5} value={printer.receiptCopies} disabled={!canWrite} onChange={(e) => setPrinter({ ...printer, receiptCopies: Math.max(1, Math.min(5, Number(e.target.value) || 1)) })} /></Field>
+          {canWrite && <Button size="sm" disabled={busy} onClick={() => void save("printer", printer, "Printer settings saved")}>Save printers</Button>}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Telegram bot</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Member-facing notifications. The bot token is a sealed secret (set/rotate below). Multi-tenant setup wires each bot token to its tenant on first poll of the bot info.
+          </p>
+          <Field label="Display name (shown in the chat and notifications)"><Input value={telegram.botName} disabled={!canWrite} onChange={(e) => setTelegram({ ...telegram, botName: e.target.value })} /></Field>
+          <Field label="Welcome message (shown on /start)"><Input value={telegram.welcomeMessage} disabled={!canWrite} onChange={(e) => setTelegram({ ...telegram, welcomeMessage: e.target.value })} /></Field>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={telegram.allowMemberLinking} disabled={!canWrite} onChange={(e) => setTelegram({ ...telegram, allowMemberLinking: e.target.checked })} />
+            Allow members to link their Telegram account (self-service)
+          </label>
+          {canWrite && <Button size="sm" disabled={busy} onClick={() => void save("telegram", telegram, "Telegram bot settings saved")}>Save bot settings</Button>}
         </CardContent>
       </Card>
 

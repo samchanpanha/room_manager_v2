@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/auth/session";
 import { can } from "@/lib/rbac/can";
 import { prisma } from "@/lib/db";
 import { recordSale } from "@/lib/operations/pos-service";
+import { getSettings } from "@/lib/settings";
 
 const schema = z.object({
   sessionId: z.string().min(1),
@@ -64,5 +65,25 @@ export async function POST(req: Request) {
     const status = result.code === "NOT_FOUND" || result.code === "PRODUCT_INVALID" ? 404 : result.code === "INVALID_QTY" || result.code === "MEMBER_REQUIRED" || result.code === "LINES_REQUIRED" ? 422 : 422;
     return fail(status, result.code, result.message);
   }
-  return ok(result.data, 201);
+
+  // §M28 printer flow: tell the POS terminal how to print after the sale.
+  const { printer } = await getSettings();
+  const productIds = parsed.data.lines.map((l) => l.productId);
+  const hasBarcoded = productIds.length > 0
+    ? await prisma.posProduct.findFirst({ where: { id: { in: productIds }, barcode: { not: null } }, select: { id: true } })
+    : null;
+
+  return ok(
+    {
+      ...result.data,
+      print: {
+        autoPrintReceipt: printer.autoPrintReceipt ?? false,
+        receiptCopies: Math.max(1, Math.min(12, printer.receiptCopies ?? 1)),
+        receiptUrl: `/api/pos/sales/${result.data.saleId}/receipt`,
+        printBarcodeByDefault: printer.printBarcodeByDefault ?? false,
+        labelUrl: hasBarcoded ? `/api/pos/products/label?ids=${productIds.join(",")}&p=1` : undefined
+      }
+    },
+    201
+  );
 }

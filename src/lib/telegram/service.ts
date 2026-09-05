@@ -6,7 +6,7 @@
 /// /status and /dues).
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/db";
-import { getTemplateOverride } from "@/lib/settings";
+import { getSettings, getTemplateOverride } from "@/lib/settings";
 import { env } from "@/lib/env";
 import { logAudit } from "@/lib/audit";
 import { createInvoiceQr } from "@/lib/qrpay/service";
@@ -191,17 +191,25 @@ export async function handleTelegramUpdate(update: TelegramUpdate, secretHeader:
   const arg = rest.join(" ").trim();
 
   const link = await resolveLink(chatId);
+  const { telegram: botSettings } = await getSettings();
+  const botName = botSettings.botName || "RentManager";
+  const welcome = botSettings.welcomeMessage || "Welcome! Send /link <code> with the code from your portal (Me → Telegram) to connect.";
 
-  // /link and /start-with-payload work for unlinked chats
+  // /link and /start-with-payload work for unlinked chats (gated by M28
+  // telegram.allowMemberLinking — self-service member linking)
   if (cmd === "/link" || (cmd === "/start" && arg.length > 0)) {
+    if (!botSettings.allowMemberLinking) {
+      await reply(chatId, `${botName}: member self-linking is disabled by staff. Contact reception to link your chat.`, "command_reply");
+      return { status: 200, handled: "link: disabled by settings" };
+    }
     return linkCommand(chatId, telegramUserId, displayName, arg);
   }
   if (cmd === "/start") {
-    await reply(chatId, "Welcome! Send /link <code> with the code from your portal (Me → Telegram) to connect.", "command_reply");
+    await reply(chatId, welcome, "command_reply");
     return { status: 200, handled: "start (no code)" };
   }
   if (cmd === "/help") {
-    await reply(chatId, HELP_TEXT);
+    await reply(chatId, `🤖 ${botName} — commands:\n${HELP_TEXT.replace("RentManager bot", botName)}`);
     return { status: 200, handled: "help" };
   }
   if (cmd === "/unlink") {

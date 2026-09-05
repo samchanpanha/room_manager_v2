@@ -22,7 +22,9 @@ async function seedSettings(): Promise<void> {
   // §M28 unified keys (getSettings() is the single consumer surface — the
   // former org.profile / billing.lateFee / billing.dunning keys are retired).
   const settings: Array<[string, unknown]> = [
-    ["m28.org", { name: "Demo Living Co.", legalName: "Demo Living Co., Ltd", address: "Phnom Penh, Cambodia", invoiceFooterNote: "Thank you for your tenancy." }],
+    ["m28.org", { name: "Demo Living Co.", legalName: "Demo Living Co., Ltd", address: "Phnom Penh, Cambodia", phone: "+855 23 000 000", email: "hello@demoliving.test", website: "https://demoliving.test", taxId: "KH-000-000-000", logo: "", invoiceFooterNote: "Thank you for your tenancy.", invoiceTemplate: "classic" }],
+    ["m28.printer", { paperWidthMm: 80, autoPrintReceipt: false, receiptCopies: 1, printBarcodeByDefault: false }],
+    ["m28.telegram", { botName: "", welcomeMessage: "", allowMemberLinking: true }],
     ["m28.locale", { currency: "USD", timezone: "Asia/Phnom_Penh", locale: "en" }],
     ["m28.billing", { invoicePrefix: "", graceDays: 3, dunningDays: [3, 7, 14] }],
     ["m28.lateFee", { mode: "flat", flatMinor: 500, monthlyPctBps: 0, maxMinor: 5000 }],
@@ -707,12 +709,12 @@ async function seedStockPos(): Promise<void> {
   for (const sup of suppliers) {
     await db.supplier.upsert({ where: { name: sup.name }, create: sup, update: sup });
   }
-  const items: Array<{ name: string; category: string; unit: string; minQtyMilli: number; supplier: string; priceMinor: number; product?: boolean }> = [
-    { name: "Coca-Cola can 330ml", category: "beverage", unit: "pcs", minQtyMilli: 12_000, supplier: "Angkor Wholesale", priceMinor: 100 },
-    { name: "Drinking water 1.5L", category: "beverage", unit: "pcs", minQtyMilli: 24_000, supplier: "Angkor Wholesale", priceMinor: 60 },
-    { name: "Instant noodles pack", category: "snack", unit: "pcs", minQtyMilli: 10_000, supplier: "Mekong Supplies", priceMinor: 150 },
-    { name: "Laundry detergent 1kg", category: "supply", unit: "box", minQtyMilli: 4_000, supplier: "Mekong Supplies", priceMinor: 450 },
-    { name: "Coffee beans", category: "grocery", unit: "kg", minQtyMilli: 2_000, supplier: "Angkor Wholesale", priceMinor: 1200 }
+  const items: Array<{ name: string; category: string; unit: string; minQtyMilli: number; supplier: string; priceMinor: number; barcode?: string; product?: boolean }> = [
+    { name: "Coca-Cola can 330ml", category: "beverage", unit: "pcs", minQtyMilli: 12_000, supplier: "Angkor Wholesale", priceMinor: 100, barcode: "8890000001006" },
+    { name: "Drinking water 1.5L", category: "beverage", unit: "pcs", minQtyMilli: 24_000, supplier: "Angkor Wholesale", priceMinor: 60, barcode: "8890000002003" },
+    { name: "Instant noodles pack", category: "snack", unit: "pcs", minQtyMilli: 10_000, supplier: "Mekong Supplies", priceMinor: 150, barcode: "8890000003000" },
+    { name: "Laundry detergent 1kg", category: "supply", unit: "box", minQtyMilli: 4_000, supplier: "Mekong Supplies", priceMinor: 450, barcode: "8890000004007" },
+    { name: "Coffee beans", category: "grocery", unit: "kg", minQtyMilli: 2_000, supplier: "Angkor Wholesale", priceMinor: 1200, barcode: "8890000005004" }
   ];
   for (const it of items) {
     const supplier = await db.supplier.findUniqueOrThrow({ where: { name: it.supplier } });
@@ -723,8 +725,8 @@ async function seedStockPos(): Promise<void> {
     });
     await db.posProduct.upsert({
       where: { name: it.name },
-      create: { name: it.name, priceMinor: it.priceMinor, category: it.category, stockItemId: item.id, isActive: true },
-      update: { priceMinor: it.priceMinor, stockItemId: item.id, isActive: true }
+      create: { name: it.name, priceMinor: it.priceMinor, category: it.category, barcode: it.barcode ?? null, stockItemId: item.id, isActive: true },
+      update: { priceMinor: it.priceMinor, barcode: it.barcode ?? null, stockItemId: item.id, isActive: true }
     });
   }
   await db.posProduct.upsert({

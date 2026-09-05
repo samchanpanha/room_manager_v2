@@ -6,6 +6,7 @@ import { authorize } from "@/lib/rbac/guard";
 import { prisma } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { LeaseContractPdf } from "@/lib/leases/contract-pdf";
+import { getSettings } from "@/lib/settings";
 import { storage } from "@/lib/storage";
 
 /// GET /api/leases/:id/contract — generate (and first-time auto-file) the
@@ -29,8 +30,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const g = await authorize("read", "M05", { propertyId: lease.propertyId });
   if (g.response) return g.response;
 
-  const org = await prisma.setting.findUnique({ where: { key: "org.profile" } });
-  const currency = org ? ((JSON.parse(org.value) as { currency?: string }).currency ?? "USD") : "USD";
+  const { locale } = await getSettings();
+  const currency = locale.currency ?? "USD";
 
   const data = {
     code: lease.code,
