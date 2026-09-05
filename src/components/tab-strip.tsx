@@ -6,6 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { HOME_TAB_HREF, tabMetaFor, moduleAccent } from "@/lib/tabs";
 import { moduleIcon } from "@/lib/icons";
 import { Icon } from "@/components/icon";
+import { useT } from "@/components/i18n-provider";
+import { tNavIn, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 interface OpenTab {
@@ -22,6 +24,13 @@ interface TabMenu {
 
 const MAX_TABS = 12;
 
+/// Tabs store the English label (from lib/tabs); render-time translation.
+/// Dynamic children use "<Page> · <Segment>" — translate only the page part.
+function tabLabel(locale: Locale, label: string): string {
+  const idx = label.indexOf(" · ");
+  return idx === -1 ? tNavIn(locale, label) : `${tNavIn(locale, label.slice(0, idx))} · ${label.slice(idx + 3)}`;
+}
+
 function invalidate(next: OpenTab[], activeRemoved: boolean, router: ReturnType<typeof useRouter>, prev: OpenTab[]) {
   if (!activeRemoved || next.length === 0) return;
   const activeIdx = prev.findIndex((t) => t.href === window.location.pathname);
@@ -35,6 +44,7 @@ function invalidate(next: OpenTab[], activeRemoved: boolean, router: ReturnType<
 export function TabStrip() {
   const pathname = usePathname();
   const router = useRouter();
+  const { locale, t, tf } = useT();
   const [tabs, setTabs] = useState<OpenTab[]>(() => [{ href: HOME_TAB_HREF, label: "Dashboard", module: "HOME" }]);
   const [menu, setMenu] = useState<TabMenu | null>(null);
 
@@ -80,11 +90,11 @@ export function TabStrip() {
     const right = idx >= 0 && idx < tabs.length - 1;
     const others = tabs.some((t) => t.href !== HOME_TAB_HREF && t.href !== tab.href);
     return [
-      { label: "Close tab", disabled: pinned, run: () => closeTab(tab) },
-      { label: "Close other tabs", disabled: !others, run: () => closeSet(new Set(tabs.filter((t) => t.href !== tab.href && t.href !== HOME_TAB_HREF).map((t) => t.href))) },
-      { label: "Close tabs to the left", disabled: !left, run: () => closeSet(new Set(tabs.slice(0, idx).filter((t) => t.href !== HOME_TAB_HREF).map((t) => t.href))) },
-      { label: "Close tabs to the right", disabled: !right, run: () => closeSet(new Set(tabs.slice(idx + 1).map((t) => t.href))) },
-      { label: "Close all tabs", disabled: tabs.length <= 1, run: () => closeSet(new Set(tabs.filter((t) => t.href !== HOME_TAB_HREF).map((t) => t.href))) }
+      { label: t("tabs.close"), disabled: pinned, run: () => closeTab(tab) },
+      { label: t("tabs.closeOthers"), disabled: !others, run: () => closeSet(new Set(tabs.filter((t) => t.href !== tab.href && t.href !== HOME_TAB_HREF).map((t) => t.href))) },
+      { label: t("tabs.closeLeft"), disabled: !left, run: () => closeSet(new Set(tabs.slice(0, idx).filter((t) => t.href !== HOME_TAB_HREF).map((t) => t.href))) },
+      { label: t("tabs.closeRight"), disabled: !right, run: () => closeSet(new Set(tabs.slice(idx + 1).map((t) => t.href))) },
+      { label: t("tabs.closeAll"), disabled: tabs.length <= 1, run: () => closeSet(new Set(tabs.filter((t) => t.href !== HOME_TAB_HREF).map((t) => t.href))) }
     ];
   }
 
@@ -136,14 +146,14 @@ export function TabStrip() {
                 ? "border-border bg-background text-foreground shadow-[0_-1px_2px_rgba(0,0,0,0.04)]"
                 : "border-transparent bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
-            title={`${tab.label} — middle-click to close`}
+            title={tf("tabs.middleHint", { label: tabLabel(locale, tab.label) })}
           >
             <Icon name={moduleIcon(tab.module)} className={cn("h-3.5 w-3.5 shrink-0", active ? "text-primary" : "text-muted-foreground/70")} />
-            <span className="truncate">{tab.label}</span>
+            <span className="truncate">{tabLabel(locale, tab.label)}</span>
             {!pinned && (
               <button
                 type="button"
-                aria-label={`Close ${tab.label}`}
+                aria-label={tf("tabs.closeNamed", { label: tabLabel(locale, tab.label) })}
                 onClick={(e) => {
                   e.stopPropagation();
                   closeTab(tab);
@@ -160,8 +170,8 @@ export function TabStrip() {
 
       <button
         type="button"
-        title="New Dashboard tab"
-        aria-label="New Dashboard tab"
+        title={t("tabs.newDashboard")}
+        aria-label={t("tabs.newDashboard")}
         onClick={() => router.push(HOME_TAB_HREF)}
         className="mb-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-lg leading-none text-muted-foreground hover:bg-muted hover:text-foreground"
       >
@@ -170,8 +180,8 @@ export function TabStrip() {
 
       <button
         type="button"
-        title="Tab options"
-        aria-label="Tab options"
+        title={t("tabs.options")}
+        aria-label={t("tabs.options")}
         onClick={(e) => {
           const activeTab = tabs.find((t) => isActive(t.href)) ?? tabs[tabs.length - 1];
           const rect = e.currentTarget.getBoundingClientRect();
@@ -183,7 +193,7 @@ export function TabStrip() {
       </button>
 
       <div className="mb-0.5 ml-auto hidden shrink-0 items-center gap-2 pr-1 text-[11px] text-muted-foreground sm:flex">
-        <span className="h-2 w-2 rounded-full bg-success" aria-hidden /> {tabs.length}/{MAX_TABS} tabs · right-click a tab for close options
+        <span className="h-2 w-2 rounded-full bg-success" aria-hidden /> {tf("tabs.hint", { n: tabs.length, max: MAX_TABS })}
       </div>
 
       {menu ? renderMenu(menu) : null}

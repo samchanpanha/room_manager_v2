@@ -113,7 +113,9 @@ document denial).
   S3-compatible storage driver (env-selected), nightly backup job + restore runbook, and a
   Settings console: org/locale/billing/late-fee/dunning defaults, sealed provider secrets
   (AES-256-GCM, masked reads), opening balances as balanced `opening` postings, per-module
-  feature flags, and data-retention purge (audit trail never purged).
+  feature flags, and data-retention purge (audit trail never purged). UI language is switchable
+  between English, Khmer (ខ្មែរ) and Chinese (中文): per-browser via the header/login 🌐 picker
+  (`rm-locale` cookie) with an org-wide default in Settings → Locale → Language.
 - **POS (M14)** — shift-style sessions (opening float → expected = float + Σ cash →
   counted variance on close), sales by cash / QR / card / **charge-to-room** (auto-issued one-time
   invoice + AR posting), auto-filed receipt PDFs, products linked to stock items.

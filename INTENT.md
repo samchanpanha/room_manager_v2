@@ -378,6 +378,20 @@ Any change request is appended here as: `vX.Y — date — description — affec
 then specs/matrix/build order are updated in place before code changes begin.
 (Log starts below this line.)
 
+v1.5 — 2026-09-05 — i18n graduates from the single-locale dictionary to switchable UI languages:
+English (`en`), Khmer (`km`), Chinese simplified (`zh`). Resolution order is `rm-locale` cookie
+(LanguageSwitcher in the admin header + standalone on /login) → §M28 `m28.locale.locale` org
+default (now a validated `en|km|zh` select in Settings → Locale) → `en`. The dictionary module
+(`src/lib/i18n.ts`) is pure (`tIn/tfIn/tNavIn` + exported `DICT`); the locale is threaded as
+props/context — root layout resolves once per request (React-cached `getT`, lazily importing
+settings so DB-free pages never break) and flows it through `I18nProvider` to client components
+(`useT`), because Next renders layouts and pages concurrently and a module-level "active locale"
+was observed to lag a request behind. Shared chrome is translated (sidebar groups/items, menu
+search incl. translated labels, tab strip menus/hints, sign-out, login screen); nav labels stay
+keyed by their English label in `src/lib/nav.ts`. Tailwind's sans stack gains Khmer (Noto Sans
+Khmer/Khmer OS) and CJK (PingFang SC/Hiragino/Microsoft YaHei) fallbacks; `html[lang="km"]`
+raises line-height for Khmer stacking marks. — affected §13, M28.
+
 v1.4 — 2026-09-04 — Phase 21 (M27/M28) decisions, taken before code:
 **(a) better-auth swap rejected; the hand-rolled auth kernel stays.** §10 row
 21 and v1.1 deferred better-auth to this phase, but the v1 kernel already

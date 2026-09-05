@@ -7,6 +7,7 @@ import { Input, Label } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { LOCALES, LOCALE_META } from "@/lib/i18n";
 import type { getSettings } from "@/lib/settings";
 
 type Settings = Awaited<ReturnType<typeof getSettings>>;
@@ -101,10 +102,19 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
       <Card>
         <CardHeader><CardTitle>Locale &amp; billing defaults</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-3 gap-2">
+          <Field label="Language (default for new browsers)">
+            <SearchableSelect
+              value={locale.locale}
+              onChange={(v) => setLocale({ ...locale, locale: v })}
+              options={LOCALES.map((l) => ({ value: l, label: `${LOCALE_META[l].native} — ${LOCALE_META[l].name}` }))}
+              className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+              disabled={!canWrite}
+              placeholder="Select language"
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-2">
             <Field label="Currency"><Input value={locale.currency} disabled={!canWrite} onChange={(e) => setLocale({ ...locale, currency: e.target.value })} /></Field>
             <Field label="Timezone"><Input value={locale.timezone} disabled={!canWrite} onChange={(e) => setLocale({ ...locale, timezone: e.target.value })} /></Field>
-            <Field label="Locale"><Input value={locale.locale} disabled={!canWrite} onChange={(e) => setLocale({ ...locale, locale: e.target.value })} /></Field>
           </div>
           <Button size="sm" variant="outline" disabled={!canWrite || busy} onClick={() => void save("locale", locale, "Locale saved")}>Save locale</Button>
           <Field label="Invoice prefix"><Input value={billing.invoicePrefix} disabled={!canWrite} onChange={(e) => setBilling({ ...billing, invoicePrefix: e.target.value })} /></Field>

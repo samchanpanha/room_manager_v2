@@ -27,7 +27,9 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)"
       },
       fontFamily: {
-        sans: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif"]
+        // Latin stack first; Khmer (Noto Sans Khmer / Khmer OS) and CJK
+        // (PingFang / Hiragino / YaHei) fallbacks cover km/zh glyphs.
+        sans: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Noto Sans", "Noto Sans Khmer", "Khmer OS", "Helvetica Neue", "Arial", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "sans-serif"]
       }
     }
   },

@@ -5,11 +5,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { NAV } from "@/lib/nav";
 import { cn } from "@/lib/utils";
-import { t } from "@/lib/i18n";
+import { tIn, tNavIn } from "@/lib/i18n";
+import { useT } from "@/components/i18n-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { HelpCenter } from "@/components/help";
 import { TabStrip } from "@/components/tab-strip";
 import { Icon } from "@/components/icon";
@@ -46,6 +48,7 @@ export function Shell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { locale, t, tf, tNav } = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -63,12 +66,17 @@ export function Shell({
     const q = query.trim().toLowerCase();
     return NAV.map((group) => {
       const items = group.items.filter((item) => !item.module || moduleAllowed[item.module]);
+      // Match on both the translated and the English label.
       const hit = items.filter(
-        (item) => !q || item.label.toLowerCase().includes(q) || t(group.label).toLowerCase().includes(q)
+        (item) =>
+          !q ||
+          item.label.toLowerCase().includes(q) ||
+          tNavIn(locale, item.label).toLowerCase().includes(q) ||
+          tIn(locale, group.label).toLowerCase().includes(q)
       );
       return { ...group, items: hit };
     }).filter((g) => g.items.length > 0);
-  }, [query, moduleAllowed]);
+  }, [query, moduleAllowed, locale]);
 
   const isCollapsed = (key: string) => collapsed[key] && !searching;
 
@@ -103,8 +111,8 @@ export function Shell({
         <Input
           data-tour="menu-search"
           type="search"
-          placeholder="Search menu…"
-          aria-label="Search menu"
+          placeholder={t("shell.search")}
+          aria-label={t("shell.searchAria")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -146,7 +154,7 @@ export function Shell({
                             )}
                           >
                             <Icon name={navIcon(item.label)} className="h-4 w-4 shrink-0" />
-                            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                            <span className="min-w-0 flex-1 truncate">{tNav(item.label)}</span>
                           </Link>
                         </li>
                       );
@@ -154,11 +162,11 @@ export function Shell({
                     return (
                       <li key={item.label}>
                         <span
-                          title={`Scheduled for Phase ${item.phase}`}
+                          title={tf("shell.phaseHint", { phase: item.phase ?? "" })}
                           className="flex cursor-not-allowed items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground/50"
                         >
                           <Icon name={navIcon(item.label)} className="h-4 w-4 shrink-0 opacity-50" />
-                          <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                          <span className="min-w-0 flex-1 truncate">{tNav(item.label)}</span>
                           <Badge variant="outline" className="px-1.5 text-[10px]">
                             P{item.phase}
                           </Badge>
@@ -171,7 +179,7 @@ export function Shell({
             </div>
           );
         })}
-        {groups.length === 0 && <p className="px-2 py-4 text-xs text-muted-foreground">No menu items match “{query}”.</p>}
+        {groups.length === 0 && <p className="px-2 py-4 text-xs text-muted-foreground">{tf("shell.noResults", { q: query })}</p>}
       </nav>
     </aside>
   );
@@ -181,10 +189,11 @@ export function Shell({
       {menu.side === "left" ? aside : null}
       <div className="flex min-w-0 flex-1 flex-col">
         <header data-tour="header" className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur">
-          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setOpen((v) => !v)} aria-label="Toggle navigation">
+          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setOpen((v) => !v)} aria-label={t("shell.toggleNav")}>
             ☰
           </Button>
           <div className="flex-1" />
+          <LanguageSwitcher />
           <ThemeToggle />
           <HelpCenter />
           <div className="flex items-center gap-3 border-l pl-3">
@@ -193,7 +202,7 @@ export function Shell({
               <p className="text-xs capitalize leading-tight text-muted-foreground">{roleBadges.join(" · ")}</p>
             </div>
             <Button variant="outline" size="sm" onClick={logout}>
-              Sign out
+              {t("shell.signOut")}
             </Button>
           </div>
         </header>
