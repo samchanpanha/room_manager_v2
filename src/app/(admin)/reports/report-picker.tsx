@@ -5,13 +5,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Badge } from "@/components/ui/badge";
+import { useT } from "@/components/i18n-provider";
 
 export interface ReportMeta {
   key: string;
+  /// Design override already applied by the page (falls back to the registry title).
   title: string;
   category: "ops" | "finance";
   source: string;
   dateFiltered: boolean;
+  /// True when Settings → Reports → design overrides this report.
+  designed?: boolean;
 }
 
 /// M26 report picker + filters — pushes ?key=&from=&to=&month=&propertyId=.
@@ -26,6 +31,7 @@ export function ReportPicker({
 }) {
   const router = useRouter();
   const params = useSearchParams();
+  const { tUi } = useT();
   const meta = reports.find((r) => r.key === current.key);
   const [key, setKey] = useState(current.key);
   const [from, setFrom] = useState(current.from ?? "");
@@ -58,7 +64,7 @@ export function ReportPicker({
             aria-label="Report"
             value={key}
             onChange={setKey}
-            options={reports.map((r) => ({ value: r.key, label: `${r.category === "ops" ? "OPS" : "FIN"} · ${r.title}` }))}
+            options={reports.map((r) => ({ value: r.key, label: `${tUi(r.category === "ops" ? "OPS" : "FIN")} · ${tUi(r.title)}` }))}
             placeholder="Search reports…"
             emptyText="No matching report"
           />
@@ -99,6 +105,7 @@ export function ReportPicker({
         <Button size="sm" onClick={apply}>
           Run report
         </Button>
+        {meta?.designed ? <Badge variant="success">{tUi("designed")}</Badge> : null}
         {meta ? (
           <div className="flex gap-2 text-xs">
             <a className="underline underline-offset-4" href={`/api/reports/${current.key}/export?format=csv&${params.toString().split("&").filter((p) => p && !p.startsWith("key=")).join("&")}`}>
@@ -110,7 +117,7 @@ export function ReportPicker({
           </div>
         ) : null}
       </div>
-      {meta ? <p className="text-xs text-muted-foreground">Source: {meta.source}</p> : null}
+      {meta ? <p className="text-xs text-muted-foreground">{tUi("Source")}: {tUi(meta.source)}</p> : null}
     </div>
   );
 }

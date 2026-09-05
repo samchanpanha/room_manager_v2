@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/components/i18n-provider";
 
 export interface SelectOption {
   value: string;
@@ -47,6 +48,7 @@ export function SearchableSelect({
   required?: boolean;
   id?: string;
 }) {
+  const { t, tUi } = useT();
   const controlled = value !== undefined;
   const [internal, setInternal] = useState(defaultValue ?? value ?? "");
   const [open, setOpen] = useState(false);
@@ -58,11 +60,15 @@ export function SearchableSelect({
   const current = controlled ? value : internal;
 
   const selected = useMemo(() => options.find((o) => o.value === current), [options, current]);
+  /// Option labels are UI copy (e.g. "All in your scope") or record data (a
+  /// property name). tUi translates the former and returns the latter as-is.
+  const display = useMemo(() => new Map(options.map((o) => [o.value, tUi(o.label)])), [options, tUi]);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return options;
-    return options.filter((o) => o.label.toLowerCase().includes(q));
-  }, [options, query]);
+    // Match the English label or its translation, so typing works in any locale.
+    return options.filter((o) => o.label.toLowerCase().includes(q) || (display.get(o.value) ?? "").toLowerCase().includes(q));
+  }, [options, query, display]);
 
   useEffect(() => {
     function onDocDown(e: MouseEvent) {
@@ -102,16 +108,16 @@ export function SearchableSelect({
       <input
         ref={inputRef}
         id={id}
-        aria-label={ariaLabel}
+        aria-label={ariaLabel ? tUi(ariaLabel) : ariaLabel}
         role="combobox"
         aria-expanded={open}
         aria-controls="searchable-select-listbox"
         aria-haspopup="listbox"
-        value={open ? query : selected?.label ?? ""}
+        value={open ? query : (selected ? (display.get(selected.value) ?? selected.label) : "")}
         disabled={disabled}
         autoFocus={autoFocus}
         required={required}
-        placeholder={selected && !open ? selected.label : placeholder}
+        placeholder={selected && !open ? (display.get(selected.value) ?? selected.label) : (placeholder ? tUi(placeholder) : placeholder)}
         onFocus={() => {
           setOpen(true);
           setQuery("");
@@ -120,7 +126,7 @@ export function SearchableSelect({
           setQuery(e.target.value);
           if (!open) setOpen(true);
           // clear to "" when the user edits the box and the text no longer matches the current option
-          if (selected && e.target.value.trim().toLowerCase() !== selected.label.toLowerCase()) commit("");
+          if (selected && e.target.value.trim().toLowerCase() !== selected.label.toLowerCase() && e.target.value.trim().toLowerCase() !== (display.get(selected.value) ?? "").toLowerCase()) commit("");
         }}
         className={cn(
           "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
@@ -134,7 +140,7 @@ export function SearchableSelect({
           role="listbox"
         >
           {filtered.length === 0 ? (
-            <li className="px-2 py-1.5 text-sm text-muted-foreground">{emptyText ?? "No matches"}</li>
+            <li className="px-2 py-1.5 text-sm text-muted-foreground">{emptyText ? tUi(emptyText) : t("select.noMatches")}</li>
           ) : (
             filtered.map((o) => {
               const active = o.value === current;
@@ -154,7 +160,7 @@ export function SearchableSelect({
                       optionDisabled && "cursor-not-allowed opacity-40"
                     )}
                   >
-                    <span className="min-w-0 truncate">{o.label}</span>
+                    <span className="min-w-0 truncate">{display.get(o.value) ?? o.label}</span>
                     {active ? <span className="shrink-0 text-primary">✓</span> : null}
                   </button>
                 </li>

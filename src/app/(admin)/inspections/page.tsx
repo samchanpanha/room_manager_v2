@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { InspectionActions } from "./inspection-actions";
 import { formatMinor } from "@/lib/money";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -145,9 +146,9 @@ export default async function InspectionsPage() {
               ))}
               {visible.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                     No inspections yet — open one for an active lease (move-in, move-out or periodic).
-                  </TableCell>
+                  </Tx></TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
@@ -155,8 +156,8 @@ export default async function InspectionsPage() {
         </CardContent>
       </Card>
       <p className="mt-3 text-xs text-muted-foreground">
-        Completing a move-out inspection links the lease (hard gate for lease end, §15 v1.1) and auto-files the PDF report to the document
-        registry (M17). Failed items become findings: open a maintenance ticket (M19) or propose a deposit deduction approved in M10.
+        <Tx>Completing a move-out inspection links the lease (hard gate for lease end, §15 v1.1) and auto-files the PDF report to the document
+        registry (M17). Failed items become findings: open a maintenance ticket (M19) or propose a deposit deduction approved in M10.</Tx>
       </p>
     </div>
   );

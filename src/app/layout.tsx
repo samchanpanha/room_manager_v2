@@ -29,9 +29,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body className="min-h-screen font-sans antialiased">
-        <Providers>
-          <I18nProvider locale={locale}>{children}</I18nProvider>
-        </Providers>
+        {/* I18nProvider wraps Providers: the ToastProvider (and every other
+            client primitive) resolves the active locale through useT(). */}
+        <I18nProvider locale={locale}>
+          <Providers>{children}</Providers>
+        </I18nProvider>
       </body>
     </html>
   );

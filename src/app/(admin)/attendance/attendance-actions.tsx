@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, Label, Select } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
+import { Tx } from "@/components/i18n-text";
 
 async function post(url: string, body: unknown): Promise<{ ok: boolean; message?: string; data?: Record<string, unknown> }> {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -44,7 +45,7 @@ export function KioskCard({ properties, isStaff }: { properties: { id: string; l
 
   return (
     <div className="mb-4 rounded-lg border bg-muted/30 p-4">
-      <div className="mb-3 text-sm font-semibold">Kiosk</div>
+      <div className="mb-3 text-sm font-semibold"><Tx>Kiosk</Tx></div>
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="att-property">Property</Label>

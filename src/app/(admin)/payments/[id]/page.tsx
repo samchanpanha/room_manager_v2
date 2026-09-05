@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/misc";
 import { formatMinor } from "@/lib/money";
 import { timeAgo } from "@/lib/utils";
 import { PaymentActions } from "../payment-jobs";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,7 @@ export default async function PaymentDetailPage({ params }: { params: Promise<{ 
     <div>
       <div className="mb-4 text-sm text-muted-foreground">
         <Link href="/payments" className="underline underline-offset-4 hover:text-foreground">
-          Payments
+          <Tx>Payments</Tx>
         </Link>{" "}
         / <span className="text-foreground">{payment.code}</span>
       </div>
@@ -77,7 +78,7 @@ export default async function PaymentDetailPage({ params }: { params: Promise<{ 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardContent className="p-5">
-            <p className="mb-3 text-sm font-medium">Allocations (§9.5 — immutable after creation)</p>
+            <p className="mb-3 text-sm font-medium"><Tx>Allocations (§9.5 — immutable after creation)</Tx></p>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -102,9 +103,9 @@ export default async function PaymentDetailPage({ params }: { params: Promise<{ 
                 ))}
                 {payment.allocations.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="py-5 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={3} className="py-5 text-center text-sm text-muted-foreground"><Tx>
                       Not allocated — the full amount is member credit (refundable by an Accountant).
-                    </TableCell>
+                    </Tx></TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
@@ -112,20 +113,20 @@ export default async function PaymentDetailPage({ params }: { params: Promise<{ 
             <div className="mt-4 flex justify-end">
               <div className="w-full max-w-64 space-y-1.5 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Allocated</span>
+                  <span className="text-muted-foreground"><Tx>Allocated</Tx></span>
                   <span className="tabular-nums">{formatMinor(payment.amountMinor - payment.remainingMinor)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Member credit</span>
+                  <span className="text-muted-foreground"><Tx>Member credit</Tx></span>
                   <span className="tabular-nums">{formatMinor(payment.remainingMinor)}</span>
                 </div>
                 <div className="flex justify-between border-t pt-1.5 font-semibold">
-                  <span>Total</span>
+                  <span><Tx>Total</Tx></span>
                   <span className="tabular-nums">{formatMinor(payment.amountMinor)}</span>
                 </div>
                 {payment.refundedMinor > 0 ? (
                   <div className="flex justify-between text-destructive">
-                    <span>Refunded</span>
+                    <span><Tx>Refunded</Tx></span>
                     <span className="tabular-nums">−{formatMinor(payment.refundedMinor)}</span>
                   </div>
                 ) : null}
@@ -136,9 +137,9 @@ export default async function PaymentDetailPage({ params }: { params: Promise<{ 
 
         <Card>
           <CardContent className="p-5">
-            <p className="mb-3 text-sm font-medium">Timeline</p>
+            <p className="mb-3 text-sm font-medium"><Tx>Timeline</Tx></p>
             <ul className="space-y-2.5">
-              {activity.length === 0 ? <li className="text-sm text-muted-foreground">No entries yet.</li> : null}
+              {activity.length === 0 ? <li className="text-sm text-muted-foreground"><Tx>No entries yet.</Tx></li> : null}
               {activity.map((a) => (
                 <li key={a.id} className="flex items-start justify-between gap-3 text-sm">
                   <div>

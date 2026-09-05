@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tx } from "@/components/i18n-text";
 
 async function send(url: string, method: string, body?: unknown): Promise<{ ok: boolean; message?: string; data?: Record<string, unknown> }> {
   const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -64,7 +65,7 @@ export function SecurityPanel({
         <CardContent className="space-y-3">
           {enrollmentRequired && (
             <p className="rounded-md border border-amber-500/50 bg-amber-500/10 p-2 text-sm text-amber-600 dark:text-amber-400">
-              2FA is mandatory for your role — enroll below. All other module capabilities are locked until a second factor is verified.
+              <Tx>2FA is mandatory for your role — enroll below. All other module capabilities are locked until a second factor is verified.</Tx>
             </p>
           )}
           <p className="text-sm">
@@ -150,7 +151,7 @@ export function SecurityPanel({
             </div>
           ))}
           <div className="flex items-center justify-between border-t pt-3">
-            <span className="text-sm text-muted-foreground">Audit trail tamper-evidence</span>
+            <span className="text-sm text-muted-foreground"><Tx>Audit trail tamper-evidence</Tx></span>
             <Button
               size="sm"
               variant="outline"

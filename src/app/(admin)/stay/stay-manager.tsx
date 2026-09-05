@@ -12,6 +12,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useToast } from "@/components/toast";
 import { formatMinor } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { Tx } from "@/components/i18n-text";
 
 type Tab = "bookings" | "modules" | "rates";
 
@@ -351,7 +352,7 @@ function BookingsTable({
                 </TableCell>
                 <TableCell className="whitespace-nowrap">
                   {fmt(b.checkIn)} → {fmt(b.checkOut)}
-                  {b.posMode === "tab" ? <div className="text-xs text-muted-foreground">POS tab</div> : null}
+                  {b.posMode === "tab" ? <div className="text-xs text-muted-foreground"><Tx>POS tab</Tx></div> : null}
                 </TableCell>
                 <TableCell>{duration((new Date(b.checkOut).getTime() - new Date(b.checkIn).getTime()) / 60000)}</TableCell>
                 <TableCell className="text-right tabular-nums">
@@ -449,10 +450,10 @@ function DetailDialog({
               ))}
             </ul>
           ) : (
-            <p className="text-muted-foreground">No lines yet.</p>
+            <p className="text-muted-foreground"><Tx>No lines yet.</Tx></p>
           )}
           <div className="mt-2 flex justify-between border-t pt-2 font-medium">
-            <span>Total</span>
+            <span><Tx>Total</Tx></span>
             <span>{formatMinor(data.tabInvoice.totalMinor)}</span>
           </div>
         </div>
@@ -1071,7 +1072,7 @@ function RateDialog({
           <Input type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
         </Field>
         <p className="rounded-lg bg-muted/60 p-2 text-xs text-muted-foreground">
-          First bucket whose upper bound ≥ stay duration wins (progressive). For blended days add a 1440-minute bucket and longer spans bill whole days + remainder.
+          <Tx>First bucket whose upper bound ≥ stay duration wins (progressive). For blended days add a 1440-minute bucket and longer spans bill whole days + remainder.</Tx>
         </p>
       </div>
       <div className="mt-4 flex justify-end gap-2">

@@ -7,6 +7,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/toast";
+import { Tx } from "@/components/i18n-text";
 
 interface FindingRow {
   id: string;
@@ -194,7 +195,7 @@ function CompleteDialog({ busy, onDone }: { busy: boolean; onDone: (items: ItemR
             >
               + Add checklist item
             </Button>
-            {rows.length === 0 ? <p className="text-xs text-muted-foreground">Add the checklist items you are capturing (mobile-friendly one-per-row).</p> : null}
+            {rows.length === 0 ? <p className="text-xs text-muted-foreground"><Tx>Add the checklist items you are capturing (mobile-friendly one-per-row).</Tx></p> : null}
             {rows.map((row, ix) => (
               <div key={ix} className="grid gap-2 rounded-md border p-2 sm:grid-cols-12">
                 <Input

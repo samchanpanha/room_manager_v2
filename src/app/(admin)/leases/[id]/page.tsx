@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/misc";
 import { LeaseActions } from "./lease-actions";
 import { ServicesCard } from "./services-card";
 import { timeAgo } from "@/lib/utils";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,7 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
     <div>
       <div className="mb-4 text-sm text-muted-foreground">
         <Link href="/leases" className="underline underline-offset-4 hover:text-foreground">
-          Leases
+          <Tx>Leases</Tx>
         </Link>{" "}
         / <span className="text-foreground">{lease.code}</span>
       </div>
@@ -81,16 +82,16 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardContent className="p-5">
-            <p className="mb-3 text-sm font-medium">Terms</p>
+            <p className="mb-3 text-sm font-medium"><Tx>Terms</Tx></p>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Term</dt>
+                <dt className="text-muted-foreground"><Tx>Term</Tx></dt>
                 <dd>
                   {lease.startDate.toISOString().slice(0, 10)} → {lease.endDate ? lease.endDate.toISOString().slice(0, 10) : "open"}
                 </dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Rent / month</dt>
+                <dt className="text-muted-foreground"><Tx>Rent / month</Tx></dt>
                 <dd className="tabular-nums">{money(lease.rentAmountMinor)}</dd>
               </div>
               <div className="flex justify-between">
@@ -100,20 +101,20 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
                 </dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Deposit</dt>
+                <dt className="text-muted-foreground"><Tx>Deposit</Tx></dt>
                 <dd className="tabular-nums">
                   {money(lease.depositTotalMinor)} in {lease.depositInstallments} installment(s)
                 </dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Notice / renewal</dt>
+                <dt className="text-muted-foreground"><Tx>Notice / renewal</Tx></dt>
                 <dd>
                   {lease.noticeDays}d · {lease.autoRenew ? "auto-renews" : "manual"}
                   {lease.escalationPercent !== null ? ` · +${lease.escalationPercent}%/yr` : ""}
                 </dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Next bill</dt>
+                <dt className="text-muted-foreground"><Tx>Next bill</Tx></dt>
                 <dd>{lease.nextBillingDate ? lease.nextBillingDate.toISOString().slice(0, 10) : "— (set on activation)"}</dd>
               </div>
               {lease.terminationReason ? (
@@ -136,9 +137,9 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
 
       <Card className="mt-4">
         <CardContent className="p-5">
-          <p className="mb-3 text-sm font-medium">Timeline (audit)</p>
+          <p className="mb-3 text-sm font-medium"><Tx>Timeline (audit)</Tx></p>
           <ul className="space-y-2.5">
-            {activity.length === 0 ? <li className="text-sm text-muted-foreground">No entries yet.</li> : null}
+            {activity.length === 0 ? <li className="text-sm text-muted-foreground"><Tx>No entries yet.</Tx></li> : null}
             {activity.map((a) => (
               <li key={a.id} className="flex items-start justify-between gap-3 text-sm">
                 <div>
@@ -155,11 +156,11 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
       </Card>
 
       <Card className="mt-4">
-        <CardContent className="p-4 text-xs text-muted-foreground">
+        <CardContent className="p-4 text-xs text-muted-foreground"><Tx>
           Effects: activation → room occupied, member active, first invoice scheduled (generation job ships in Phase 6) · ending →
           room cleaning (when last lease in room), member moved_out, deposit settlement triggered (M10 acts from Phase 9) ·
           termination clearance/inspection gates tighten as those modules land.
-        </CardContent>
+        </Tx></CardContent>
       </Card>
     </div>
   );

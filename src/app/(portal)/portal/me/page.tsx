@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireMember } from "@/lib/portal";
+import { getT } from "@/lib/locale-server";
 import { TelegramCard } from "@/components/telegram-card";
 import { LogoutButton } from "./logout-button";
 
@@ -8,12 +9,12 @@ const money = (minor: number | null | undefined) => (minor == null ? "—" : `$$
 
 /// §M25 profile — identity, tenancy status, KYC chip, deposit, sign out.
 export default async function PortalMePage() {
-  const { member } = await requireMember();
+  const [{ member }, { tUi }] = await Promise.all([requireMember(), getT()]);
   const deposit = await (await import("@/lib/portal")).memberDeposit(member.id);
 
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-semibold tracking-tight">My profile</h1>
+      <h1 className="text-lg font-semibold tracking-tight">{tUi("My profile")}</h1>
 
       <Card>
         <CardHeader className="pb-2">
@@ -25,7 +26,7 @@ export default async function PortalMePage() {
           <p className="text-muted-foreground">{member.phone ?? "—"}</p>
           <div className="flex gap-2 pt-1">
             <Badge variant="secondary">{member.status}</Badge>
-            <Badge variant={member.kycCompletedAt ? "success" : "warning"}>{member.kycCompletedAt ? "KYC complete" : "KYC pending"}</Badge>
+            <Badge variant={member.kycCompletedAt ? "success" : "warning"}>{member.kycCompletedAt ? tUi("KYC complete") : tUi("KYC pending")}</Badge>
           </div>
         </CardContent>
       </Card>
@@ -41,7 +42,7 @@ export default async function PortalMePage() {
               <Badge variant={deposit.status === "held" || deposit.status === "settled" ? "success" : "warning"}>{deposit.status}</Badge>
             </div>
           ) : (
-            <p className="text-muted-foreground">No deposit on file.</p>
+            <p className="text-muted-foreground">{tUi("No deposit on file.")}</p>
           )}
         </CardContent>
       </Card>

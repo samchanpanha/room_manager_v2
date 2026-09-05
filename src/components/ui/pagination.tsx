@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/components/i18n-provider";
 import { Select } from "@/components/ui/input";
 
 export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -65,19 +66,20 @@ export function Pagination({
   onPageSize: (size: number) => void;
   labelId?: string;
 }) {
+  const { t, tf } = useT();
   if (total === 0) return null;
   const from = page === 1 ? 1 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
       <p id={labelId} className="text-xs text-muted-foreground">
-        Showing {from}–{to} of {total} row{total === 1 ? "" : "s"}
+        {tf("table.showing", { from, to, total, s: total === 1 ? "" : "s" })}
       </p>
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-1.5 text-xs">
-          <span className="text-muted-foreground">Rows</span>
+          <span className="text-muted-foreground">{t("table.rows")}</span>
           <Select
-            aria-label="Rows per page"
+            aria-label={t("table.rowsPerPage")}
             className="h-8 w-auto py-0 text-xs"
             value={String(pageSize)}
             onChange={(e) => onPageSize(Number(e.target.value))}
@@ -90,13 +92,13 @@ export function Pagination({
           </Select>
         </div>
         <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => onPage(page - 1)}>
-          ‹ Prev
+          {t("table.prev")}
         </Button>
         <span className="text-xs tabular-nums text-muted-foreground">
           {page} / {pageCount}
         </span>
         <Button size="sm" variant="outline" disabled={page >= pageCount} onClick={() => onPage(page + 1)}>
-          Next ›
+          {t("table.next")}
         </Button>
       </div>
     </div>

@@ -7,9 +7,8 @@ import { Input, Label } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { LOCALES, LOCALE_META } from "@/lib/i18n";
 import type { getSettings } from "@/lib/settings";
-import { REPORTS } from "@/lib/reports/registry";
+import { Tx } from "@/components/i18n-text";
 
 type Settings = Awaited<ReturnType<typeof getSettings>>;
 
@@ -51,7 +50,6 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
   const [printer, setPrinter] = useState(settings.printer);
   const [telegram, setTelegram] = useState(settings.telegram);
   const [menu, setMenu] = useState(settings.menu);
-  const [reports, setReports] = useState(settings.reports);
   const [units, setUnits] = useState(settings.units.units);
   const [newUnit, setNewUnit] = useState("");
   const [templates, setTemplates] = useState({
@@ -104,16 +102,7 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
       <Card>
         <CardHeader><CardTitle>Locale &amp; billing defaults</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <Field label="Language (default for new browsers)">
-            <SearchableSelect
-              value={locale.locale}
-              onChange={(v) => setLocale({ ...locale, locale: v })}
-              options={LOCALES.map((l) => ({ value: l, label: `${LOCALE_META[l].native} — ${LOCALE_META[l].name}` }))}
-              className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-              disabled={!canWrite}
-              placeholder="Select language"
-            />
-          </Field>
+          {/* Language moved to its own card (org default + per-browser override). */}
           <div className="grid grid-cols-2 gap-2">
             <Field label="Currency"><Input value={locale.currency} disabled={!canWrite} onChange={(e) => setLocale({ ...locale, currency: e.target.value })} /></Field>
             <Field label="Timezone"><Input value={locale.timezone} disabled={!canWrite} onChange={(e) => setLocale({ ...locale, timezone: e.target.value })} /></Field>
@@ -161,7 +150,7 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
       <Card>
         <CardHeader><CardTitle>Printers</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-xs text-muted-foreground">Receipt and barcode-label printing. Paper width controls thermal slip sizing for printed PDFs / browser window.print().</p>
+          <p className="text-xs text-muted-foreground"><Tx>Receipt and barcode-label printing. Paper width controls thermal slip sizing for printed PDFs / browser window.print().</Tx></p>
           <Field label="Receipt paper width">
             <SearchableSelect
               value={String(printer.paperWidthMm)}
@@ -191,7 +180,7 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
       <Card>
         <CardHeader><CardTitle>Sidebar</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-xs text-muted-foreground">Where the app menu sits in the shell. Applies on next reload.</p>
+          <p className="text-xs text-muted-foreground"><Tx>Where the app menu sits in the shell. Applies on next reload.</Tx></p>
           <select
             className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
             value={menu.side}
@@ -208,7 +197,7 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
       <Card>
         <CardHeader><CardTitle>Stock units</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-xs text-muted-foreground">Measurement units offered when creating stock items and POS products. Items keep their unit even if the list changes.</p>
+          <p className="text-xs text-muted-foreground"><Tx>Measurement units offered when creating stock items and POS products. Items keep their unit even if the list changes.</Tx></p>
           <div className="flex flex-wrap gap-1.5">
             {units.map((u) => (
               <span key={u} className="inline-flex items-center gap-1 rounded-full border bg-muted px-2.5 py-0.5 text-xs">
@@ -256,7 +245,7 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
         <CardHeader><CardTitle>Telegram bot</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <p className="text-xs text-muted-foreground">
-            Member-facing notifications. The bot token is a sealed secret (set/rotate below). Multi-tenant setup wires each bot token to its tenant on first poll of the bot info.
+            <Tx>Member-facing notifications. The bot token is a sealed secret (set/rotate below). Multi-tenant setup wires each bot token to its tenant on first poll of the bot info.</Tx>
           </p>
           <Field label="Display name (shown in the chat and notifications)"><Input value={telegram.botName} disabled={!canWrite} onChange={(e) => setTelegram({ ...telegram, botName: e.target.value })} /></Field>
           <Field label="Welcome message (shown on /start)"><Input value={telegram.welcomeMessage} disabled={!canWrite} onChange={(e) => setTelegram({ ...telegram, welcomeMessage: e.target.value })} /></Field>
@@ -292,16 +281,7 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle>Reports configuration</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-xs text-muted-foreground">Optionally enable selected reports, assign report keys to user IDs, and customize titles. Leave enabled reports empty to show all permitted reports.</p>
-          <Field label="Enabled report keys (comma-separated)"><Input value={reports.enabledKeys.join(", ")} disabled={!canWrite} placeholder="empty = all" onChange={(e) => setReports({ ...reports, enabledKeys: e.target.value.split(",").map((x) => x.trim()).filter((x) => REPORTS.some((r) => r.key === x)) })} /></Field>
-          <Field label="Assignments (JSON: report key → user IDs)"><Input value={JSON.stringify(reports.assignments)} disabled={!canWrite} onChange={(e) => { try { setReports({ ...reports, assignments: JSON.parse(e.target.value) }); } catch { /* keep editable text until valid JSON */ } }} /></Field>
-          <Field label="Designs (JSON: report key → title/description/columns)"><Input value={JSON.stringify(reports.designs)} disabled={!canWrite} onChange={(e) => { try { setReports({ ...reports, designs: JSON.parse(e.target.value) }); } catch { /* keep editable text until valid JSON */ } }} /></Field>
-          {canWrite && <Button size="sm" disabled={busy} onClick={() => void save("reports", reports, "Reports configuration saved")}>Save reports configuration</Button>}
-        </CardContent>
-      </Card>
+      {/* Reports configuration lives in ./reports-config (develop · assign · design). */}
 
       <Card>
         <CardHeader><CardTitle>Table defaults</CardTitle></CardHeader>
@@ -394,7 +374,7 @@ export function OpeningBalanceForm({ accounts, canWrite }: { accounts: Array<{ c
     <Card>
       <CardHeader><CardTitle>Opening balances</CardTitle></CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-xs text-muted-foreground">Posts one balanced <code>opening</code> ledger transaction. Forward-only — mistakes are corrected by a reversing adjustment, never a rewrite.</p>
+        <p className="text-xs text-muted-foreground">Posts one balanced <code><Tx>opening</Tx></code> ledger transaction. Forward-only — mistakes are corrected by a reversing adjustment, never a rewrite.</p>
         <div className="flex items-center gap-2">
           <SearchableSelect
             value={c1}
@@ -405,7 +385,7 @@ export function OpeningBalanceForm({ accounts, canWrite }: { accounts: Array<{ c
             placeholder="Select account"
           />
           <Input type="number" className="w-28" value={a1} disabled={!canWrite} onChange={(e) => setA1(e.target.value)} />
-          <span className="text-sm text-muted-foreground">debit</span>
+          <span className="text-sm text-muted-foreground"><Tx>debit</Tx></span>
         </div>
         <div className="flex items-center gap-2">
           <SearchableSelect
@@ -417,10 +397,10 @@ export function OpeningBalanceForm({ accounts, canWrite }: { accounts: Array<{ c
             placeholder="Select account"
           />
           <Input type="number" className="w-28" value={a2} disabled={!canWrite} onChange={(e) => setA2(e.target.value)} />
-          <span className="text-sm text-muted-foreground">credit</span>
+          <span className="text-sm text-muted-foreground"><Tx>credit</Tx></span>
         </div>
         <Button size="sm" disabled={!canWrite || busy || !a1 || a1 !== a2} onClick={() => void post()}>Post opening balances</Button>
-        {a1 !== a2 && <p className="text-xs text-destructive">Debit and credit amounts must be equal (balanced posting).</p>}
+        {a1 !== a2 && <p className="text-xs text-destructive"><Tx>Debit and credit amounts must be equal (balanced posting).</Tx></p>}
       </CardContent>
     </Card>
   );

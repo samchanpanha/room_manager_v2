@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
+import { useT } from "@/components/i18n-provider";
 
 /// §M25 OTP login: identifier (party email or phone) → 6-digit code. The dev
 /// echo code is shown inline (demo has no mail/SMS provider yet — M21/M28).
 export function LoginForm() {
   const router = useRouter();
+  const { tUi } = useT();
   const [step, setStep] = useState<"identifier" | "code">("identifier");
   const [identifier, setIdentifier] = useState("");
   const [code, setCode] = useState("");
@@ -33,7 +35,7 @@ export function LoginForm() {
       return;
     }
     if (!data.delivered) {
-      setError("We could not find a resident with that email or phone. Please check with reception.");
+      setError(tUi("We could not find a resident with that email or phone. Please check with reception."));
       return;
     }
     if (data.devCode) setDevCode(data.devCode);
@@ -62,9 +64,11 @@ export function LoginForm() {
   return (
     <Card className="w-full">
       <CardContent className="p-6">
-        <h1 className="text-xl font-semibold tracking-tight">Resident sign-in</h1>
+        <h1 className="text-xl font-semibold tracking-tight">{tUi("Resident sign-in")}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {step === "identifier" ? "Enter the email or phone number you registered with." : `We sent a 6-digit code to ${identifier}.`}
+          {step === "identifier"
+            ? tUi("Enter the email or phone number you registered with.")
+            : tUi("We sent a 6-digit code to {identifier}.").replace("{identifier}", identifier)}
         </p>
 
         {step === "identifier" ? (
@@ -85,7 +89,7 @@ export function LoginForm() {
             </div>
             {devCode ? (
               <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
-                Demo mode — your code is <span className="font-mono font-semibold text-foreground">{devCode}</span>
+                {tUi("Demo mode — your code is")} <span className="font-mono font-semibold text-foreground">{devCode}</span>
               </p>
             ) : null}
             <Button type="submit" className="w-full" disabled={busy || code.length !== 6}>
@@ -100,7 +104,7 @@ export function LoginForm() {
                 setDevCode(null);
               }}
             >
-              Use a different email or phone
+              {tUi("Use a different email or phone")}
             </button>
           </form>
         )}

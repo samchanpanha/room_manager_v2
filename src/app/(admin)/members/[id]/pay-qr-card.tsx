@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { signMemberToken, memberPayQrDataUrl } from "@/lib/qrpay/tokens";
 import { env } from "@/lib/env";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tx } from "@/components/i18n-text";
 
 /// M13: the member's scan-to-pay QR (poster/invoice insert). Encodes
 /// {APP_BASE_URL}/pay?m=<HMAC token> — pay-without-login (§M13).
@@ -15,7 +16,7 @@ export async function MemberPayQrCard({ memberId }: { memberId: string }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={dataUrl} alt="Member pay QR" className="h-32 w-32 rounded-lg border bg-white p-1.5" />
         <div className="text-sm">
-          <p className="font-medium">Scan-to-pay QR (M13)</p>
+          <p className="font-medium"><Tx>Scan-to-pay QR (M13)</Tx></p>
           <p className="mt-1 text-xs text-muted-foreground">
             Print this on the door poster or invoice: scanning opens the pay-without-login page with the member&apos;s outstanding invoices.
             {openCount > 0 ? ` Currently ${openCount} open invoice(s).` : " No open invoices right now."}

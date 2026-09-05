@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, Label } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
+import { Tx } from "@/components/i18n-text";
 
 interface RoleOpt { id: string; name: string; key?: string; isProtected?: boolean }
 interface PropertyOpt { id: string; name: string; code?: string }
@@ -34,7 +35,7 @@ function CheckList({
 }) {
   return (
     <div id={id} className="max-h-40 space-y-1.5 overflow-y-auto rounded-md border p-2">
-      {options.length === 0 ? <p className="p-1 text-xs text-muted-foreground">None available</p> : null}
+      {options.length === 0 ? <p className="p-1 text-xs text-muted-foreground"><Tx>None available</Tx></p> : null}
       {options.map((o) => (
         <label key={o.id} className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={selected.has(o.id)} onChange={() => onToggle(o.id)} className="h-4 w-4" />

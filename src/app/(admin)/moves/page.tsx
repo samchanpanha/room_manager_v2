@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { MoveActions } from "./move-actions";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -139,9 +140,9 @@ export default async function RoomMovesPage() {
               ))}
               {visible.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                     No room moves yet — request one for an active lease (member portal or staff).
-                  </TableCell>
+                  </Tx></TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
@@ -149,8 +150,8 @@ export default async function RoomMovesPage() {
         </CardContent>
       </Card>
       <p className="mt-3 text-xs text-muted-foreground">
-        Execution bills the new lease&apos;s first period as the adjustment invoice: prorated new rent + move fee − unused old-rent credit
-        (discount) = exact delta. The deposit row moves with the member — the 2100 liability never changes.
+        <Tx>Execution bills the new lease&apos;s first period as the adjustment invoice: prorated new rent + move fee − unused old-rent credit
+        (discount) = exact delta. The deposit row moves with the member — the 2100 liability never changes.</Tx>
       </p>
     </div>
   );

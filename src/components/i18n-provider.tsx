@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, useMemo } from "react";
 import { DEFAULT_LOCALE, tfIn, tIn, tNavIn, tUiIn, type Locale } from "@/lib/i18n";
 
 /// Locale flows down as React context from the root layout's resolved value —
@@ -15,14 +15,19 @@ export function useLocale(): Locale {
   return useContext(LocaleContext);
 }
 
-/// Bound translators for client components: const { t, tf, tNav } = useT();
+/// Bound translators for client components: const { t, tf, tNav, tUi } = useT();
+/// Memoised on the locale so primitives can use them in dependency arrays.
 export function useT() {
   const locale = useContext(LocaleContext);
-  return {
-    locale,
-    t: (key: string) => tIn(locale, key),
-    tf: (key: string, vars: Record<string, string | number>) => tfIn(locale, key, vars),
-    tNav: (label: string) => tNavIn(locale, label),
-    tUi: (label: string) => tUiIn(locale, label)
-  };
+  return useMemo(
+    () => ({
+      locale,
+      t: (key: string) => tIn(locale, key),
+      tf: (key: string, vars: Record<string, string | number>) => tfIn(locale, key, vars),
+      tNav: (label: string) => tNavIn(locale, label),
+      /// Translate an authored English UI string via the phrase table.
+      tUi: (label: string) => tUiIn(locale, label)
+    }),
+    [locale]
+  );
 }

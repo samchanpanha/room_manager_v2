@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { NewPropertyButton } from "./new-property";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -108,13 +109,13 @@ export default async function PropertiesPage() {
       )}
       {can(user, "read", "M01") ? (
         <p className="mt-3 text-xs text-muted-foreground">
-          Tip: property scoping is enforced server-side — e.g. the demo Property Manager is assigned to BLR only and cannot
-          mutate Riverside Villa, even via direct API calls.
+          <Tx>Tip: property scoping is enforced server-side — e.g. the demo Property Manager is assigned to BLR only and cannot
+          mutate Riverside Villa, even via direct API calls.</Tx>
         </p>
       ) : null}
       <div className="mt-4">
         <Link href="/dashboard" className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
-          ← Dashboard
+          <Tx>← Dashboard</Tx>
         </Link>
       </div>
     </div>

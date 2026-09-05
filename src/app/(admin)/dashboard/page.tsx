@@ -17,6 +17,7 @@ import { moduleAccent } from "@/lib/tabs";
 import { navIcon } from "@/lib/icons";
 import { Icon } from "@/components/icon";
 import { timeAgo, titleCase } from "@/lib/utils";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +71,7 @@ export default async function DashboardPage() {
           </p>
         </div>
         <Link href="/reports" className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
-          Open Reports →
+          <Tx>Open Reports →</Tx>
         </Link>
       </div>
 
@@ -104,7 +105,7 @@ export default async function DashboardPage() {
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <p className="mb-2 text-xs font-medium text-muted-foreground">Due soon</p>
+                <p className="mb-2 text-xs font-medium text-muted-foreground"><Tx>Due soon</Tx></p>
                 {rentDues.upcoming.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nothing due in the next {settings.rentAlerts.aheadDays} days.</p>
                 ) : (
@@ -124,9 +125,9 @@ export default async function DashboardPage() {
                 )}
               </div>
               <div>
-                <p className="mb-2 text-xs font-medium text-muted-foreground">Overdue</p>
+                <p className="mb-2 text-xs font-medium text-muted-foreground"><Tx>Overdue</Tx></p>
                 {rentDues.overdue.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No overdue rent invoices.</p>
+                  <p className="text-sm text-muted-foreground"><Tx>No overdue rent invoices.</Tx></p>
                 ) : (
                   <ul className="space-y-1.5 text-sm">
                     {rentDues.overdue.slice(0, 5).map((d) => (
@@ -143,9 +144,9 @@ export default async function DashboardPage() {
                 )}
               </div>
             </div>
-            <Link href="/reports?key=overdue-not-paid" className="mt-3 inline-block text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground">
+            <Link href="/reports?key=overdue-not-paid" className="mt-3 inline-block text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"><Tx>
               Open the overdue-not-paid report →
-            </Link>
+            </Tx></Link>
           </CardContent>
         </Card>
       ) : null}
@@ -153,7 +154,7 @@ export default async function DashboardPage() {
       <Card className="mt-6" data-tour="launch">
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Quick launch</CardTitle>
-          <span className="text-xs text-muted-foreground">one click opens a new tab</span>
+          <span className="text-xs text-muted-foreground"><Tx>one click opens a new tab</Tx></span>
         </CardHeader>
         <CardContent>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -205,7 +206,7 @@ export default async function DashboardPage() {
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base">Recent activity (audit trail)</CardTitle>
             <Link href="/audit" className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
-              View all
+              <Tx>View all</Tx>
             </Link>
           </CardHeader>
           <CardContent>
@@ -239,7 +240,7 @@ export default async function DashboardPage() {
             <Badge variant="outline">{stubCount} modules queued · phases 3–22</Badge>
           </div>
           <p className="mt-3 text-sm text-muted-foreground">
-            Live modules: billing (M06–M13), operations (M14–M23), finance (M24, M26), comms (M21, M25) and admin (M01, M27–M29).
+            <Tx>Live modules: billing (M06–M13), operations (M14–M23), finance (M24, M26), comms (M21, M25) and admin (M01, M27–M29).</Tx>
           </p>
         </CardContent>
       </Card>

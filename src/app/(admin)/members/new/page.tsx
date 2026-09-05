@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/auth/session";
 import { can } from "@/lib/rbac/can";
 import { PageHeader } from "@/components/ui/misc";
 import { OnboardingWizard } from "./onboarding-wizard";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export default async function NewMemberPage() {
     return (
       <div>
         <PageHeader title="Onboard member" />
-        <p className="text-sm text-destructive">Your roles do not include create on Members (M02).</p>
+        <p className="text-sm text-destructive"><Tx>Your roles do not include create on Members (M02).</Tx></p>
       </div>
     );
   }

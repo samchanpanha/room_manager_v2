@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { useT } from "@/components/i18n-provider";
 
 interface DialogProps {
   open: boolean;
@@ -17,6 +18,7 @@ interface DialogProps {
 /// some parents (sticky headers with backdrop-blur, transforms) act as a
 /// containing block for position:fixed children, which would clip the overlay.
 export function Dialog({ open, onClose, title, description, children, wide }: DialogProps) {
+  const { tUi } = useT();
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -38,8 +40,8 @@ export function Dialog({ open, onClose, title, description, children, wide }: Di
           wide ? "max-w-3xl" : "max-w-lg"
         )}
       >
-        <h2 className="text-lg font-semibold">{title}</h2>
-        {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+        <h2 className="text-lg font-semibold">{tUi(title)}</h2>
+        {description ? <p className="mt-1 text-sm text-muted-foreground">{tUi(description)}</p> : null}
         <div className="mt-4">{children}</div>
       </div>
     </div>,

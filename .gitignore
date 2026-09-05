@@ -1,4 +1,3 @@
-```gitignore
 # Dependencies
 node_modules/
 .pnpm-store/
@@ -83,4 +82,9 @@ out/
 *.so
 *.a
 *.out
-```
+
+# M27 backups
+backups/
+
+# i18n audit artifacts (regenerate: node scripts/extract-strings.mjs)
+i18n-strings.json

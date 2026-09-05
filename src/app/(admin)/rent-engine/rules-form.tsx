@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
+import { Tx } from "@/components/i18n-text";
 
 interface Initial {
   graceDays: number;
@@ -96,7 +97,7 @@ export function RulesForm({ canEdit, initial }: { canEdit: boolean; initial: Ini
           </Button>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">Read-only — M06:update required to change billing rules.</p>
+        <p className="text-xs text-muted-foreground"><Tx>Read-only — M06:update required to change billing rules.</Tx></p>
       )}
     </form>
   );

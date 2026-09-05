@@ -9,6 +9,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
 import { cn, titleCase } from "@/lib/utils";
+import { Tx } from "@/components/i18n-text";
 
 // ── View types (serialized from the server page) ────────────────────────────
 
@@ -113,16 +114,16 @@ export function MemberTabs({
       {tab === "Lease" ? (
         <Card>
           <CardContent className="p-8 text-center">
-            <p className="text-sm font-medium text-muted-foreground">No lease yet</p>
-            <p className="mt-1 text-xs text-muted-foreground">Leases & contracts arrive in Phase 5 — activation will live here.</p>
+            <p className="text-sm font-medium text-muted-foreground"><Tx>No lease yet</Tx></p>
+            <p className="mt-1 text-xs text-muted-foreground"><Tx>Leases & contracts arrive in Phase 5 — activation will live here.</Tx></p>
           </CardContent>
         </Card>
       ) : null}
       {tab === "Ledger" ? (
         <Card>
           <CardContent className="p-8 text-center">
-            <p className="text-sm font-medium text-muted-foreground">No ledger entries yet</p>
-            <p className="mt-1 text-xs text-muted-foreground">The member account statement comes with the Ledger phase (7).</p>
+            <p className="text-sm font-medium text-muted-foreground"><Tx>No ledger entries yet</Tx></p>
+            <p className="mt-1 text-xs text-muted-foreground"><Tx>The member account statement comes with the Ledger phase (7).</Tx></p>
           </CardContent>
         </Card>
       ) : null}
@@ -213,13 +214,13 @@ function ProfileTab({ member, canUpdate }: { member: MemberView; canUpdate: bool
     <div className="space-y-5">
       {member.blacklisted && member.blacklistReason ? (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          <span className="font-medium">Blacklisted:</span> {member.blacklistReason}
+          <span className="font-medium"><Tx>Blacklisted:</Tx></span> {member.blacklistReason}
         </div>
       ) : null}
 
       <Card>
         <CardContent className="p-5">
-          <p className="mb-3 text-sm font-medium">Lifecycle</p>
+          <p className="mb-3 text-sm font-medium"><Tx>Lifecycle</Tx></p>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{member.status}</Badge>
             {member.nextStatuses.map((to) => (
@@ -244,7 +245,7 @@ function ProfileTab({ member, canUpdate }: { member: MemberView; canUpdate: bool
               >
                 {member.blacklisted ? "Remove blacklist" : "Blacklist member"}
               </Button>
-              <span className="ml-2 text-xs text-muted-foreground">requires a written reason; always audited</span>
+              <span className="ml-2 text-xs text-muted-foreground"><Tx>requires a written reason; always audited</Tx></span>
             </div>
           ) : null}
         </CardContent>
@@ -253,7 +254,7 @@ function ProfileTab({ member, canUpdate }: { member: MemberView; canUpdate: bool
       {canUpdate ? (
         <Card>
           <CardContent className="p-5">
-            <p className="mb-3 text-sm font-medium">Edit profile</p>
+            <p className="mb-3 text-sm font-medium"><Tx>Edit profile</Tx></p>
             <form onSubmit={saveProfile} className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
@@ -302,7 +303,7 @@ function ProfileTab({ member, canUpdate }: { member: MemberView; canUpdate: bool
         </Card>
       ) : (
         <Card>
-          <CardContent className="p-5 text-sm text-muted-foreground">Read-only access (M02:read).</CardContent>
+          <CardContent className="p-5 text-sm text-muted-foreground"><Tx>Read-only access (M02:read).</Tx></CardContent>
         </Card>
       )}
 
@@ -381,7 +382,7 @@ function ContactsTab({ memberId, contacts, canUpdate }: { memberId: string; cont
     <Card>
       <CardContent className="p-5">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-sm font-medium">Emergency contacts</p>
+          <p className="text-sm font-medium"><Tx>Emergency contacts</Tx></p>
           {canUpdate ? <Button size="sm" onClick={() => setOpen(true)}>+ Add contact</Button> : null}
         </div>
         <ul className="divide-y">
@@ -403,7 +404,7 @@ function ContactsTab({ memberId, contacts, canUpdate }: { memberId: string; cont
               ) : null}
             </li>
           ))}
-          {contacts.length === 0 ? <li className="py-3 text-sm text-muted-foreground">No contacts on file.</li> : null}
+          {contacts.length === 0 ? <li className="py-3 text-sm text-muted-foreground"><Tx>No contacts on file.</Tx></li> : null}
         </ul>
       </CardContent>
       <Dialog open={open} onClose={() => setOpen(false)} title="Add emergency contact">
@@ -491,7 +492,7 @@ function DocumentsTab({
     <Card>
       <CardContent className="p-5">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-sm font-medium">Documents</p>
+          <p className="text-sm font-medium"><Tx>Documents</Tx></p>
           {flags.canUploadDocs ? (
             <Button size="sm" onClick={() => setUploadOpen(true)}>
               + Upload document
@@ -499,7 +500,7 @@ function DocumentsTab({
           ) : null}
         </div>
         {documents.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">No documents on file.</p>
+          <p className="py-6 text-center text-sm text-muted-foreground"><Tx>No documents on file.</Tx></p>
         ) : (
           <ul className="divide-y">
             {documents.map((d) => (

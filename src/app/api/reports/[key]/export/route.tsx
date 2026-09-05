@@ -5,7 +5,17 @@ import { hasModuleAccess } from "@/lib/rbac/can";
 import { toCsv } from "@/lib/csv";
 import { runReport } from "@/lib/reports/service";
 import { canSeeReport, reportScope } from "@/lib/reports/scope";
+import { applyReportDesign, resolveReportKeys, summaryLabel } from "@/lib/reports/config";
+import { getSettings } from "@/lib/settings";
+import { getT } from "@/lib/locale-server";
 import { ReportPdf } from "@/lib/reports/report-pdf";
+
+/// Money summary keys carry minor units; spreadsheets want numbers in major
+/// units, so exports convert them (the screen keeps the currency-formatted text).
+function exportValue(k: string, v: unknown): string | number {
+  if (typeof v === "number") return k.endsWith("Minor") ? v / 100 : v;
+  return v == null ? "" : String(v);
+}
 
 const querySchema = z.object({
   format: z.enum(["csv", "pdf", "xlsx"]).default("csv"),
@@ -31,12 +41,25 @@ export async function GET(req: Request, ctx: { params: Promise<{ key: string }> 
 
   const result = await runReport(key, parsed.data, scope);
   if (!result) return fail(404, "NOT_FOUND", "Unknown report");
+
+  // Optional org configuration applies to exports exactly as it does on screen:
+  // develop/assign gating first, then the design (title/description/columns).
+  const { reports: reportSettings } = await getSettings();
+  if (!resolveReportKeys([key], reportSettings, user.id).includes(key)) {
+    return fail(403, "FORBIDDEN", "This report is not enabled or assigned for your account");
+  }
+  const designed = applyReportDesign(result, reportSettings.designs[key]);
+  // Labels follow the caller's language (en / km / zh). PDF stays English:
+  // @react-pdf/renderer ships Helvetica, which cannot render Khmer or Chinese
+  // glyphs — a localized PDF would come out as boxes.
+  const { tUi } = await getT();
+  const local = parsed.data.format === "pdf" ? (text: string) => text : tUi;
   const stamp = new Date().toISOString().slice(0, 10);
 
   if (parsed.data.format === "csv") {
-    const header = result.columns.map((c) => c.label);
-    const rows = result.rows.map((r) => result.columns.map((c) => r[c.key]));
-    for (const [k, v] of Object.entries(result.summary)) rows.push([k, v]);
+    const header = designed.columns.map((c) => local(c.label));
+    const rows = designed.rows.map((r) => designed.columns.map((c) => r[c.key]));
+    for (const [k, v] of Object.entries(designed.summary)) rows.push([local(summaryLabel(k)), exportValue(k, v)]);
     return new Response(toCsv(header, rows), {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
@@ -47,12 +70,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ key: string }> 
 
   if (parsed.data.format === "xlsx") {
     const { utils, write } = await import("xlsx");
-    const header = result.columns.map((c) => c.label);
-    const body = result.rows.map((r) => result.columns.map((c) => r[c.key]));
-    const sheet = utils.aoa_to_sheet([header, ...body, ...Object.entries(result.summary)]);
+    const header = designed.columns.map((c) => local(c.label));
+    const body = designed.rows.map((r) => designed.columns.map((c) => r[c.key]));
+    const summaryRows = Object.entries(designed.summary).map(([k, v]) => [local(summaryLabel(k)), exportValue(k, v)]);
+    const sheet = utils.aoa_to_sheet([header, ...body, ...summaryRows]);
     try {
-      sheet["!cols"] = result.columns.map((c, _i) => ({
-        wch: Math.max(10, c.label.length, ...result.rows.map((r) => String(r[c.key] ?? "").length))
+      sheet["!cols"] = designed.columns.map((c, _i) => ({
+        wch: Math.max(10, local(c.label).length, ...designed.rows.map((r) => String(r[c.key] ?? "").length))
       }));
     } catch {
       // width hinting is best-effort
@@ -73,12 +97,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ key: string }> 
   const buffer = await renderToBuffer(
     <ReportPdf
       data={{
-        title: result.title,
-        source: result.source,
+        title: designed.title,
+        source: designed.source,
         generatedAt: new Date().toISOString().replace("T", " ").slice(0, 16) + " UTC",
-        period: result.from || result.to ? `${result.from ?? "…"} → ${result.to ?? "…"}` : `as of ${stamp}`,
-        columns: result.columns,
-        rows: result.rows,
+        period: designed.from || designed.to ? `${designed.from ?? "…"} → ${designed.to ?? "…"}` : `as of ${stamp}`,
+        columns: designed.columns,
+        rows: designed.rows,
         summaryLines
       }}
     />

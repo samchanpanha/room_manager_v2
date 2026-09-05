@@ -17,6 +17,20 @@
 ///      (header on every screen + standalone on /login).
 ///   2. Org-wide default — §M28 Settings → Locale → Language (`m28.locale.locale`).
 ///   3. English.
+import { lookupPhrase, mergePhrases, type PhraseTable } from "@/lib/locales/phrase-table";
+import { uiColumns } from "@/lib/locales/ui-columns";
+import { uiCommon } from "@/lib/locales/ui-common";
+import { uiFields } from "@/lib/locales/ui-fields";
+import { uiGuide } from "@/lib/locales/ui-guide";
+import { uiLabels } from "@/lib/locales/ui-labels";
+import { uiMessages } from "@/lib/locales/ui-messages";
+import { uiPages } from "@/lib/locales/ui-pages";
+import { uiExtra } from "@/lib/locales/ui-extra";
+import { uiPortal } from "@/lib/locales/ui-portal";
+import { uiProse } from "@/lib/locales/ui-prose";
+import { uiReports } from "@/lib/locales/ui-reports";
+import { uiStatus } from "@/lib/locales/ui-status";
+
 export const LOCALES = ["en", "km", "zh"] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = "en";
@@ -124,6 +138,16 @@ const en: Record<string, string> = {
   "tabs.closeNamed": "Close {label}",
 
   "lang.label": "Language",
+
+  "table.showing": "Showing {from}–{to} of {total} row{s}",
+  "table.rows": "Rows",
+  "table.rowsPerPage": "Rows per page",
+  "table.prev": "‹ Prev",
+  "table.next": "Next ›",
+  "select.noMatches": "No matches",
+
+  "settings.langOverridden": "overridden for this browser (org default: {lang})",
+  "settings.language.intro": "English, Khmer (ខ្មែរ) and Chinese (中文) are available on every module screen — menus, page titles, table columns, field labels, statuses, buttons and exports. The org default applies to new browsers; each visitor can override it with the 🌐 switcher in the header, or here.",
 
   // Reports page
   "reports.page.title": "Reports",
@@ -254,7 +278,7 @@ const km: Record<string, string> = {
   "nav.item.Owners": "ម្ចាស់អចលនទ្រព្យ",
   "nav.item.Owner Portal": "ខ្លោងទ្វារម្ចាស់",
   "nav.item.Leases": "កិច្ចសន្យាជួល",
-  "nav.item.Rent Engine": "ការគណនាថ្លៃជួល",
+  "nav.item.Rent Engine": "ម៉ាស៊ីនគណនាថ្លៃជួល",
   "nav.item.Invoices": "វិក្កយបត្រ",
   "nav.item.Payments": "ការទូទាត់",
   "nav.item.Deposits": "ប្រាក់កក់",
@@ -270,7 +294,7 @@ const km: Record<string, string> = {
   "nav.item.POS": "ចំណុចលក់",
   "nav.item.POS Catalog": "កាតាឡុកចំណុចលក់",
   "nav.item.Stock": "ស្តុក",
-  "nav.item.Short Stays": "ការសម្រាកខ្លី",
+  "nav.item.Short Stays": "ការស្នាក់ខ្លី",
   "nav.item.Purchase Orders": "លិខិតបញ្ជាទិញ",
   "nav.item.Attendance": "ការវត្តមាន",
   "nav.item.Tenant Portal": "ខ្លោងទ្វារអ្នកជួល",
@@ -301,6 +325,16 @@ const km: Record<string, string> = {
   "tabs.closeNamed": "បិទ {label}",
 
   "lang.label": "ភាសា",
+
+  "table.showing": "បង្ហាញ {from}–{to} ក្នុងចំណោម {total} ជួរ",
+  "table.rows": "ជួរ",
+  "table.rowsPerPage": "ជួរក្នុងមួយទំព័រ",
+  "table.prev": "‹ មុន",
+  "table.next": "បន្ទាប់ ›",
+  "select.noMatches": "រកមិនឃើញ",
+
+  "settings.langOverridden": "បានប្តូរសម្រាប់កម្មវិធីរុករកនេះ (លំនាំដើមស្ថាប័ន៖ {lang})",
+  "settings.language.intro": "ភាសាអង់គ្លេស ខ្មែរ និងចិន មាននៅគ្រប់អេក្រង់ម៉ូឌុល — ម៉ឺនុយ ចំណងជើងទំព័រ ជួរឈរតារាង ស្លាកវាល ស្ថានភាព ប៊ូតុង និងឯកសារនាំចេញ។ លំនាំដើមស្ថាប័នអនុវត្តសម្រាប់កម្មវិធីរុករកថ្មី; អ្នកប្រើម្នាក់ៗអាចប្តូរតាមប៊ូតុង 🌐 ក្នុងបារខាងលើ ឬនៅទីនេះ។",
 
   // Reports page
   "reports.page.title": "របាយការណ៍",
@@ -479,6 +513,16 @@ const zh: Record<string, string> = {
 
   "lang.label": "语言",
 
+  "table.showing": "显示第 {from}–{to} 条，共 {total} 行",
+  "table.rows": "行数",
+  "table.rowsPerPage": "每页行数",
+  "table.prev": "‹ 上一页",
+  "table.next": "下一页 ›",
+  "select.noMatches": "无匹配项",
+
+  "settings.langOverridden": "已在此浏览器中覆盖（机构默认：{lang}）",
+  "settings.language.intro": "所有模块页面均支持英语、高棉语（ខ្មែរ）和中文（中文）— 菜单、页面标题、表格列、字段标签、状态、按钮与导出文件。机构默认语言适用于新浏览器；每位访问者可以通过顶栏的 🌐 切换器或此处覆盖。",
+
   // Reports page
   "reports.page.title": "报表",
   "reports.page.description": "M26 — 分析和导出，可按日期范围和物业筛选",
@@ -601,16 +645,33 @@ export function tNavIn(locale: Locale, label: string): string {
   return DICT[locale][`nav.item.${label}`] ?? label;
 }
 
-// Common labels used across every module. Page components can pass their English
-// labels through this helper without duplicating locale plumbing.
-const COMMON_UI: Record<Locale, Record<string, string>> = {
-  en: {},
-  km: { "Save": "រក្សាទុក", "Cancel": "បោះបង់", "Search": "ស្វែងរក", "Filter": "តម្រង", "Loading…": "កំពុងផ្ទុក…", "No results": "គ្មានលទ្ធផល", "Actions": "សកម្មភាព", "Status": "ស្ថានភាព", "Name": "ឈ្មោះ", "Date": "កាលបរិច្ឆេទ", "Create": "បង្កើត", "Edit": "កែសម្រួល", "Delete": "លុប", "Submit": "ដាក់ស្នើ", "Close": "បិទ", "Back": "ត្រឡប់ក្រោយ" },
-  zh: { "Save": "保存", "Cancel": "取消", "Search": "搜索", "Filter": "筛选", "Loading…": "加载中…", "No results": "无结果", "Actions": "操作", "Status": "状态", "Name": "名称", "Date": "日期", "Create": "创建", "Edit": "编辑", "Delete": "删除", "Submit": "提交", "Close": "关闭", "Back": "返回" }
-};
+/// UI phrase tables — the English text of every label, column header, button,
+/// badge/status, field, page title, hint and toast in the app, mapped per
+/// locale (src/lib/locales/ui-*.ts). `tUiIn` is an exact-match lookup, so the
+/// shared UI primitives can translate whatever a page hands them without the
+/// page knowing anything about locales — see src/components/i18n-text.tsx.
+export const UI_PHRASES: PhraseTable = mergePhrases(
+  uiColumns,
+  uiCommon,
+  uiFields,
+  uiStatus,
+  uiPages,
+  uiMessages,
+  uiExtra,
+  uiPortal,
+  uiProse,
+  uiReports,
+  uiGuide,
+  uiLabels
+);
 
+/// Translate an authored English UI string into `locale`.
+/// Falls back to the nav label table, then to the original English text, so an
+/// untranslated phrase degrades to today's behaviour instead of a key.
 export function tUiIn(locale: Locale, text: string): string {
-  return COMMON_UI[locale][text] ?? tNavIn(locale, text);
+  if (locale === "en") return text;
+  if (typeof text !== "string" || text.length === 0) return text;
+  return lookupPhrase(locale, UI_PHRASES, text) ?? tNavIn(locale, text);
 }
 
 /// Client-side switch (LanguageSwitcher): persist the choice in the cookie.

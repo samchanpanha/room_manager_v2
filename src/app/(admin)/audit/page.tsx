@@ -10,6 +10,7 @@ import { Input, Select } from "@/components/ui/input";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { MODULE_BY_KEY } from "@/lib/rbac/catalog";
 import { formatDate, titleCase } from "@/lib/utils";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,7 @@ export default async function AuditPage({
       <form className="mb-4 flex flex-wrap items-end gap-3" method="get">
         <div className="w-44 space-y-1.5">
           <label htmlFor="f-module" className="text-sm font-medium">
-            Module
+            <Tx>Module</Tx>
           </label>
           <Select id="f-module" name="module" defaultValue={sp.module ?? ""}>
             <option value="">All modules</option>
@@ -63,13 +64,13 @@ export default async function AuditPage({
         </div>
         <div className="w-64 space-y-1.5">
           <label htmlFor="f-q" className="text-sm font-medium">
-            Actor or summary contains
+            <Tx>Actor or summary contains</Tx>
           </label>
           <Input id="f-q" name="q" defaultValue={sp.q ?? ""} placeholder="e.g. Malis" />
         </div>
         <Button type="submit">Filter</Button>
         <a href="/audit" className="text-sm text-muted-foreground underline underline-offset-4">
-          Reset
+          <Tx>Reset</Tx>
         </a>
       </form>
 
@@ -114,7 +115,7 @@ export default async function AuditPage({
               className="rounded-md border px-3 py-1.5 hover:bg-accent"
               href={`/audit?${new URLSearchParams({ ...(sp.module ? { module: sp.module } : {}), ...(sp.q ? { q: sp.q } : {}), page: String(page - 1) })}`}
             >
-              ← Prev
+              <Tx>← Prev</Tx>
             </a>
           ) : null}
           {page < pages ? (
@@ -122,7 +123,7 @@ export default async function AuditPage({
               className="rounded-md border px-3 py-1.5 hover:bg-accent"
               href={`/audit?${new URLSearchParams({ ...(sp.module ? { module: sp.module } : {}), ...(sp.q ? { q: sp.q } : {}), page: String(page + 1) })}`}
             >
-              Next →
+              <Tx>Next →</Tx>
             </a>
           ) : null}
         </div>

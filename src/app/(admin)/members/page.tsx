@@ -5,12 +5,13 @@ import { can, hasModuleAccess, type EffectivePermission } from "@/lib/rbac/can";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { buttonClassName } from "@/components/ui/button";
+import { buttonClassName } from "@/components/ui/button-styles";
 import { Input, Select } from "@/components/ui/input";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { MEMBER_STATUSES } from "@/lib/members/lifecycle";
 import { formatDate, titleCase } from "@/lib/utils";
 import { formatMinor } from "@/lib/money";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +75,7 @@ export default async function MembersPage({
         actions={
           can(user, "create", "M02") ? (
             <Link href="/members/new" className={buttonClassName()}>
-              + Onboard member
+              <Tx>+ Onboard member</Tx>
             </Link>
           ) : undefined
         }
@@ -83,7 +84,7 @@ export default async function MembersPage({
       <form method="get" className="mb-4 flex flex-wrap items-end gap-3">
         <div className="w-40 space-y-1.5">
           <label htmlFor="f-status" className="text-sm font-medium">
-            Status
+            <Tx>Status</Tx>
           </label>
           <Select id="f-status" name="status" defaultValue={sp.status ?? ""}>
             <option value="">All statuses</option>
@@ -96,7 +97,7 @@ export default async function MembersPage({
         </div>
         <div className="w-48 space-y-1.5">
           <label htmlFor="f-prop" className="text-sm font-medium">
-            Property
+            <Tx>Property</Tx>
           </label>
           <Select id="f-prop" name="propertyId" defaultValue={sp.propertyId ?? ""}>
             <option value="">All properties</option>
@@ -109,13 +110,13 @@ export default async function MembersPage({
         </div>
         <div className="w-56 space-y-1.5">
           <label htmlFor="f-q" className="text-sm font-medium">
-            Search name / email / ID
+            <Tx>Search name / email / ID</Tx>
           </label>
           <Input id="f-q" name="q" defaultValue={sp.q ?? ""} />
         </div>
-        <button type="submit" className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90">Filter</button>
+        <button type="submit" className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"><Tx>Filter</Tx></button>
         <Link href="/members" className="pb-2 text-sm text-muted-foreground underline underline-offset-4">
-          Reset
+          <Tx>Reset</Tx>
         </Link>
       </form>
 

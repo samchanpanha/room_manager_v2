@@ -9,6 +9,7 @@ import { formatMinor } from "@/lib/money";
 import { expensesScope, canApproveExpenses } from "@/lib/operations/expenses-scope";
 import { profitAndLoss } from "@/lib/operations/expenses-service";
 import { ExpensesActions } from "./expenses-actions";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         <form className="ml-auto flex items-center gap-2" action="/expenses" method="get">
           <input type="month" name="month" defaultValue={month} className="h-8 rounded-md border bg-transparent px-2 text-xs" />
           <button type="submit" className="h-8 rounded-md border px-2 text-xs hover:bg-accent">
-            View month
+            <Tx>View month</Tx>
           </button>
         </form>
       </div>
@@ -98,7 +99,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
                     </TableRow>
                   ))}
                   <TableRow className="font-medium">
-                    <TableCell className="text-xs">Total revenue</TableCell>
+                    <TableCell className="text-xs"><Tx>Total revenue</Tx></TableCell>
                     <TableCell className="text-right tabular-nums text-xs">{formatMinor(report.revenueTotalMinor)}</TableCell>
                   </TableRow>
                   {report.expenses.map((l) => (
@@ -108,17 +109,17 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
                     </TableRow>
                   ))}
                   <TableRow className="font-medium">
-                    <TableCell className="text-xs">Total operating expenses</TableCell>
+                    <TableCell className="text-xs"><Tx>Total operating expenses</Tx></TableCell>
                     <TableCell className="text-right tabular-nums text-xs">{formatMinor(report.expenseTotalMinor)}</TableCell>
                   </TableRow>
                   {report.payoutTotalMinor > 0 ? (
                     <TableRow>
-                      <TableCell className="text-xs">Owner payouts</TableCell>
+                      <TableCell className="text-xs"><Tx>Owner payouts</Tx></TableCell>
                       <TableCell className="text-right tabular-nums text-xs">−{formatMinor(report.payoutTotalMinor)}</TableCell>
                     </TableRow>
                   ) : null}
                   <TableRow className="font-semibold">
-                    <TableCell className="text-xs">Net</TableCell>
+                    <TableCell className="text-xs"><Tx>Net</Tx></TableCell>
                     <TableCell className="text-right tabular-nums text-xs">{formatMinor(report.netMinor)}</TableCell>
                   </TableRow>
                 </TableBody>
@@ -155,9 +156,9 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
                     ))}
                     {report.reconciliation.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
+                        <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground"><Tx>
                           No expense postings this month.
-                        </TableCell>
+                        </Tx></TableCell>
                       </TableRow>
                     ) : null}
                   </TableBody>
@@ -197,9 +198,9 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
                     ))}
                     {report.budgets.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
+                        <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground"><Tx>
                           No budgets or spend this month.
-                        </TableCell>
+                        </Tx></TableCell>
                       </TableRow>
                     ) : null}
                   </TableBody>
@@ -212,7 +213,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
 
       <Card className="mt-4">
         <CardContent className="p-0">
-          <div className="border-b p-3 text-sm font-semibold">Expenses</div>
+          <div className="border-b p-3 text-sm font-semibold"><Tx>Expenses</Tx></div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -248,7 +249,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
               {expenses.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
-                    No expenses recorded yet.
+                    <Tx>No expenses recorded yet.</Tx>
                   </TableCell>
                 </TableRow>
               ) : null}
@@ -257,11 +258,11 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         </CardContent>
       </Card>
 
-      <p className="mt-3 text-xs text-muted-foreground">
+      <p className="mt-3 text-xs text-muted-foreground"><Tx>
         Approval above the threshold is Accountant+ (GLOBAL M20:update, mirroring the deposit-refund gate). Approval posts
         DR category-account / CR cash|bank with refType `expense`; voids reverse the posting — the P&L reads the ledger, so
         register and ledger always reconcile exactly.
-      </p>
+      </Tx></p>
     </div>
   );
 }

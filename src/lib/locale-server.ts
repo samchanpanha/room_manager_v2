@@ -6,7 +6,7 @@
 /// pages that work without the DB (e.g. /login) never break on resolution.
 import { cookies } from "next/headers";
 import { cache } from "react";
-import { DEFAULT_LOCALE, LOCALE_COOKIE, tfIn, tIn, tNavIn, toLocale, type Locale } from "@/lib/i18n";
+import { DEFAULT_LOCALE, LOCALE_COOKIE, tfIn, tIn, tNavIn, tUiIn, toLocale, type Locale } from "@/lib/i18n";
 
 export const getResolvedLocale = cache(async (): Promise<Locale> => {
   try {
@@ -34,6 +34,9 @@ export const getT = cache(async () => {
     locale,
     t: (key: string) => tIn(locale, key),
     tf: (key: string, vars: Record<string, string | number>) => tfIn(locale, key, vars),
-    tNav: (label: string) => tNavIn(locale, label)
+    tNav: (label: string) => tNavIn(locale, label),
+    /// Translate an authored English UI string (labels, column headers,
+    /// statuses, hints) — the server-side twin of `useT().tUi`.
+    tUi: (text: string) => tUiIn(locale, text)
   };
 });
