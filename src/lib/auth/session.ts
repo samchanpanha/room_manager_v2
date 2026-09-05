@@ -16,6 +16,7 @@ export interface AuthUser extends Subject {
   sessionId: string;
   isSuperAdmin: boolean;
   totpEnrollmentRequired: boolean;
+  mustChangePassword: boolean;
 }
 
 const ADMIN_PLUS_ROLES = new Set(["SUPER_ADMIN", "ADMIN"]);
@@ -99,6 +100,9 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     isSuperAdmin: roles.includes("SUPER_ADMIN"),
     // §M27: TOTP 2FA is mandatory for Admin+ — until enrolled, only M27
     // capabilities resolve (can()/hasModuleAccess() gate on this flag).
-    totpEnrollmentRequired: isAdminPlus && !session.user.totpEnabled
+    totpEnrollmentRequired: isAdminPlus && !session.user.totpEnabled,
+    // M34: admin-set default/temporary password — user is routed to the
+    // forced password-change screen until they set their own.
+    mustChangePassword: session.user.mustChangePassword
   };
 }

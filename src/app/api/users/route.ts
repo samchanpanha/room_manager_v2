@@ -9,6 +9,7 @@ const createSchema = z.object({
   name: z.string().min(2).max(120),
   email: z.string().email(),
   password: z.string().min(8).max(100),
+  mustChangePassword: z.boolean().default(true),
   roleIds: z.array(z.string()).min(1, "Assign at least one role"),
   propertyIds: z.array(z.string()).default([])
 });
@@ -34,6 +35,7 @@ export async function POST(req: Request) {
       name: parsed.data.name,
       email,
       passwordHash: hashPassword(parsed.data.password),
+      mustChangePassword: parsed.data.mustChangePassword,
       roles: { create: parsed.data.roleIds.map((roleId) => ({ roleId })) },
       assignments: { create: parsed.data.propertyIds.map((propertyId) => ({ propertyId })) }
     }
@@ -45,7 +47,7 @@ export async function POST(req: Request) {
     action: "create",
     entityType: "user",
     entityId: user.id,
-    summary: `Created user ${user.email} with roles: ${roles.map((r) => r.name).join(", ")}`,
+    summary: `Created user ${user.email} with roles: ${roles.map((r) => r.name).join(", ")}${parsed.data.mustChangePassword ? " — password change required at next sign-in" : ""}`,
     after: { email, roles: roles.map((r) => r.key), propertyIds: parsed.data.propertyIds },
     ip: clientIp(req)
   });

@@ -8,6 +8,7 @@ import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { PhotoCell } from "@/components/photo-cell";
 import { formatMinor } from "@/lib/money";
 import { useToast } from "@/components/toast";
 import { Tx } from "@/components/i18n-text";
@@ -22,6 +23,7 @@ export type ClientProduct = {
   sku: string | null;
   description: string | null;
   isActive: boolean;
+  imageDocId?: string | null;
   stock: { id: string; name: string; qtyMilli: number; unit: string } | null;
 };
 
@@ -147,6 +149,7 @@ export function ProductsClient({ products, stockItems, categories, legacyCategor
             <TableHeader>
               <TableRow>
                 <TableHead className="w-8"></TableHead>
+                <TableHead>Photo</TableHead>
                 <TableHead>Product</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Barcode / SKU</TableHead>
@@ -161,6 +164,14 @@ export function ProductsClient({ products, stockItems, categories, legacyCategor
                 <TableRow key={p.id}>
                   <TableCell>
                     <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)} aria-label={`Select ${p.name}`} />
+                  </TableCell>
+                  <TableCell>
+                    <PhotoCell
+                      getUrl={`/api/pos/products/${p.id}/image`}
+                      uploadUrl={`/api/pos/products/${p.id}/image`}
+                      alt={p.name}
+                      canWrite={canWrite}
+                    />
                   </TableCell>
                   <TableCell>
                     <span className="text-sm font-medium">{p.name}</span>
@@ -192,7 +203,7 @@ export function ProductsClient({ products, stockItems, categories, legacyCategor
               ))}
               {products.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground"><Tx>
+                  <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                     No products yet — add one from the button above.
                   </Tx></TableCell>
                 </TableRow>

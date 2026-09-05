@@ -22,12 +22,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     resource = { propertyId: doc.propertyId };
   }
 
-  // Stock item photos are read under M15 (Stock) scope, not the documents
-  // module — any staff that can view a property's stock can fetch the photo.
-  const g = doc.entity === "STOCK_ITEM" ? await authorize("read", "M15", resource) : await authorize("read", "M17", resource);
+  const imageModule = doc.entity === "STOCK_ITEM" ? "M15" : doc.entity === "POS_PRODUCT" ? "M14" : doc.entity === "SERVICE_CATALOG" ? "M12" : null;
+  // Product/service photos are read under their catalog module (Stock M15,
+  // POS M14, Services M12), not the documents module — any staff that can view
+  // the catalog can fetch the photo. Other documents stay under M17.
+  const g = imageModule ? await authorize("read", imageModule, resource) : await authorize("read", "M17", resource);
   if (g.response) return g.response;
 
-  const auditModule = doc.entity === "STOCK_ITEM" ? "M15" : "M17";
+  const auditModule = imageModule ?? "M17";
 
   const token = signDownloadToken(doc.id);
   const expiresAt = new Date(Date.now() + SIGNED_URL_TTL_SECONDS * 1000);

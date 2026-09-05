@@ -29,7 +29,8 @@ export function Loginform() {
         setError(body?.message ?? t("auth.login.error"));
         return;
       }
-      router.replace("/dashboard");
+      const body = (await res.json().catch(() => null)) as { mustChangePassword?: boolean } | null;
+      router.replace(body?.mustChangePassword ? "/account/password?force=1" : "/dashboard");
       router.refresh();
     } finally {
       setBusy(false);

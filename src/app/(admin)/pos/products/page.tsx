@@ -52,6 +52,7 @@ export default async function PosProductsPage() {
           sku: p.sku,
           description: p.description,
           isActive: p.isActive,
+          imageDocId: p.imageDocId,
           stock: p.stockItem ? { id: p.stockItem.id, name: p.stockItem.name, qtyMilli: p.stockItem.qtyMilli, unit: p.stockItem.unit } : null
         }))}
         stockItems={stockItems.map((s) => ({ id: s.id, label: `${s.name} (${(s.qtyMilli / 1000).toFixed(s.unit === "pcs" ? 0 : 2)} ${s.unit})` }))}

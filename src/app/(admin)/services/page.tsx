@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, PageHeader, StatCard } from "@/components/ui/misc";
+import { PhotoCell } from "@/components/photo-cell";
 import { ServiceActions } from "./service-actions";
 import { Tx } from "@/components/i18n-text";
 
@@ -146,6 +147,7 @@ export default async function ServicesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Photo</TableHead>
                   <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Model</TableHead>
@@ -155,6 +157,14 @@ export default async function ServicesPage() {
               <TableBody>
                 {catalog.map((c) => (
                   <TableRow key={c.id}>
+                    <TableCell>
+                      <PhotoCell
+                        getUrl={`/api/services/${c.id}/image`}
+                        uploadUrl={`/api/services/${c.id}/image`}
+                        alt={c.name}
+                        canWrite={canSuspend}
+                      />
+                    </TableCell>
                     <TableCell className="font-mono text-xs">{c.code}</TableCell>
                     <TableCell>
                       {c.name}

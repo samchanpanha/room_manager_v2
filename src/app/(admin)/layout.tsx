@@ -10,6 +10,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
+  // M34: an admin-set default/temporary password is still active — the only
+  // page the user may reach is the forced change screen on /account/password.
+  if (user.mustChangePassword) redirect("/account/password?force=1");
+
   const moduleAllowed: Record<string, boolean> = {};
   const [flags, settings] = await Promise.all([getFeatureFlags(), getSettings()]);
   setActiveCurrency(settings.locale.currency); // §M28 org-wide display currency

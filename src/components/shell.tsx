@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NAV } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import { tIn, tNavIn } from "@/lib/i18n";
 import { useT } from "@/components/i18n-provider";
+import { useTx } from "@/components/i18n-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,10 +49,29 @@ export function Shell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const tUi = useTx();
   const { locale, t, tf, tNav } = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // M34: groups start collapsed (except the one containing the active page);
+  // the user's choices persist per browser via localStorage.
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const raw = window.localStorage.getItem("rm-nav");
+      return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("rm-nav", JSON.stringify(collapsed));
+    } catch {
+      // storage quota / private mode — collapsing still works for the session
+    }
+  }, [collapsed]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -78,7 +98,23 @@ export function Shell({
     }).filter((g) => g.items.length > 0);
   }, [query, moduleAllowed, locale]);
 
-  const isCollapsed = (key: string) => collapsed[key] && !searching;
+  const activeGroupKey = useMemo(() => {
+    for (const group of NAV) {
+      if (group.items.some((item) => item.href && (pathname === item.href || pathname.startsWith(item.href + "/")))) return group.label;
+    }
+    return null;
+  }, [pathname]);
+
+  const isCollapsed = (key: string) => {
+    if (searching) return false;
+    if (Object.prototype.hasOwnProperty.call(collapsed, key)) return collapsed[key];
+    // Never toggled: open only the group holding the active page.
+    return key !== activeGroupKey;
+  };
+
+  function setAll(open: boolean) {
+    setCollapsed(Object.fromEntries(groups.map((g) => [g.label, !open])));
+  }
 
   const brandNode = org.logo ? (
     // eslint-disable-next-line @next/next/no-img-element
@@ -118,6 +154,17 @@ export function Shell({
         />
       </div>
 
+      <div className="px-3 pb-2">
+        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+          <button type="button" onClick={() => setAll(true)} className="rounded px-1.5 py-0.5 hover:bg-accent hover:text-foreground">
+            {tUi("Collapse all")}
+          </button>
+          <button type="button" onClick={() => setAll(false)} className="rounded px-1.5 py-0.5 hover:bg-accent hover:text-foreground">
+            {tUi("Expand all")}
+          </button>
+        </div>
+      </div>
+
       <nav className="px-3 pb-16">
         {groups.map((group) => {
           const key = group.label;
@@ -134,7 +181,10 @@ export function Shell({
                   <Icon name={navGroupIcon(group.label)} className="h-3.5 w-3.5" />
                   {t(group.label)}
                 </span>
-                <span aria-hidden className="text-[10px]">{closed ? "▸" : "▾"}</span>
+                <span className="flex items-center gap-1.5 text-[10px]">
+                  <span className="tabular-nums opacity-70">{group.items.length}</span>
+                  <span aria-hidden>{closed ? "▸" : "▾"}</span>
+                </span>
               </button>
               {!closed && (
                 <ul className="space-y-0.5">

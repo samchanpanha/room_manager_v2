@@ -55,6 +55,8 @@ export async function POST(req: Request) {
     roles,
     // Admin+ must complete TOTP enrollment before any other module capability
     // resolves (can()/hasModuleAccess() gate on the session user's flag).
-    totpEnrollmentRequired: roles.some((r) => r === "SUPER_ADMIN" || r === "ADMIN") && !user.totpEnabled
+    totpEnrollmentRequired: roles.some((r) => r === "SUPER_ADMIN" || r === "ADMIN") && !user.totpEnabled,
+    // M34: an admin-set default/temporary password forces a change at next sign-in.
+    mustChangePassword: user.mustChangePassword
   });
 }

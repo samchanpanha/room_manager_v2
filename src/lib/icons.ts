@@ -30,6 +30,7 @@ export function navIcon(label: string): IconName {
     case "Stock": return "archive";
     case "Purchase Orders": return "file-plus";
     case "Attendance": return "clock";
+    case "My Account": return "user";
     case "Telegram Bot": return "send";
     case "Reports": return "chart";
     case "Users": return "user";
@@ -87,9 +88,11 @@ export function navGroupIcon(label: string): IconName {
     case "nav.billing": return "receipt";
     case "nav.finance": return "wallet";
     case "nav.operations": return "wrench";
+    case "nav.store": return "archive";
     case "nav.comms": return "message";
     case "nav.insights": return "chart";
     case "nav.admin": return "shield";
+    case "nav.account": return "user";
     default: return "sparkle";
   }
 }

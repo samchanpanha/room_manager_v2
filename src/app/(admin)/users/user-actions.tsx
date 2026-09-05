@@ -53,6 +53,7 @@ export function NewUserButton({ roles, properties }: { roles: RoleOpt[]; propert
   const [busy, setBusy] = useState(false);
   const [roleIds, setRoleIds] = useState<Set<string>>(new Set());
   const [propertyIds, setPropertyIds] = useState<Set<string>>(new Set());
+  const [mustChange, setMustChange] = useState(true);
 
   const toggle = (set: Set<string>, setter: (s: Set<string>) => void, id: string) => {
     const next = new Set(set);
@@ -69,6 +70,7 @@ export function NewUserButton({ roles, properties }: { roles: RoleOpt[]; propert
       name: form.get("name"),
       email: form.get("email"),
       password: form.get("password"),
+      mustChangePassword: mustChange,
       roleIds: [...roleIds],
       propertyIds: [...propertyIds]
     });
@@ -81,6 +83,7 @@ export function NewUserButton({ roles, properties }: { roles: RoleOpt[]; propert
     setOpen(false);
     setRoleIds(new Set());
     setPropertyIds(new Set());
+    setMustChange(true);
     router.refresh();
   }
 
@@ -116,6 +119,10 @@ export function NewUserButton({ roles, properties }: { roles: RoleOpt[]; propert
               onToggle={(id) => toggle(propertyIds, setPropertyIds, id)}
             />
           </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={mustChange} onChange={(e) => setMustChange(e.target.checked)} className="h-4 w-4" />
+            <Tx>Require password change at next sign-in (default)</Tx>
+          </label>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
@@ -148,6 +155,8 @@ export function UserRowActions({
   const router = useRouter();
   const { push } = useToast();
   const [editOpen, setEditOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetPwd, setResetPwd] = useState("");
   const [busy, setBusy] = useState(false);
   const [roleIds, setRoleIds] = useState<Set<string>>(new Set(currentRoleIds));
   const [propertyIds, setPropertyIds] = useState<Set<string>>(new Set(currentPropertyIds));
@@ -191,10 +200,32 @@ export function UserRowActions({
     router.refresh();
   }
 
+  async function resetPassword(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    const r = await api(`/api/users/${target.id}`, "PATCH", { password: resetPwd });
+    setBusy(false);
+    if (!r.ok) {
+      push({ title: "Reset failed", description: r.message, variant: "destructive" });
+      return;
+    }
+    push({
+      title: "Password reset",
+      description: "Temporary password set — they must change it at next sign-in",
+      variant: "success"
+    });
+    setResetOpen(false);
+    setResetPwd("");
+    router.refresh();
+  }
+
   return (
     <div className="flex justify-end gap-1.5">
       <Button size="sm" variant="outline" disabled={busy} onClick={() => setEditOpen(true)}>
         Edit
+      </Button>
+      <Button size="sm" variant="outline" disabled={busy || isSelf} onClick={() => setResetOpen(true)}>
+        Reset
       </Button>
       <Button size="sm" variant={target.status === "active" ? "destructive" : "success"} disabled={busy || isSelf} onClick={toggleStatus}>
         {target.status === "active" ? "Disable" : "Enable"}
@@ -229,6 +260,25 @@ export function UserRowActions({
             </Button>
             <Button type="submit" disabled={busy}>
               {busy ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+      <Dialog open={resetOpen} onClose={() => setResetOpen(false)} title={`Reset password — ${target.name}`}>
+        <form onSubmit={resetPassword} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor={`r-pass-${target.id}`}>Temporary password (min 8 chars)</Label>
+            <Input id={`r-pass-${target.id}`} type="password" value={resetPwd} onChange={(e) => setResetPwd(e.target.value)} minLength={8} required />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            <Tx>Sets a temporary password and makes it mandatory to change at the user's next sign-in.</Tx>
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setResetOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy || resetPwd.length < 8}>
+              {busy ? "Saving…" : "Set temporary password"}
             </Button>
           </div>
         </form>

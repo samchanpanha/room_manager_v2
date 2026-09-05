@@ -3,12 +3,14 @@ import { fail, ok, parseBody, clientIp } from "@/lib/api";
 import { authorize } from "@/lib/rbac/guard";
 import { prisma } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
+import { hashPassword } from "@/lib/auth/password";
 
 const patchSchema = z.object({
   status: z.enum(["active", "disabled"]).optional(),
   roleIds: z.array(z.string()).optional(),
   propertyIds: z.array(z.string()).optional(),
-  name: z.string().min(2).max(120).optional()
+  name: z.string().min(2).max(120).optional(),
+  password: z.string().min(8).max(100).optional()
 });
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -50,7 +52,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         });
       }
     }
-    return tx.user.update({ where: { id }, data: { status: d.status, name: d.name } });
+    // Admin reset: set a temporary/default password and force a change at the
+    // user's next sign-in (M34).
+    return tx.user.update({
+      where: { id },
+      data: {
+        status: d.status,
+        name: d.name,
+        ...(d.password ? { passwordHash: hashPassword(d.password), mustChangePassword: true } : {})
+      }
+    });
   });
 
   await logAudit({

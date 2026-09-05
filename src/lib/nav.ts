@@ -55,12 +55,17 @@ export const NAV: NavGroup[] = [
       { label: "Inspections", href: "/inspections", module: "M18" },
       { label: "Maintenance", href: "/maintenance", module: "M19" },
       { label: "Complaints", href: "/complaints", module: "M22" },
+      { label: "Short Stays", href: "/stay", module: "M32" },
+      { label: "Attendance", href: "/attendance", module: "M23" }
+    ]
+  },
+  {
+    label: "nav.store",
+    items: [
       { label: "POS", href: "/pos", module: "M14" },
       { label: "POS Catalog", href: "/pos/products", module: "M14" },
       { label: "Stock", href: "/stock", module: "M15" },
-      { label: "Short Stays", href: "/stay", module: "M32" },
-      { label: "Purchase Orders", href: "/po", module: "M29" },
-      { label: "Attendance", href: "/attendance", module: "M23" }
+      { label: "Purchase Orders", href: "/po", module: "M29" }
     ]
   },
   {
@@ -83,5 +88,9 @@ export const NAV: NavGroup[] = [
       { label: "Settings", href: "/settings", module: "M28" },
       { label: "Security", href: "/settings/security", module: "M27" }
     ]
+  },
+  {
+    label: "nav.account",
+    items: [{ label: "My Account", href: "/account" }]
   }
 ];
