@@ -301,6 +301,18 @@ export function tNavIn(locale: Locale, label: string): string {
   return DICT[locale][`nav.item.${label}`] ?? label;
 }
 
+// Common labels used across every module. Page components can pass their English
+// labels through this helper without duplicating locale plumbing.
+const COMMON_UI: Record<Locale, Record<string, string>> = {
+  en: {},
+  km: { "Save": "រក្សាទុក", "Cancel": "បោះបង់", "Search": "ស្វែងរក", "Filter": "តម្រង", "Loading…": "កំពុងផ្ទុក…", "No results": "គ្មានលទ្ធផល", "Actions": "សកម្មភាព", "Status": "ស្ថានភាព", "Name": "ឈ្មោះ", "Date": "កាលបរិច្ឆេទ", "Create": "បង្កើត", "Edit": "កែសម្រួល", "Delete": "លុប", "Submit": "ដាក់ស្នើ", "Close": "បិទ", "Back": "ត្រឡប់ក្រោយ" },
+  zh: { "Save": "保存", "Cancel": "取消", "Search": "搜索", "Filter": "筛选", "Loading…": "加载中…", "No results": "无结果", "Actions": "操作", "Status": "状态", "Name": "名称", "Date": "日期", "Create": "创建", "Edit": "编辑", "Delete": "删除", "Submit": "提交", "Close": "关闭", "Back": "返回" }
+};
+
+export function tUiIn(locale: Locale, text: string): string {
+  return COMMON_UI[locale][text] ?? tNavIn(locale, text);
+}
+
 /// Client-side switch (LanguageSwitcher): persist the choice in the cookie.
 /// Callers then `router.refresh()`; the root layout re-resolves and the new
 /// locale flows through the tree as props/context on the next render.

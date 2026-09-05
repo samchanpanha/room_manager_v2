@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { LOCALES, LOCALE_META } from "@/lib/i18n";
 import type { getSettings } from "@/lib/settings";
+import { REPORTS } from "@/lib/reports/registry";
 
 type Settings = Awaited<ReturnType<typeof getSettings>>;
 
@@ -50,6 +51,7 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
   const [printer, setPrinter] = useState(settings.printer);
   const [telegram, setTelegram] = useState(settings.telegram);
   const [menu, setMenu] = useState(settings.menu);
+  const [reports, setReports] = useState(settings.reports);
   const [units, setUnits] = useState(settings.units.units);
   const [newUnit, setNewUnit] = useState("");
   const [templates, setTemplates] = useState({
@@ -287,6 +289,17 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
               </Field>
             ))}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Reports configuration</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">Optionally enable selected reports, assign report keys to user IDs, and customize titles. Leave enabled reports empty to show all permitted reports.</p>
+          <Field label="Enabled report keys (comma-separated)"><Input value={reports.enabledKeys.join(", ")} disabled={!canWrite} placeholder="empty = all" onChange={(e) => setReports({ ...reports, enabledKeys: e.target.value.split(",").map((x) => x.trim()).filter((x) => REPORTS.some((r) => r.key === x)) })} /></Field>
+          <Field label="Assignments (JSON: report key → user IDs)"><Input value={JSON.stringify(reports.assignments)} disabled={!canWrite} onChange={(e) => { try { setReports({ ...reports, assignments: JSON.parse(e.target.value) }); } catch { /* keep editable text until valid JSON */ } }} /></Field>
+          <Field label="Designs (JSON: report key → title/description/columns)"><Input value={JSON.stringify(reports.designs)} disabled={!canWrite} onChange={(e) => { try { setReports({ ...reports, designs: JSON.parse(e.target.value) }); } catch { /* keep editable text until valid JSON */ } }} /></Field>
+          {canWrite && <Button size="sm" disabled={busy} onClick={() => void save("reports", reports, "Reports configuration saved")}>Save reports configuration</Button>}
         </CardContent>
       </Card>
 

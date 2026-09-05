@@ -8,6 +8,7 @@ import { REPORT_BY_KEY } from "@/lib/reports/registry";
 import { canSeeReport, reportScope, visibleReportKeys } from "@/lib/reports/scope";
 import { runReport } from "@/lib/reports/service";
 import { formatMinor } from "@/lib/money";
+import { getSettings } from "@/lib/settings";
 import { ReportPicker } from "./report-picker";
 
 export const dynamic = "force-dynamic";
@@ -28,8 +29,12 @@ export default async function ReportsPage({
 
   const scope = await reportScope(user);
   if (!scope.allowed) redirect("/dashboard");
-  const allowed = new Set(visibleReportKeys(user));
+  const settings = await getSettings();
+  const assigned = Object.entries(settings.reports.assignments).filter(([, ids]) => ids.includes(user.id)).map(([key]) => key);
+  const enabled = settings.reports.enabledKeys.length === 0 ? null : new Set(settings.reports.enabledKeys);
+  const allowed = new Set(visibleReportKeys(user).filter((key) => (!enabled || enabled.has(key)) && (assigned.length === 0 || assigned.includes(key))));
   const reports = [...REPORT_BY_KEY.values()].filter((r) => allowed.has(r.key));
+  if (reports.length === 0) return <PageHeader title="Reports" description="No reports are currently assigned or enabled for your account." />;
   const currentKey = sp.key && allowed.has(sp.key) ? sp.key : reports[0]!.key;
 
   const [properties, result] = await Promise.all([

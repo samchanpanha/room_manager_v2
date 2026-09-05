@@ -107,6 +107,15 @@ export const TEMPLATE_EVENTS = [
 
 export type FeatureFlags = Record<string, boolean>;
 
+/** Optional M26 configuration. Empty enabledKeys means all registered reports.
+ * assignments maps a report key to user ids; designs stores presentation metadata.
+ * Report data remains registry/query backed and is never editable here. */
+export interface ReportSettings {
+  enabledKeys: string[];
+  assignments: Record<string, string[]>;
+  designs: Record<string, { title?: string; description?: string; columns?: string[] }>;
+}
+
 /// Default page size for list tables (overridable per user session).
 export interface TableSettings {
   pageSize: number;
@@ -174,14 +183,18 @@ const UNITS: GroupDefLike & { defaults: UnitsSettings } = {
   defaults: { units: ["pcs", "kg", "l", "box", "m", "pack", "bottle", "can", "packet", "dozen", "carton", "case"] }
 };
 const FEATURES: GroupDefLike & { defaults: FeatureFlags } = { key: "m28.features", defaults: DEFAULT_FEATURE_FLAGS };
+const REPORTS: GroupDefLike & { defaults: ReportSettings } = {
+  key: "m28.reports",
+  defaults: { enabledKeys: [], assignments: {}, designs: {} }
+};
 const TEMPLATES: GroupDefLike & { defaults: TemplateSettings } = { key: "m28.templates", defaults: {} };
 const PROVIDERS: GroupDefLike & { defaults: Record<string, string> } = { key: "m28.providers", defaults: {} };
 const TABLE: GroupDefLike & { defaults: TableSettings } = { key: "m28.table", defaults: { pageSize: 25 } };
 const RENT_ALERTS: GroupDefLike & { defaults: RentAlertSettings } = { key: "m28.alerts", defaults: { aheadDays: 3, overdueDays: 1 } };
 
-const GROUPS: Record<SettingsGroupName, GroupDefLike> = { org: ORG, locale: LOCALE, billing: BILLING, lateFee: LATE_FEE, retention: RETENTION, features: FEATURES, templates: TEMPLATES, printer: PRINTER, telegram: TELEGRAM_BOT, menu: MENU, units: UNITS, table: TABLE, alerts: RENT_ALERTS };
+const GROUPS: Record<SettingsGroupName, GroupDefLike> = { org: ORG, locale: LOCALE, billing: BILLING, lateFee: LATE_FEE, retention: RETENTION, features: FEATURES, reports: REPORTS, templates: TEMPLATES, printer: PRINTER, telegram: TELEGRAM_BOT, menu: MENU, units: UNITS, table: TABLE, alerts: RENT_ALERTS };
 
-export type SettingsGroupName = "org" | "locale" | "billing" | "lateFee" | "retention" | "features" | "templates" | "printer" | "telegram" | "menu" | "units" | "table" | "alerts";
+export type SettingsGroupName = "org" | "locale" | "billing" | "lateFee" | "retention" | "features" | "reports" | "templates" | "printer" | "telegram" | "menu" | "units" | "table" | "alerts";
 
 async function readGroup<T extends object>(def: GroupDefLike): Promise<T> {
   const row = await prisma.setting.findUnique({ where: { key: def.key } });
@@ -221,6 +234,7 @@ export async function getSettings(): Promise<{
   lateFee: LateFeeSettings;
   retention: RetentionSettings;
   features: FeatureFlags;
+  reports: ReportSettings;
   templates: TemplateSettings;
   printer: PrinterSettings;
   telegram: TelegramBotSettings;
@@ -230,13 +244,14 @@ export async function getSettings(): Promise<{
   rentAlerts: RentAlertSettings;
   providers: { paymentCredentials: { configured: boolean; last4: string | null }; telegramBotToken: { configured: boolean; last4: string | null } };
 }> {
-  const [org, locale, billing, lateFee, retention, features, templates, printer, telegram, menu, units, table, rentAlerts, providers] = await Promise.all([
+  const [org, locale, billing, lateFee, retention, features, reports, templates, printer, telegram, menu, units, table, rentAlerts, providers] = await Promise.all([
     readGroup<OrgSettings>(ORG),
     readGroup<LocaleSettings>(LOCALE),
     readGroup<BillingSettings>(BILLING),
     readGroup<LateFeeSettings>(LATE_FEE),
     readGroup<RetentionSettings>(RETENTION),
     readGroup<FeatureFlags>(FEATURES),
+    readGroup<ReportSettings>(REPORTS),
     readGroup<TemplateSettings>(TEMPLATES),
     readGroup<PrinterSettings>(PRINTER),
     readGroup<TelegramBotSettings>(TELEGRAM_BOT),
@@ -253,6 +268,7 @@ export async function getSettings(): Promise<{
     lateFee,
     retention,
     features,
+    reports,
     templates,
     printer,
     telegram,
