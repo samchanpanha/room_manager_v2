@@ -101,7 +101,7 @@ export default async function AttendancePage() {
 
       <Card className="mt-4">
         <CardContent className="p-0">
-          <div className="border-b p-3 text-sm font-semibold">Records — {month}</div>
+          <div className="border-b p-3 text-sm font-semibold"><Tx>Records — </Tx>{month}</div>
           <Table>
             <TableHeader>
               <TableRow>

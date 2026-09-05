@@ -146,8 +146,8 @@ export default async function DepositsPage({
                   <TableCell>
                     {d.invoiceId ? (
                       <a href={`/invoices/${d.invoiceId}`} className="font-mono text-xs underline underline-offset-4 hover:underline">
-                        view
-                      </a>
+                        <Tx>view
+                      </Tx></a>
                     ) : (
                       <span className="text-xs text-muted-foreground"><Tx>not billed</Tx></span>
                     )}

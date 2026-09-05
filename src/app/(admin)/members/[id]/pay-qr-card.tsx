@@ -18,10 +18,10 @@ export async function MemberPayQrCard({ memberId }: { memberId: string }) {
         <div className="text-sm">
           <p className="font-medium"><Tx>Scan-to-pay QR (M13)</Tx></p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Print this on the door poster or invoice: scanning opens the pay-without-login page with the member&apos;s outstanding invoices.
-            {openCount > 0 ? ` Currently ${openCount} open invoice(s).` : " No open invoices right now."}
+            <Tx>Print this on the door poster or invoice: scanning opens the pay-without-login page with the member&apos;s outstanding invoices.
+            </Tx>{openCount > 0 ? ` Currently ${openCount} open invoice(s).` : " No open invoices right now."}
           </p>
-          <p className="mt-1 break-all font-mono text-[10px] text-muted-foreground">/pay?m={token.slice(0, 18)}…</p>
+          <p className="mt-1 break-all font-mono text-[10px] text-muted-foreground"><Tx>/pay?m=</Tx>{token.slice(0, 18)}…</p>
         </div>
       </CardContent>
     </Card>

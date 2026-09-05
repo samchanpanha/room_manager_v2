@@ -136,8 +136,8 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
         <CardHeader><CardTitle>Notification templates (Telegram)</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <p className="text-xs text-muted-foreground">
-            Overrides for member notifications. Placeholders: invoice.issued → {"{code} {total}"} · payment.confirmed → {"{code} {receipt} {total}"} · dunning → {"{code} {due}"}. Empty = default text.
-          </p>
+            <Tx>Overrides for member notifications. Placeholders: invoice.issued → </Tx>{"{code} {total}"} <Tx>· payment.confirmed → </Tx>{"{code} {receipt} {total}"} <Tx>· dunning → </Tx>{"{code} {due}"}<Tx>. Empty = default text.
+          </Tx></p>
           {(["invoice.issued", "payment.confirmed", "invoice.dunning_reminder"] as const).map((ev) => (
             <Field key={ev} label={ev}>
               <Input value={templates[ev]} disabled={!canWrite} placeholder="default" onChange={(e) => setTemplates({ ...templates, [ev]: e.target.value })} />
@@ -166,12 +166,12 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
           </Field>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={printer.autoPrintReceipt} disabled={!canWrite} onChange={(e) => setPrinter({ ...printer, autoPrintReceipt: e.target.checked })} />
-            Auto-print the receipt right after each POS sale
-          </label>
+            <Tx>Auto-print the receipt right after each POS sale
+          </Tx></label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={printer.printBarcodeByDefault} disabled={!canWrite} onChange={(e) => setPrinter({ ...printer, printBarcodeByDefault: e.target.checked })} />
-            Offer barcode label printing by default
-          </label>
+            <Tx>Offer barcode label printing by default
+          </Tx></label>
           <Field label="Receipt copies"><Input type="number" min={1} max={5} value={printer.receiptCopies} disabled={!canWrite} onChange={(e) => setPrinter({ ...printer, receiptCopies: Math.max(1, Math.min(5, Number(e.target.value) || 1)) })} /></Field>
           {canWrite && <Button size="sm" disabled={busy} onClick={() => void save("printer", printer, "Printer settings saved")}>Save printers</Button>}
         </CardContent>
@@ -187,8 +187,8 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
             disabled={!canWrite}
             onChange={(e) => setMenu({ side: e.target.value as Settings["menu"]["side"] })}
           >
-            <option value="left">Left</option>
-            <option value="right">Right</option>
+            <option value="left"><Tx>Left</Tx></option>
+            <option value="right"><Tx>Right</Tx></option>
           </select>
           {canWrite && <Button size="sm" disabled={busy} onClick={() => void save("menu", menu, "Sidebar position saved")}>Save sidebar</Button>}
         </CardContent>
@@ -251,8 +251,8 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
           <Field label="Welcome message (shown on /start)"><Input value={telegram.welcomeMessage} disabled={!canWrite} onChange={(e) => setTelegram({ ...telegram, welcomeMessage: e.target.value })} /></Field>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={telegram.allowMemberLinking} disabled={!canWrite} onChange={(e) => setTelegram({ ...telegram, allowMemberLinking: e.target.checked })} />
-            Allow members to link their Telegram account (self-service)
-          </label>
+            <Tx>Allow members to link their Telegram account (self-service)
+          </Tx></label>
           {canWrite && <Button size="sm" disabled={busy} onClick={() => void save("telegram", telegram, "Telegram bot settings saved")}>Save bot settings</Button>}
         </CardContent>
       </Card>
@@ -268,7 +268,7 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
                 disabled={!canWrite}
                 onChange={(e) => void save("features", { [k]: e.target.checked }, `Flag ${k} ${e.target.checked ? "enabled" : "disabled"}`)}
               />
-              Module {k}
+              <Tx>Module </Tx>{k}
             </label>
           ))}
           <div className="grid grid-cols-4 gap-2 pt-2">
@@ -294,7 +294,7 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
               onChange={(e) => void save("table", { pageSize: Number(e.target.value) }, "Table defaults saved")}
             >
               {[10, 25, 50, 100].map((n) => (
-                <option key={n} value={n}>{n} rows</option>
+                <option key={n} value={n}>{n} <Tx>rows</Tx></option>
               ))}
             </select>
           </Field>
@@ -374,7 +374,7 @@ export function OpeningBalanceForm({ accounts, canWrite }: { accounts: Array<{ c
     <Card>
       <CardHeader><CardTitle>Opening balances</CardTitle></CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-xs text-muted-foreground">Posts one balanced <code><Tx>opening</Tx></code> ledger transaction. Forward-only — mistakes are corrected by a reversing adjustment, never a rewrite.</p>
+        <p className="text-xs text-muted-foreground"><Tx>Posts one balanced </Tx><code><Tx>opening</Tx></code> <Tx>ledger transaction. Forward-only — mistakes are corrected by a reversing adjustment, never a rewrite.</Tx></p>
         <div className="flex items-center gap-2">
           <SearchableSelect
             value={c1}

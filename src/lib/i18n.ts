@@ -30,6 +30,7 @@ import { uiPortal } from "@/lib/locales/ui-portal";
 import { uiProse } from "@/lib/locales/ui-prose";
 import { uiReports } from "@/lib/locales/ui-reports";
 import { uiStatus } from "@/lib/locales/ui-status";
+import { uiCopy } from "@/lib/locales/ui-copy";
 
 export const LOCALES = ["en", "km", "zh"] as const;
 export type Locale = (typeof LOCALES)[number];
@@ -662,7 +663,8 @@ export const UI_PHRASES: PhraseTable = mergePhrases(
   uiProse,
   uiReports,
   uiGuide,
-  uiLabels
+  uiLabels,
+  uiCopy
 );
 
 /// Translate an authored English UI string into `locale`.

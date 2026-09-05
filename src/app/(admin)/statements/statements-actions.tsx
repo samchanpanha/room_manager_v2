@@ -7,6 +7,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Input, Label, Select } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
 
+import { Tx } from "@/components/i18n-text";
 async function post(url: string, body: unknown): Promise<{ ok: boolean; message?: string }> {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = (await res.json().catch(() => ({}))) as { message?: string; code?: string };
@@ -70,8 +71,8 @@ function GenerateDialog({ busy, onDone }: { busy: boolean; onDone: (b: Record<st
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="force" className="h-4 w-4" />
-            Force (ignore the contract payout day)
-          </label>
+            <Tx>Force (ignore the contract payout day)
+          </Tx></label>
           <Button type="submit" disabled={busy}>
             Generate
           </Button>
@@ -190,8 +191,8 @@ function PayDialog({ busy, approved, onDone }: { busy: boolean; approved: { id: 
           <div className="space-y-1.5">
             <Label htmlFor="stmp-method">Method</Label>
             <Select id="stmp-method" name="method" defaultValue="bank_transfer">
-              <option value="bank_transfer">Bank transfer</option>
-              <option value="cash">Cash</option>
+              <option value="bank_transfer"><Tx>Bank transfer</Tx></option>
+              <option value="cash"><Tx>Cash</Tx></option>
             </Select>
           </div>
           <Button type="submit" disabled={busy}>

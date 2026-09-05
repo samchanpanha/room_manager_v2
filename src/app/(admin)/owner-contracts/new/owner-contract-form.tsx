@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
 
+import { Tx } from "@/components/i18n-text";
 export function OwnerContractForm({
   owners,
   buildings
@@ -62,7 +63,7 @@ export function OwnerContractForm({
             <div className="space-y-1.5">
               <Label htmlFor="oc-owner">Owner *</Label>
               <Select id="oc-owner" name="ownerProfileId" required>
-                <option value="">— select owner —</option>
+                <option value=""><Tx>— select owner —</Tx></option>
                 {owners.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.label}
@@ -73,7 +74,7 @@ export function OwnerContractForm({
             <div className="space-y-1.5">
               <Label htmlFor="oc-building">Building (no open contract) *</Label>
               <Select id="oc-building" name="buildingId" required>
-                <option value="">— select building —</option>
+                <option value=""><Tx>— select building —</Tx></option>
                 {buildings.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.label}
@@ -88,12 +89,12 @@ export function OwnerContractForm({
             <div className="flex gap-4 text-sm">
               <label className="flex items-center gap-2">
                 <input type="radio" name="model" checked={model === "REVENUE_SHARE"} onChange={() => setModel("REVENUE_SHARE")} className="h-4 w-4" />
-                Revenue share (owner gets % of collected rent)
-              </label>
+                <Tx>Revenue share (owner gets % of collected rent)
+              </Tx></label>
               <label className="flex items-center gap-2">
                 <input type="radio" name="model" checked={model === "FIXED_RENT"} onChange={() => setModel("FIXED_RENT")} className="h-4 w-4" />
-                Fixed master rent (we pay the owner)
-              </label>
+                <Tx>Fixed master rent (we pay the owner)
+              </Tx></label>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {model === "REVENUE_SHARE" ? (

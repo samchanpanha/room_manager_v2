@@ -110,7 +110,7 @@ function FloorBlock({ floor, canCreate, canUpdate }: { floor: FloorView; canCrea
     <div>
       <div className="mb-2 flex items-center justify-between">
         <p className="text-sm font-medium text-muted-foreground">
-          {floor.name} <span className="text-xs">(level {floor.level}) · {floor.rooms.length} rooms</span>
+          {floor.name} <span className="text-xs"><Tx>(level </Tx>{floor.level}) · {floor.rooms.length} <Tx>rooms</Tx></span>
         </p>
         {canCreate ? (
           <Button size="sm" variant="ghost" onClick={() => setWizard(true)}>
@@ -149,7 +149,7 @@ function RoomCard({ room, canUpdate }: { room: RoomView; canUpdate: boolean }) {
         </div>
         <p className="mt-1 text-xs text-muted-foreground">{room.type}</p>
         <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
-          {formatMinor(room.basePriceMinor)} · {room.beds.length || room.capacity} bed{room.beds.length === 1 ? "" : "s"}
+          {formatMinor(room.basePriceMinor)} · {room.beds.length || room.capacity} <Tx>bed</Tx>{room.beds.length === 1 ? "" : "s"}
         </p>
       </button>
       <RoomDialog room={room} open={open} onClose={() => setOpen(false)} canUpdate={canUpdate} />
@@ -222,8 +222,8 @@ function RoomDialog({ room, open, onClose, canUpdate }: { room: RoomView; open: 
               ))}
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground">
-              Allowed: {room.status} → [{nexts.join(", ")}] · enforced server-side, every change audited
-            </p>
+              <Tx>Allowed: </Tx>{room.status} → [{nexts.join(", ")}<Tx>] · enforced server-side, every change audited
+            </Tx></p>
           </div>
         ) : null}
 

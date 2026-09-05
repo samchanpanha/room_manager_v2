@@ -239,7 +239,7 @@ export function PosTerminal({ property, openSession, sales, products, members, c
             {openSession ? (
               <>
                 <span className="text-sm text-muted-foreground">
-                  float {formatMinor(openSession.openingFloatMinor)} · {openSession.sales} sale(s) · cash expected {formatMinor(cashExpected)}
+                  <Tx>float </Tx>{formatMinor(openSession.openingFloatMinor)} · {openSession.sales} <Tx>sale(s) · cash expected </Tx>{formatMinor(cashExpected)}
                 </span>
                 {canWrite ? (
                   <Button size="sm" variant="secondary" className="ml-auto" onClick={() => setCloseDialog(true)} disabled={busy || sessionBusy}>
@@ -281,8 +281,8 @@ export function PosTerminal({ property, openSession, sales, products, members, c
                   className={`rounded-full px-3 py-1 text-xs transition-colors ${!filterCat ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}
                   onClick={() => setFilterCat("")}
                 >
-                  All
-                </button>
+                  <Tx>All
+                </Tx></button>
                 {categories.map((c) => (
                   <button
                     key={c}
@@ -341,8 +341,8 @@ export function PosTerminal({ property, openSession, sales, products, members, c
               <h2 className="text-sm font-semibold"><Tx>Current order</Tx></h2>
               {cartLines.length > 0 ? (
                 <button className="text-xs text-muted-foreground underline underline-offset-4" onClick={() => setCart({})}>
-                  clear
-                </button>
+                  <Tx>clear
+                </Tx></button>
               ) : null}
             </div>
 
@@ -407,7 +407,7 @@ export function PosTerminal({ property, openSession, sales, products, members, c
                 <div className="space-y-1.5">
                   <Label htmlFor="pos-member">Member</Label>
                   <Select id="pos-member" value={memberId} onChange={(e) => setMemberId(e.target.value)}>
-                    <option value="">Select a member…</option>
+                    <option value=""><Tx>Select a member…</Tx></option>
                     {members.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.label}
@@ -527,7 +527,7 @@ export function PosTerminal({ property, openSession, sales, products, members, c
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatMinor(s.totalMinor)}
-                    {s.discountMinor > 0 ? <span className="block text-xs text-destructive">−disc {formatMinor(s.discountMinor)} · net {formatMinor(s.totalMinor - s.discountMinor)}</span> : null}
+                    {s.discountMinor > 0 ? <span className="block text-xs text-destructive"><Tx>−disc </Tx>{formatMinor(s.discountMinor)} <Tx>· net </Tx>{formatMinor(s.totalMinor - s.discountMinor)}</span> : null}
                   </TableCell>
                   <TableCell>
                     {s.invoiceId ? (
@@ -536,8 +536,8 @@ export function PosTerminal({ property, openSession, sales, products, members, c
                       </a>
                     ) : (
                       <a href={`/api/pos/sales/${s.id}/receipt`} className="text-xs underline underline-offset-4" target="_blank" rel="noopener">
-                        PDF →
-                      </a>
+                        <Tx>PDF →
+                      </Tx></a>
                     )}
                   </TableCell>
                 </TableRow>

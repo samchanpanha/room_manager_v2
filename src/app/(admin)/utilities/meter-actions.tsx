@@ -7,6 +7,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
 
+import { Tx } from "@/components/i18n-text";
 interface MeterRef {
   id: string;
   code: string;
@@ -78,8 +79,8 @@ export function MeterActions({ meter, canRecord }: { meter: MeterRef; canRecord:
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="estimate" className="h-4 w-4" />
-            Estimated reading (average of last 3)
-          </label>
+            <Tx>Estimated reading (average of last 3)
+          </Tx></label>
           <div className="space-y-1.5">
             <Label htmlFor={`mn-${meter.id}`}>Note</Label>
             <Input id={`mn-${meter.id}`} name="note" maxLength={300} placeholder="optional" />

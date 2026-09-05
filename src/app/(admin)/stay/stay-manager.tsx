@@ -318,7 +318,7 @@ function BookingsTable({
           placeholder="All statuses"
         />
         <span className="ml-auto text-sm text-muted-foreground">
-          Completed revenue: <span className="font-medium">{formatMinor(grossMinor)}</span>
+          <Tx>Completed revenue: </Tx><span className="font-medium">{formatMinor(grossMinor)}</span>
         </span>
       </div>
 
@@ -357,12 +357,12 @@ function BookingsTable({
                 <TableCell>{duration((new Date(b.checkOut).getTime() - new Date(b.checkIn).getTime()) / 60000)}</TableCell>
                 <TableCell className="text-right tabular-nums">
                   {formatMinor(b.priceSnapshotMinor)}
-                  {b.depositMinor > 0 ? <div className="text-xs text-muted-foreground">+{formatMinor(b.depositMinor)} deposit</div> : null}
+                  {b.depositMinor > 0 ? <div className="text-xs text-muted-foreground">+{formatMinor(b.depositMinor)} <Tx>deposit</Tx></div> : null}
                 </TableCell>
                 <TableCell>
                   <Badge variant={STATUS_VARIANT[b.status] ?? "outline"}>{STATUS_LABEL[b.status] ?? b.status}</Badge>
                   {b.tabInvoice && b.tabInvoice.amountDueMinor > 0 ? (
-                    <div className="mt-1 text-xs text-destructive">due {formatMinor(b.tabInvoice.amountDueMinor)}</div>
+                    <div className="mt-1 text-xs text-destructive"><Tx>due </Tx>{formatMinor(b.tabInvoice.amountDueMinor)}</div>
                   ) : null}
                 </TableCell>
                 <TableCell className="text-right">
@@ -437,7 +437,7 @@ function DetailDialog({
       {data.tabInvoice ? (
         <div className="mt-4 rounded-lg border p-3 text-sm">
           <div className="mb-2 flex items-center justify-between">
-            <span className="font-medium">Settlement invoice {data.tabInvoice.code}</span>
+            <span className="font-medium"><Tx>Settlement invoice </Tx>{data.tabInvoice.code}</span>
             <Badge variant="outline">{data.tabInvoice.status}</Badge>
           </div>
 {data.tabInvoice.items?.length ? (
@@ -463,8 +463,8 @@ function DetailDialog({
         <div className="mt-4 space-y-3 rounded-lg border p-3">
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="text-xs font-medium text-muted-foreground">
-              Pay method
-              <SearchableSelect
+              <Tx>Pay method
+              </Tx><SearchableSelect
                 value={payMethod}
                 onChange={setPayMethod}
                 options={[
@@ -477,8 +477,8 @@ function DetailDialog({
               />
             </label>
             <label className="text-xs font-medium text-muted-foreground">
-              Deposit collected via
-              <SearchableSelect
+              <Tx>Deposit collected via
+              </Tx><SearchableSelect
                 value={depositMethod}
                 onChange={setDepositMethod}
                 options={[
@@ -492,8 +492,8 @@ function DetailDialog({
             </label>
           </div>
           <label className="block text-xs font-medium text-muted-foreground">
-            Extend check-out to (optional)
-            <Input type="datetime-local" value={extendTo} onChange={(e) => setExtendTo(e.target.value)} className="mt-1" />
+            <Tx>Extend check-out to (optional)
+            </Tx><Input type="datetime-local" value={extendTo} onChange={(e) => setExtendTo(e.target.value)} className="mt-1" />
           </label>
           <Button disabled={busy} className="w-full" onClick={() => runAction(data.id, "checkout", { payMethod, depositMethod, ...(extendTo ? { extendTo } : {}) }).then(onClose)}>
             Check out — issue invoice & settle
@@ -528,8 +528,8 @@ function DetailDialog({
 
       <div className="mt-4 rounded-lg border border-destructive/40 p-3">
         <label className="text-xs font-medium text-destructive">
-          Void booking
-          <div className="mt-1 flex gap-2">
+          <Tx>Void booking
+          </Tx><div className="mt-1 flex gap-2">
             <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (required)" />
             <Button variant="destructive" disabled={busy || !reason.trim()} onClick={() => runAction(data.id, "void", { reason: reason.trim() }).then(onClose)}>
               Void
@@ -618,8 +618,8 @@ function NewBookingDialog({
     <Dialog open onClose={onClose} title="New short stay" description="Pick a module, a room and an interval — the price is quoted live." wide>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-xs font-medium text-muted-foreground">
-          Module
-          <SearchableSelect
+          <Tx>Module
+          </Tx><SearchableSelect
             value={moduleId}
             onChange={(v) => { setModuleId(v); setQuote(null); }}
             options={modules.filter((m) => m.isActive).map((m) => ({
@@ -631,8 +631,8 @@ function NewBookingDialog({
           />
         </label>
         <label className="text-xs font-medium text-muted-foreground">
-          Room
-          <SearchableSelect
+          <Tx>Room
+          </Tx><SearchableSelect
             value={roomId}
             onChange={(v) => { setRoomId(v); setQuote(null); }}
             options={[
@@ -644,20 +644,20 @@ function NewBookingDialog({
           />
         </label>
         <label className="text-xs font-medium text-muted-foreground">
-          Check-in
-          <Input type="datetime-local" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); setQuote(null); }} className="mt-1" />
+          <Tx>Check-in
+          </Tx><Input type="datetime-local" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); setQuote(null); }} className="mt-1" />
         </label>
         <label className="text-xs font-medium text-muted-foreground">
-          Check-out
-          <Input type="datetime-local" value={checkOut} onChange={(e) => { setCheckOut(e.target.value); setQuote(null); }} className="mt-1" />
+          <Tx>Check-out
+          </Tx><Input type="datetime-local" value={checkOut} onChange={(e) => { setCheckOut(e.target.value); setQuote(null); }} className="mt-1" />
         </label>
         <label className="text-xs font-medium text-muted-foreground">
-          Guests
-          <Input type="number" min={1} max={10} value={guests} onChange={(e) => { setGuests(parseInt(e.target.value) || 1); setQuote(null); }} className="mt-1" />
+          <Tx>Guests
+          </Tx><Input type="number" min={1} max={10} value={guests} onChange={(e) => { setGuests(parseInt(e.target.value) || 1); setQuote(null); }} className="mt-1" />
         </label>
         <label className="text-xs font-medium text-muted-foreground">
-          POS mode
-          <SearchableSelect
+          <Tx>POS mode
+          </Tx><SearchableSelect
             value={posMode}
             onChange={(v) => setPosMode(v as "direct" | "tab")}
             options={[
@@ -669,24 +669,24 @@ function NewBookingDialog({
           />
         </label>
         <label className="text-xs font-medium text-muted-foreground">
-          Guest name *
-          <Input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Walk-in: name" className="mt-1" />
+          <Tx>Guest name *
+          </Tx><Input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Walk-in: name" className="mt-1" />
         </label>
         <label className="text-xs font-medium text-muted-foreground">
-          Guest phone
-          <Input value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="For repeat guests" className="mt-1" />
+          <Tx>Guest phone
+          </Tx><Input value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="For repeat guests" className="mt-1" />
         </label>
         <label className="text-xs font-medium text-muted-foreground">
-          ID / passport
-          <Input value={guestIdNumber} onChange={(e) => setGuestIdNumber(e.target.value)} className="mt-1" />
+          <Tx>ID / passport
+          </Tx><Input value={guestIdNumber} onChange={(e) => setGuestIdNumber(e.target.value)} className="mt-1" />
         </label>
         <label className="text-xs font-medium text-muted-foreground">
-          Deposit to collect (major)
-          <Input type="number" min={0} step="0.01" value={deposit} onChange={(e) => setDeposit(e.target.value)} className="mt-1" />
+          <Tx>Deposit to collect (major)
+          </Tx><Input type="number" min={0} step="0.01" value={deposit} onChange={(e) => setDeposit(e.target.value)} className="mt-1" />
         </label>
         <label className="text-xs font-medium text-muted-foreground sm:col-span-2">
-          Notes
-          <Input value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1" />
+          <Tx>Notes
+          </Tx><Input value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1" />
         </label>
       </div>
 
@@ -698,8 +698,8 @@ function NewBookingDialog({
         {quote ? (
           <div className="text-right">
             <p className="text-sm text-muted-foreground">
-              {duration(quote.minutes)} · {quote.buckets.length} bucket(s)
-            </p>
+              {duration(quote.minutes)} · {quote.buckets.length} <Tx>bucket(s)
+            </Tx></p>
             <p className="text-lg font-semibold tabular-nums">{formatMinor(quote.totalMinor)}</p>
           </div>
         ) : null}
@@ -863,8 +863,8 @@ function ModuleDialog({ existing, onClose }: { existing?: ModuleRow; onClose: ()
         {existing ? (
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-            Active (archive to hide from booking)
-          </label>
+            <Tx>Active (archive to hide from booking)
+          </Tx></label>
         ) : null}
       </div>
       <div className="mt-4 flex justify-end gap-2">

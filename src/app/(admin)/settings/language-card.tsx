@@ -9,6 +9,7 @@ import { useT } from "@/components/i18n-provider";
 import { LOCALES, LOCALE_META, applyLocale, isLocale, tfIn, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
+import { Tx } from "@/components/i18n-text";
 /// §M28 Settings → Language.
 /// Two layers, both optional:
 ///   1. the ORG DEFAULT (`m28.locale.locale`) — what a brand-new browser gets;
@@ -99,7 +100,7 @@ export function LanguageCard({ orgDefault, canWrite }: { orgDefault: string; can
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Showing: <span className="font-medium">{LOCALE_META[locale].native}</span>
+          <Tx>Showing: </Tx><span className="font-medium">{LOCALE_META[locale].native}</span>
           {overridden ? ` · ${tfIn(locale, "settings.langOverridden", { lang: LOCALE_META[current].name })}` : ` · ${tUi("org default")}`}
         </p>
       </CardContent>

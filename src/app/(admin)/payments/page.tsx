@@ -179,9 +179,9 @@ export default async function PaymentsPage({
         </CardContent>
       </Card>
       <p className="mt-3 text-xs text-muted-foreground">
-        Partial payments set invoices to <span className="font-mono"><Tx>partial_paid</Tx></span>; allocations are immutable; refunds of
+        <Tx>Partial payments set invoices to </Tx><span className="font-mono"><Tx>partial_paid</Tx></span><Tx>; allocations are immutable; refunds of
         member credit need Accountant approval and reverse via the ledger; gateway webhooks are idempotent (duplicates ignored).
-      </p>
+      </Tx></p>
     </div>
   );
 }

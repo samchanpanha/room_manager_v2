@@ -64,13 +64,13 @@ export default async function LeasesPage({ searchParams }: { searchParams: Promi
           href="/leases"
           className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === "leases" ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         >
-          Member leases ({leases.length})
+          <Tx>Member leases (</Tx>{leases.length})
         </Link>
         <Link
           href="/leases?tab=contracts"
           className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === "contracts" ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         >
-          Owner contracts ({contracts.length})
+          <Tx>Owner contracts (</Tx>{contracts.length})
         </Link>
       </div>
 
@@ -115,7 +115,7 @@ export default async function LeasesPage({ searchParams }: { searchParams: Promi
                     <TableCell className="text-right tabular-nums">
                       {formatMinor(l.rentAmountMinor)}
                       {l.services.length > 0 ? (
-                        <span className="ml-1 text-xs text-muted-foreground">+{l.services.length} svc</span>
+                        <span className="ml-1 text-xs text-muted-foreground">+{l.services.length} <Tx>svc</Tx></span>
                       ) : null}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
@@ -165,7 +165,7 @@ export default async function LeasesPage({ searchParams }: { searchParams: Promi
                     <TableCell className="text-sm">
                       {c.model === "REVENUE_SHARE" ? `${c.sharePercent}% share` : `${formatMinor(c.fixedRentMinor ?? 0)}/mo fixed`}
                       {c.managementFeePercent > 0 ? (
-                        <span className="text-xs text-muted-foreground"> · fee {c.managementFeePercent}%</span>
+                        <span className="text-xs text-muted-foreground"> <Tx>· fee </Tx>{c.managementFeePercent}%</span>
                       ) : null}
                     </TableCell>
                     <TableCell>
@@ -194,10 +194,10 @@ export default async function LeasesPage({ searchParams }: { searchParams: Promi
       )}
 
       <p className="mt-3 text-xs text-muted-foreground">
-        Lifecycle: {titleCase("draft → active → notice → terminated | completed")} — activation flips the room to occupied and
+        <Tx>Lifecycle: </Tx>{titleCase("draft → active → notice → terminated | completed")} <Tx>— activation flips the room to occupied and
         the member to active, and schedules the first invoice; ending flips the room to cleaning and triggers deposit
         settlement.
-      </p>
+      </Tx></p>
     </div>
   );
 }

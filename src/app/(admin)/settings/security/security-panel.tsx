@@ -69,7 +69,7 @@ export function SecurityPanel({
             </p>
           )}
           <p className="text-sm">
-            Status: {totpEnabled ? "enabled (TOTP verified at login)" : enrollmentStarted ? "enrollment started, not verified" : "not enrolled"}
+            <Tx>Status: </Tx>{totpEnabled ? "enabled (TOTP verified at login)" : enrollmentStarted ? "enrollment started, not verified" : "not enrolled"}
             {isAdmin && !totpEnabled ? " — mandatory for Admin+" : ""}
           </p>
           {!totpEnabled && (
@@ -111,7 +111,7 @@ export function SecurityPanel({
             <div className="space-y-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={qr} alt="TOTP QR code" width={180} height={180} />
-              <p className="text-xs text-muted-foreground">Scan with your authenticator app for {email}, then verify a current code.</p>
+              <p className="text-xs text-muted-foreground"><Tx>Scan with your authenticator app for </Tx>{email}<Tx>, then verify a current code.</Tx></p>
             </div>
           )}
           {isSuperAdmin && adminsWithTotp.length > 0 && (
@@ -138,7 +138,7 @@ export function SecurityPanel({
               <div className="min-w-0">
                 <p className="truncate">{(s.userAgent ?? "unknown device").slice(0, 60)}</p>
                 <p className="text-xs text-muted-foreground">
-                  {s.ip ?? "no ip"} · started {s.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+                  {s.ip ?? "no ip"} <Tx>· started </Tx>{s.createdAt.toISOString().slice(0, 16).replace("T", " ")}
                   {s.revokedAt ? " · revoked" : ""}
                   {s.current ? " · this device" : ""}
                 </p>

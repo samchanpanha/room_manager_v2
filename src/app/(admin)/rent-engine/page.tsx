@@ -101,19 +101,19 @@ export default async function RentEnginePage() {
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
               <p>
-                <span className="font-medium text-foreground"><Tx>Generation</Tx></span> bills every active lease whose period has
-                started (up to {leadDays} day(s) early). Mid-month move-ins produce a prorated stub invoice first, then full
+                <span className="font-medium text-foreground"><Tx>Generation</Tx></span> <Tx>bills every active lease whose period has
+                started (up to </Tx>{leadDays} <Tx>day(s) early). Mid-month move-ins produce a prorated stub invoice first, then full
                 advance-monthly invoices. Re-runs are idempotent — one live invoice per lease per period.
-              </p>
+              </Tx></p>
               <p>
-                <span className="font-medium text-foreground"><Tx>Late fees</Tx></span> apply once per invoice after{" "}
-                {lateFee?.graceDays ?? 3} day(s) past due. <span className="font-medium text-foreground"><Tx>Dunning</Tx></span>{" "}
-                reminders fire on day {schedule.join(", day ")} past due (channels land with Telegram in Phase 19).
-              </p>
+                <span className="font-medium text-foreground"><Tx>Late fees</Tx></span> <Tx>apply once per invoice after</Tx>{" "}
+                {lateFee?.graceDays ?? 3} <Tx>day(s) past due. </Tx><span className="font-medium text-foreground"><Tx>Dunning</Tx></span>{" "}
+                <Tx>reminders fire on day </Tx>{schedule.join(", day ")} <Tx>past due (channels land with Telegram in Phase 19).
+              </Tx></p>
               <p>
-                <span className="font-medium text-foreground"><Tx>Invariants:</Tx></span> integer minor units · total = Σ items −
+                <span className="font-medium text-foreground"><Tx>Invariants:</Tx></span> <Tx>integer minor units · total = Σ items −
                 discount + tax · issued invoices immutable (credit notes only) · gapless numbering per property-year.
-              </p>
+              </Tx></p>
             </CardContent>
           </Card>
         </div>

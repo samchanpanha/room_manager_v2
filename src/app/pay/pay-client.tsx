@@ -122,7 +122,7 @@ export function PayClient() {
               <p className="text-sm text-muted-foreground"><Tx>Paying as</Tx></p>
               <p className="text-lg font-semibold">{dues.member.name}</p>
               <p className="mt-3 text-3xl font-bold tabular-nums">{usd(dues.totalDueMinor)}</p>
-              <p className="text-xs text-muted-foreground">total outstanding across {dues.invoices.length} invoice(s)</p>
+              <p className="text-xs text-muted-foreground"><Tx>total outstanding across </Tx>{dues.invoices.length} <Tx>invoice(s)</Tx></p>
             </CardContent>
           </Card>
 
@@ -133,7 +133,7 @@ export function PayClient() {
                   <div>
                     <p className="font-mono text-xs font-medium">{inv.code}</p>
                     <p className="text-xs text-muted-foreground">
-                      {inv.periodStart.slice(0, 10)} → {new Date(new Date(inv.periodEnd).getTime() - 86_400_000).toISOString().slice(0, 10)} · due{" "}
+                      {inv.periodStart.slice(0, 10)} → {new Date(new Date(inv.periodEnd).getTime() - 86_400_000).toISOString().slice(0, 10)} <Tx>· due</Tx>{" "}
                       {inv.dueDate.slice(0, 10)}
                     </p>
                   </div>

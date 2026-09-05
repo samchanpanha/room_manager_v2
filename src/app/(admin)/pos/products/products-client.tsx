@@ -120,7 +120,7 @@ export function ProductsClient({ products, stockItems, categories, legacyCategor
         )}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <Select className="h-9 w-44" value={printCategory} onChange={(e) => setPrintCategory(e.target.value)}>
-            <option value="">All categories</option>
+            <option value=""><Tx>All categories</Tx></option>
             {legacyCategories.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -167,26 +167,26 @@ export function ProductsClient({ products, stockItems, categories, legacyCategor
                     {p.description ? <span className="block max-w-[30ch] truncate text-xs text-muted-foreground">{p.description}</span> : null}
                     {canWrite ? (
                       <button className="block text-xs text-muted-foreground underline underline-offset-4" onClick={() => startEdit(p)}>
-                        edit
-                      </button>
+                        <Tx>edit
+                      </Tx></button>
                     ) : null}
                   </TableCell>
                   <TableCell>{p.category ? <Badge variant="outline">{p.category}</Badge> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
                   <TableCell className="font-mono text-xs">
                     {p.barcode ?? <span className="text-muted-foreground">—</span>}
-                    {p.sku ? <span className="block text-muted-foreground">SKU {p.sku}</span> : null}
+                    {p.sku ? <span className="block text-muted-foreground"><Tx>SKU </Tx>{p.sku}</span> : null}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{formatMinor(p.priceMinor)}</TableCell>
                   <TableCell className="text-xs">
-                    {p.stock ? `${(p.stock.qtyMilli / 1000).toFixed(p.stock.unit === "pcs" ? 0 : 2)} ${p.stock.unit}` : <span className="text-muted-foreground">service</span>}
+                    {p.stock ? `${(p.stock.qtyMilli / 1000).toFixed(p.stock.unit === "pcs" ? 0 : 2)} ${p.stock.unit}` : <span className="text-muted-foreground"><Tx>service</Tx></span>}
                   </TableCell>
                   <TableCell>
                     <Badge variant={p.isActive ? "success" : "secondary"}>{p.isActive ? "active" : "hidden"}</Badge>
                   </TableCell>
                   <TableCell className="text-right text-xs">
                     <a className="underline underline-offset-4" href={`/api/pos/products/label?ids=${p.id}&copies=1&p=0`} target="_blank" rel="noopener noreferrer">
-                      print
-                    </a>
+                      <Tx>print
+                    </Tx></a>
                   </TableCell>
                 </TableRow>
               ))}
@@ -222,7 +222,7 @@ export function ProductsClient({ products, stockItems, categories, legacyCategor
             <div className="space-y-1.5">
               <Label htmlFor="pp-category">Category</Label>
               <Select id="pp-category" value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>
-                <option value="">— uncategorized —</option>
+                <option value=""><Tx>— uncategorized —</Tx></option>
                 {categories.map((c) => (
                   <option key={c.value} value={c.value}>
                     {c.label}
@@ -230,9 +230,9 @@ export function ProductsClient({ products, stockItems, categories, legacyCategor
                 ))}
               </Select>
               {form.categoryId ? (
-                <p className="text-xs text-muted-foreground">Saved as: {categories.find((c) => c.value === form.categoryId)?.label.trim() ?? form.category}</p>
+                <p className="text-xs text-muted-foreground"><Tx>Saved as: </Tx>{categories.find((c) => c.value === form.categoryId)?.label.trim() ?? form.category}</p>
               ) : form.category ? (
-                <p className="text-xs text-muted-foreground">Legacy category string: {form.category}</p>
+                <p className="text-xs text-muted-foreground"><Tx>Legacy category string: </Tx>{form.category}</p>
               ) : null}
             </div>
             <div className="space-y-1.5">
@@ -250,20 +250,20 @@ export function ProductsClient({ products, stockItems, categories, legacyCategor
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="pp-stock">Stock item</Label>
               <Select id="pp-stock" value={form.stockItemId} onChange={(e) => setForm({ ...form, stockItemId: e.target.value })}>
-                <option value="">— service / not linked —</option>
+                <option value=""><Tx>— service / not linked —</Tx></option>
                 {stockItems.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.label}
                   </option>
                 ))}
               </Select>
-              {form.stockItemId && stockMap.get(form.stockItemId) ? <p className="text-xs text-muted-foreground">Linked stock: {stockMap.get(form.stockItemId)}</p> : null}
+              {form.stockItemId && stockMap.get(form.stockItemId) ? <p className="text-xs text-muted-foreground"><Tx>Linked stock: </Tx>{stockMap.get(form.stockItemId)}</p> : null}
             </div>
             {!isNew ? (
               <label className="flex items-center gap-2 text-sm sm:col-span-2">
                 <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />
-                Active (visible at the till and on labels)
-              </label>
+                <Tx>Active (visible at the till and on labels)
+              </Tx></label>
             ) : null}
           </div>
           <div className="flex justify-end gap-2">

@@ -83,7 +83,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         <div className="mt-2 grid gap-4 lg:grid-cols-2">
           <Card>
             <CardContent className="p-0">
-              <div className="border-b p-3 text-sm font-semibold">P&L — {report.month} ({report.scope})</div>
+              <div className="border-b p-3 text-sm font-semibold"><Tx>P&L — </Tx>{report.month} ({report.scope})</div>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -94,7 +94,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
                 <TableBody>
                   {report.revenue.map((l) => (
                     <TableRow key={`r${l.code}`}>
-                      <TableCell className="text-xs">Revenue · {l.label} <span className="font-mono text-muted-foreground">{l.code}</span></TableCell>
+                      <TableCell className="text-xs"><Tx>Revenue · </Tx>{l.label} <span className="font-mono text-muted-foreground">{l.code}</span></TableCell>
                       <TableCell className="text-right tabular-nums text-xs">{formatMinor(l.amountMinor)}</TableCell>
                     </TableRow>
                   ))}
@@ -104,7 +104,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
                   </TableRow>
                   {report.expenses.map((l) => (
                     <TableRow key={`e${l.code}`}>
-                      <TableCell className="text-xs">Expense · {l.label} <span className="font-mono text-muted-foreground">{l.code}</span></TableCell>
+                      <TableCell className="text-xs"><Tx>Expense · </Tx>{l.label} <span className="font-mono text-muted-foreground">{l.code}</span></TableCell>
                       <TableCell className="text-right tabular-nums text-xs">{formatMinor(l.amountMinor)}</TableCell>
                     </TableRow>
                   ))}
@@ -131,8 +131,8 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
             <Card>
               <CardContent className="p-0">
                 <div className="border-b p-3 text-sm font-semibold">
-                  Register ↔ ledger reconciliation
-                  <Badge variant={report.reconcilesExactly ? "success" : "destructive"} className="ml-2">
+                  <Tx>Register ↔ ledger reconciliation
+                  </Tx><Badge variant={report.reconcilesExactly ? "success" : "destructive"} className="ml-2">
                     {report.reconcilesExactly ? "exact" : "mismatch"}
                   </Badge>
                 </div>
@@ -168,7 +168,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
 
             <Card>
               <CardContent className="p-0">
-                <div className="border-b p-3 text-sm font-semibold">Budget vs actual — {report.month}</div>
+                <div className="border-b p-3 text-sm font-semibold"><Tx>Budget vs actual — </Tx>{report.month}</div>
                 <Table>
                   <TableHeader>
                     <TableRow>

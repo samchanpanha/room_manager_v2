@@ -215,7 +215,7 @@ export function OnboardingWizard({
               <div className="space-y-1.5">
                 <Label htmlFor="w-prop">Home property (drives access scoping)</Label>
                 <Select id="w-prop" value={homePropertyId} onChange={(e) => setHomePropertyId(e.target.value)}>
-                  <option value="">— unassigned —</option>
+                  <option value=""><Tx>— unassigned —</Tx></option>
                   {properties.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.label}
@@ -260,7 +260,7 @@ export function OnboardingWizard({
                   <Badge variant="success">all required types staged</Badge>
                 ) : (
                   <span className="text-sm text-muted-foreground">
-                    still needed: {missingKyc.map((t) => t.name).join(", ")}
+                    <Tx>still needed: </Tx>{missingKyc.map((t) => t.name).join(", ")}
                   </span>
                 )}
               </div>
@@ -323,7 +323,7 @@ export function OnboardingWizard({
               <div className="rounded-lg border p-4">
                 <p className="font-medium">{personal.name}</p>
                 <p className="text-muted-foreground">
-                  {personal.email || "no email"} · {personal.phone || "no phone"} · {personal.nationality || "—"} · ID {personal.idNumber || "—"}
+                  {personal.email || "no email"} · {personal.phone || "no phone"} · {personal.nationality || "—"} <Tx>· ID </Tx>{personal.idNumber || "—"}
                 </p>
                 <p className="text-muted-foreground">
                   {personal.occupation || "—"}

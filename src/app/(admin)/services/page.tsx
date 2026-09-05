@@ -102,7 +102,7 @@ export default async function ServicesPage() {
                       {a.lease.code}
                     </a>
                     <span className="block text-xs text-muted-foreground">
-                      {a.lease.member.party.name} · room {a.lease.room.number}
+                      {a.lease.member.party.name} <Tx>· room </Tx>{a.lease.room.number}
                     </span>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">

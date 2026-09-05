@@ -158,7 +158,7 @@ export function AttendanceAdmin({ properties, staff, month, firstPropertyId, rec
       </Button>
       {propertyId ? (
         <a href={`/api/attendance/export?propertyId=${propertyId}&month=${month}`} className="inline-flex h-8 items-center rounded-md border px-3 text-sm hover:bg-accent">
-          Export CSV ({month})
+          <Tx>Export CSV (</Tx>{month})
         </a>
       ) : null}
     </div>

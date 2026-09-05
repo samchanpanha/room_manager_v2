@@ -6,6 +6,7 @@ import { requireMember } from "@/lib/portal";
 import { getT } from "@/lib/locale-server";
 import { UploadForm } from "./upload-form";
 
+import { Tx } from "@/components/i18n-text";
 /// §M25 documents — the member's own M17 documents + KYC upload.
 export default async function PortalDocsPage() {
   const { member } = await requireMember();
@@ -45,7 +46,7 @@ export default async function PortalDocsPage() {
               <div>
                 <p className="font-medium">{d.docType.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  v{d.version} · {(d.sizeBytes / 1024).toFixed(0)} KB · {d.createdAt.toISOString().slice(0, 10)}
+                  <Tx>v</Tx>{d.version} · {(d.sizeBytes / 1024).toFixed(0)} <Tx>KB · </Tx>{d.createdAt.toISOString().slice(0, 10)}
                   {d.expiryDate ? ` · ${tUi("expires")} ${d.expiryDate.toISOString().slice(0, 10)}` : ""}
                 </p>
               </div>

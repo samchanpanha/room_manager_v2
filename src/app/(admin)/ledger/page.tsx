@@ -116,8 +116,8 @@ export default async function LedgerPage({
             <div className="mt-3 flex items-center justify-between border-t pt-3 text-sm font-semibold">
               <span><Tx>Totals</Tx></span>
               <span className="flex items-center gap-4">
-                <span className="tabular-nums">DR {formatMinor(tb.totalDebit)}</span>
-                <span className="tabular-nums">CR {formatMinor(tb.totalCredit)}</span>
+                <span className="tabular-nums"><Tx>DR </Tx>{formatMinor(tb.totalDebit)}</span>
+                <span className="tabular-nums"><Tx>CR </Tx>{formatMinor(tb.totalCredit)}</span>
                 <Badge variant={tb.balanced ? "success" : "destructive"}>{tb.balanced ? "nets 0" : "off!"}</Badge>
               </span>
             </div>
@@ -169,7 +169,7 @@ export default async function LedgerPage({
                 <input id="jf-from" name="from" type="date" defaultValue={sp.from ?? ""} className="h-9 rounded-md border bg-background px-2" />
               </div>
               <div className="space-y-1">
-                <label htmlFor="jf-to" className="text-xs text-muted-foreground">To</label>
+                <label htmlFor="jf-to" className="text-xs text-muted-foreground"><Tx>To</Tx></label>
                 <input id="jf-to" name="to" type="date" defaultValue={sp.to ?? ""} className="h-9 rounded-md border bg-background px-2" />
               </div>
               {memberFilter ? <input type="hidden" name="memberId" value={memberFilter.id} /> : null}
@@ -178,7 +178,7 @@ export default async function LedgerPage({
               </button>
               {memberFilter ? (
                 <span className="pb-2 text-xs text-muted-foreground">
-                  member: <span className="text-foreground">{memberFilter.party.name}</span>{" "}
+                  <Tx>member: </Tx><span className="text-foreground">{memberFilter.party.name}</span>{" "}
                   <a href="/ledger" className="underline underline-offset-4"><Tx>clear</Tx></a>
                 </span>
               ) : null}

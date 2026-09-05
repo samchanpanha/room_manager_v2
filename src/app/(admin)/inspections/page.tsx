@@ -109,7 +109,7 @@ export default async function InspectionsPage() {
                             {f.deductionStatus ? (
                               <span className="text-muted-foreground">
                                 {" "}
-                                · deduction {f.deductionMinor != null ? formatMinor(f.deductionMinor) : ""} {f.deductionStatus}
+                                <Tx>· deduction </Tx>{f.deductionMinor != null ? formatMinor(f.deductionMinor) : ""} {f.deductionStatus}
                               </span>
                             ) : null}
                           </div>

@@ -67,8 +67,8 @@ export default async function DashboardPage() {
             {greeting()}, {dashUser?.name.split(" ")[0] ?? "there"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {`${settings.org.name} · ${settings.locale.currency} · ${settings.locale.timezone}`} — open a module below or from the menu; each page opens in its own tab.
-          </p>
+            {`${settings.org.name} · ${settings.locale.currency} · ${settings.locale.timezone}`} <Tx>— open a module below or from the menu; each page opens in its own tab.
+          </Tx></p>
         </div>
         <Link href="/reports" className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
           <Tx>Open Reports →</Tx>
@@ -99,7 +99,7 @@ export default async function DashboardPage() {
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base">Rent dues (M33)</CardTitle>
             <span className="text-xs text-muted-foreground">
-              within next {settings.rentAlerts.aheadDays} days · upcoming {formatMinor(rentDues.upcomingTotalMinor, settings.locale.currency)} · overdue {formatMinor(rentDues.overdueTotalMinor, settings.locale.currency)}
+              <Tx>within next </Tx>{settings.rentAlerts.aheadDays} <Tx>days · upcoming </Tx>{formatMinor(rentDues.upcomingTotalMinor, settings.locale.currency)} <Tx>· overdue </Tx>{formatMinor(rentDues.overdueTotalMinor, settings.locale.currency)}
             </span>
           </CardHeader>
           <CardContent>
@@ -107,7 +107,7 @@ export default async function DashboardPage() {
               <div>
                 <p className="mb-2 text-xs font-medium text-muted-foreground"><Tx>Due soon</Tx></p>
                 {rentDues.upcoming.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nothing due in the next {settings.rentAlerts.aheadDays} days.</p>
+                  <p className="text-sm text-muted-foreground"><Tx>Nothing due in the next </Tx>{settings.rentAlerts.aheadDays} <Tx>days.</Tx></p>
                 ) : (
                   <ul className="space-y-1.5 text-sm">
                     {rentDues.upcoming.slice(0, 5).map((d) => (

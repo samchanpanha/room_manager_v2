@@ -8,6 +8,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Badge } from "@/components/ui/badge";
 import { useT } from "@/components/i18n-provider";
 
+import { Tx } from "@/components/i18n-text";
 export interface ReportMeta {
   key: string;
   /// Design override already applied by the page (falls back to the registry title).
@@ -109,11 +110,11 @@ export function ReportPicker({
         {meta ? (
           <div className="flex gap-2 text-xs">
             <a className="underline underline-offset-4" href={`/api/reports/${current.key}/export?format=csv&${params.toString().split("&").filter((p) => p && !p.startsWith("key=")).join("&")}`}>
-              CSV
-            </a>
+              <Tx>CSV
+            </Tx></a>
             <a className="underline underline-offset-4" href={`/api/reports/${current.key}/export?format=pdf&${params.toString().split("&").filter((p) => p && !p.startsWith("key=")).join("&")}`}>
-              PDF
-            </a>
+              <Tx>PDF
+            </Tx></a>
           </div>
         ) : null}
       </div>

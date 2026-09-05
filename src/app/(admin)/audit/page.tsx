@@ -54,7 +54,7 @@ export default async function AuditPage({
             <Tx>Module</Tx>
           </label>
           <Select id="f-module" name="module" defaultValue={sp.module ?? ""}>
-            <option value="">All modules</option>
+            <option value=""><Tx>All modules</Tx></option>
             {MODULES.map((m) => (
               <option key={m.key} value={m.key}>
                 {m.key} · {m.name}
@@ -107,7 +107,7 @@ export default async function AuditPage({
 
       <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
         <span>
-          {total} entries · page {page}/{pages}
+          {total} <Tx>entries · page </Tx>{page}/{pages}
         </span>
         <div className="flex gap-2">
           {page > 1 ? (

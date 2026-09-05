@@ -79,7 +79,7 @@ export default async function ComplaintsPage() {
                       <span className="font-mono text-xs">{c.code}</span>
                       <span className="block max-w-64 truncate text-xs">{c.subject}</span>
                       <span className="text-xs text-muted-foreground">
-                        {c.category} · {c.priority} · via {c.source}
+                        {c.category} · {c.priority} <Tx>· via </Tx>{c.source}
                         {c.slaBreachedAt ? " · SLA BREACHED" : ""}
                       </span>
                     </TableCell>
@@ -89,7 +89,7 @@ export default async function ComplaintsPage() {
                       {c.ticket ? <span className="block text-xs text-muted-foreground">→ {c.ticket.code}</span> : null}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {c.comments.length} comment{c.comments.length === 1 ? "" : "s"}
+                      {c.comments.length} <Tx>comment</Tx>{c.comments.length === 1 ? "" : "s"}
                       {c.resolutionNote ? <span className="block max-w-56 truncate">✓ {c.resolutionNote}</span> : null}
                     </TableCell>
                     <TableCell>{c.rating ? <Badge variant="success">{c.rating}/5</Badge> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>

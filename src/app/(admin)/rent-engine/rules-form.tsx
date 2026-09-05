@@ -62,8 +62,8 @@ export function RulesForm({ canEdit, initial }: { canEdit: boolean; initial: Ini
         <div className="space-y-1.5">
           <Label htmlFor="re-type">Late fee type</Label>
           <Select id="re-type" name="lateFeeType" value={type} onChange={(e) => setType(e.target.value)} disabled={!canEdit}>
-            <option value="FIXED">Fixed amount</option>
-            <option value="PERCENT">Percent of outstanding</option>
+            <option value="FIXED"><Tx>Fixed amount</Tx></option>
+            <option value="PERCENT"><Tx>Percent of outstanding</Tx></option>
           </Select>
         </div>
         {type === "FIXED" ? (

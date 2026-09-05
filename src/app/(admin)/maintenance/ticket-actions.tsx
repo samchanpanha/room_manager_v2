@@ -118,7 +118,7 @@ function CreateDialog({
             <div className="space-y-1.5">
               <Label htmlFor="tk-lease">Member lease (portal-style, links the room)</Label>
               <Select id="tk-lease" name="leaseId" defaultValue="">
-                <option value="">— no member lease —</option>
+                <option value=""><Tx>— no member lease —</Tx></option>
                 {leases.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.label}
@@ -129,7 +129,7 @@ function CreateDialog({
             <div className="space-y-1.5">
               <Label htmlFor="tk-room">…or room directly (common area)</Label>
               <Select id="tk-room" name="roomId" defaultValue="">
-                <option value="">— via lease —</option>
+                <option value=""><Tx>— via lease —</Tx></option>
                 {rooms.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.label}
@@ -269,8 +269,8 @@ function CostDialog({ busy, onDone }: { busy: boolean; onDone: (cost: { kind: st
           <div className="space-y-1.5">
             <Label htmlFor="tk-cost-kind">Kind</Label>
             <Select id="tk-cost-kind" name="kind" defaultValue="labor" required>
-              <option value="labor">labor</option>
-              <option value="material">material</option>
+              <option value="labor"><Tx>labor</Tx></option>
+              <option value="material"><Tx>material</Tx></option>
             </Select>
           </div>
           <div className="space-y-1.5">
@@ -280,8 +280,8 @@ function CostDialog({ busy, onDone }: { busy: boolean; onDone: (cost: { kind: st
           <div className="space-y-1.5">
             <Label htmlFor="tk-cost-charge">Charge to</Label>
             <Select id="tk-cost-charge" name="chargeTo" defaultValue="expense" required>
-              <option value="expense">expense (M20)</option>
-              <option value="owner">owner P&L (M24)</option>
+              <option value="expense"><Tx>expense (M20)</Tx></option>
+              <option value="owner"><Tx>owner P&L (M24)</Tx></option>
             </Select>
           </div>
           <div className="space-y-1.5">

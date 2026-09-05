@@ -80,7 +80,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {member.party.email ?? "no email"} · {member.party.phone ?? "no phone"} ·{" "}
-            {member.homeProperty ? `home: ${member.homeProperty.code}` : "no property"} · onboarded {formatDate(member.createdAt)}
+            {member.homeProperty ? `home: ${member.homeProperty.code}` : "no property"} <Tx>· onboarded </Tx>{formatDate(member.createdAt)}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Badge variant={member.status === "active" ? "success" : member.status === "verified" ? "info" : "outline"}>
@@ -159,7 +159,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         return (
           <Card className="mt-6">
             <CardContent className="p-4">
-              <h2 className="mb-3 text-sm font-semibold">Room move history ({mv.length})</h2>
+              <h2 className="mb-3 text-sm font-semibold"><Tx>Room move history (</Tx>{mv.length})</h2>
               <ol className="space-y-3">
                 {mv.map((m) => (
                   <li key={m.id} className="flex items-start gap-3 text-sm">
@@ -167,22 +167,22 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                     <div>
                       <p>
                         <Badge variant={m.status === "executed" ? "success" : m.status === "cancelled" ? "secondary" : "warning"}>{m.status}</Badge>{" "}
-                        moved to room <span className="font-medium">{m.toRoom.number}</span>
+                        <Tx>moved to room </Tx><span className="font-medium">{m.toRoom.number}</span>
                         {m.newLease ? (
                           <>
                             {" "}
-                            — lease <span className="font-mono text-xs">{m.newLease.code}</span>
+                            <Tx>— lease </Tx><span className="font-mono text-xs">{m.newLease.code}</span>
                           </>
                         ) : null}
                         {m.adjustmentInvoice ? (
                           <>
                             {" "}
-                            · adjustment <Link href={`/invoices/${m.adjustmentInvoiceId}`} className="font-mono text-xs underline underline-offset-4">{m.adjustmentInvoice.code}</Link>
+                            <Tx>· adjustment </Tx><Link href={`/invoices/${m.adjustmentInvoiceId}`} className="font-mono text-xs underline underline-offset-4">{m.adjustmentInvoice.code}</Link>
                           </>
                         ) : null}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {m.code} · requested by {m.requestedByRole} · proration delta {formatMinor(m.netMinor ?? 0)}
+                        {m.code} <Tx>· requested by </Tx>{m.requestedByRole} <Tx>· proration delta </Tx>{formatMinor(m.netMinor ?? 0)}
                         {m.inspectionsNote ? ` · inspections: ${m.inspectionsNote}` : ""}
                       </p>
                     </div>

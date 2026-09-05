@@ -120,9 +120,9 @@ export function PermissionGrid({
                     onChange={(e) => setScope(m.key, e.target.value)}
                     disabled={disabled || grid[m.key].actions.size === 0}
                   >
-                    <option value="GLOBAL">GLOBAL</option>
-                    <option value="PROPERTY">PROPERTY</option>
-                    <option value="OWN">OWN</option>
+                    <option value="GLOBAL"><Tx>GLOBAL</Tx></option>
+                    <option value="PROPERTY"><Tx>PROPERTY</Tx></option>
+                    <option value="OWN"><Tx>OWN</Tx></option>
                   </Select>
                 </td>
               </tr>
@@ -131,7 +131,7 @@ export function PermissionGrid({
         </table>
       </div>
       <div className="mt-4 flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{total} grants selected</p>
+        <p className="text-sm text-muted-foreground">{total} <Tx>grants selected</Tx></p>
         <Button onClick={save} disabled={disabled || busy}>
           {busy ? "Saving…" : "Save permission grid"}
         </Button>

@@ -215,8 +215,8 @@ export function StockManager({ items, categories, suppliers, properties, units, 
               emptyText="No matching category"
             />
             <label className="flex items-center gap-1.5 text-xs">
-              <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)} /> low only
-            </label>
+              <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)} /> <Tx>low only
+            </Tx></label>
           </div>
 
           <Card>
@@ -242,7 +242,7 @@ export function StockManager({ items, categories, suppliers, properties, units, 
                         <TableCell>
                           {i.name}
                           <span className="block text-xs text-muted-foreground">
-                            {i.category || "uncategorized"} · per {i.unit}
+                            {i.category || "uncategorized"} <Tx>· per </Tx>{i.unit}
                             {i.packUnit && i.packSize ? ` · 1 ${i.packUnit} = ${i.packSize} ${i.unit}` : ""} · {i.propertyCode}
                             {!i.isActive ? " · archived" : ""}
                           </span>
@@ -431,7 +431,7 @@ export function StockManager({ items, categories, suppliers, properties, units, 
                     <TableCell className="text-xs">
                       {t.lines.map((l) => (
                         <span key={`${t.id}-${l.itemName}`} className="block">
-                          {l.itemName}: expected {l.expectedMilli / 1000} → counted {l.countedMilli / 1000}
+                          {l.itemName}<Tx>: expected </Tx>{l.expectedMilli / 1000} <Tx>→ counted </Tx>{l.countedMilli / 1000}
                           {l.expectedMilli !== l.countedMilli ? <Badge variant={l.countedMilli > l.expectedMilli ? "success" : "warning"} className="ml-1">{l.countedMilli > l.expectedMilli ? "+" : ""}{(l.countedMilli - l.expectedMilli) / 1000}</Badge> : null}
                         </span>
                       ))}
@@ -598,8 +598,8 @@ function ItemDialog({
           {!isNew ? (
             <label className="flex items-center gap-2 pt-6 text-sm">
               <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-              Active (archived hides from new selections & deactivates low-stock)
-            </label>
+              <Tx>Active (archived hides from new selections & deactivates low-stock)
+            </Tx></label>
           ) : null}
         </div>
         <div className="flex justify-end gap-2">
@@ -688,8 +688,8 @@ function CategoryDialog({
           ) : (
             <label className="flex items-center gap-2 pt-6 text-sm">
               <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-              Active
-            </label>
+              <Tx>Active
+            </Tx></label>
           )}
         </div>
         <div className="flex justify-end gap-2">
@@ -733,7 +733,7 @@ function PhotoDialog({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={url} alt={item.name} className="max-h-72 rounded-md object-contain" />
           ) : (
-            <p className="text-sm text-muted-foreground">No photo yet — {canWrite ? "upload one below." : "ask a staff member to add one."}</p>
+            <p className="text-sm text-muted-foreground"><Tx>No photo yet — </Tx>{canWrite ? "upload one below." : "ask a staff member to add one."}</p>
           )}
         </div>
         {canWrite ? (

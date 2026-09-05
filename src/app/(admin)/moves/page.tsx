@@ -107,8 +107,8 @@ export default async function RoomMovesPage() {
                   </TableCell>
                   <TableCell className="text-xs">
                     {m.fromLease.code}
-                    <span className="text-muted-foreground"> → room {m.toRoom.number}</span>
-                    {m.newLease ? <span className="block text-muted-foreground">new: {m.newLease.code}</span> : null}
+                    <span className="text-muted-foreground"> <Tx>→ room </Tx>{m.toRoom.number}</span>
+                    {m.newLease ? <span className="block text-muted-foreground"><Tx>new: </Tx>{m.newLease.code}</span> : null}
                   </TableCell>
                   <TableCell className="text-xs">{m.effectiveAt.toISOString().slice(0, 10)}</TableCell>
                   <TableCell>

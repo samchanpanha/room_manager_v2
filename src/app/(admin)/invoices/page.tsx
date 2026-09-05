@@ -95,7 +95,7 @@ export default async function InvoicesPage({
             <Tx>Status</Tx>
           </label>
           <Select id="f-status" name="status" defaultValue={sp.status ?? ""}>
-            <option value="">All statuses</option>
+            <option value=""><Tx>All statuses</Tx></option>
             {["draft", "issued", "partial_paid", "paid", "overdue", "void"].map((s) => (
               <option key={s} value={s}>
                 {s.replaceAll("_", " ")}
@@ -108,7 +108,7 @@ export default async function InvoicesPage({
             <Tx>Property</Tx>
           </label>
           <Select id="f-prop" name="propertyId" defaultValue={sp.propertyId ?? ""}>
-            <option value="">All properties</option>
+            <option value=""><Tx>All properties</Tx></option>
             {properties.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.code} · {p.name}
@@ -192,9 +192,9 @@ export default async function InvoicesPage({
         </CardContent>
       </Card>
       <p className="mt-3 text-xs text-muted-foreground">
-        Numbering <span className="font-mono">{"{PROP}-{YEAR}-{SEQ}"}</span> is allocated gapless at issue time; issued invoices
+        <Tx>Numbering </Tx><span className="font-mono">{"{PROP}-{YEAR}-{SEQ}"}</span> <Tx>is allocated gapless at issue time; issued invoices
         are immutable — corrections via credit notes; void requires Super Admin + reason. Dunning: +3/+7/+14 days past due.
-      </p>
+      </Tx></p>
       <div className="mt-2 text-xs text-muted-foreground">
         <Link href="/rent-engine" className="underline underline-offset-4">
           <Tx>Rent engine rules →</Tx>

@@ -68,7 +68,7 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
             <Link href={`/members/${lease.memberProfileId}`} className="underline underline-offset-4">
               {lease.member.party.name}
             </Link>{" "}
-            · {lease.room.floor.building.property.code}/{lease.room.floor.building.name} / Room {lease.room.number}
+            · {lease.room.floor.building.property.code}/{lease.room.floor.building.name} <Tx>/ Room </Tx>{lease.room.number}
             {lease.bedId ? ` (${lease.room.beds.find((b) => b.id === lease.bedId)?.label ?? "bed"})` : " (entire room)"}
           </p>
         </div>
@@ -95,21 +95,21 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
                 <dd className="tabular-nums">{money(lease.rentAmountMinor)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Billing</dt>
+                <dt className="text-muted-foreground"><Tx>Billing</Tx></dt>
                 <dd>
-                  day {lease.billingCycleDay} · {lease.prorationBasis === "thirty_day" ? "30-day" : "calendar"} proration
-                </dd>
+                  <Tx>day </Tx>{lease.billingCycleDay} · {lease.prorationBasis === "thirty_day" ? "30-day" : "calendar"} <Tx>proration
+                </Tx></dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground"><Tx>Deposit</Tx></dt>
                 <dd className="tabular-nums">
-                  {money(lease.depositTotalMinor)} in {lease.depositInstallments} installment(s)
-                </dd>
+                  {money(lease.depositTotalMinor)} <Tx>in </Tx>{lease.depositInstallments} <Tx>installment(s)
+                </Tx></dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground"><Tx>Notice / renewal</Tx></dt>
                 <dd>
-                  {lease.noticeDays}d · {lease.autoRenew ? "auto-renews" : "manual"}
+                  {lease.noticeDays}<Tx>d · </Tx>{lease.autoRenew ? "auto-renews" : "manual"}
                   {lease.escalationPercent !== null ? ` · +${lease.escalationPercent}%/yr` : ""}
                 </dd>
               </div>
@@ -119,7 +119,7 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
               </div>
               {lease.terminationReason ? (
                 <div className="flex justify-between border-t pt-2">
-                  <dt className="text-destructive">Terminated</dt>
+                  <dt className="text-destructive"><Tx>Terminated</Tx></dt>
                   <dd className="max-w-64 text-right text-destructive">{lease.terminationReason}</dd>
                 </div>
               ) : null}

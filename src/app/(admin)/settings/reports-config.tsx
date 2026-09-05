@@ -98,35 +98,53 @@ export function ReportsConfig({
     setDraft({ ...draft, designs });
   }
 
+  /// The columns shown for a report: the stored design order, or — before any
+  /// design has been saved — the full registry order. Design edits materialise
+  /// a stored design the first time they change that default.
+  function currentColumns(key: string): ReportDesignColumn[] {
+    const report = reports.find((r) => r.key === key);
+    return report
+      ? draft.designs[key]?.columns?.length
+        ? draft.designs[key]!.columns!
+        : report.columns.map((c) => ({ key: c.key }))
+      : [];
+  }
+
+  /// Store a column list, collapsing it back to "default" (registry order, no
+  /// labels) when it matches — empty and unchanged designs never persist, the
+  /// same rule normalizeReportSettings applies on read (§M28).
+  function patchColumns(key: string, columns: ReportDesignColumn[]) {
+    const report = reports.find((r) => r.key === key);
+    const isDefault =
+      Boolean(report) && columns.length === report!.columns.length && columns.every((c, i) => c.key === report!.columns[i]!.key && !c.label);
+    patchDesign(key, { columns: columns.length === 0 || isDefault ? undefined : columns });
+  }
+
   function toggleColumn(key: string, columnKey: string, on: boolean) {
     const report = reports.find((r) => r.key === key);
     if (!report) return;
-    // No stored design yet ⇒ start from the full registry order.
-    const current: ReportDesignColumn[] = draft.designs[key]?.columns?.length
-      ? draft.designs[key]!.columns!
-      : report.columns.map((c) => ({ key: c.key }));
+    const current = currentColumns(key);
     const next = on ? [...current, { key: columnKey }] : current.filter((c) => c.key !== columnKey);
-    const isDefault =
-      next.length === report.columns.length && next.every((c, i) => c.key === report.columns[i]!.key && !c.label);
-    patchDesign(key, { columns: isDefault ? undefined : next });
+    patchColumns(key, next);
   }
 
   function moveColumn(key: string, columnKey: string, dir: -1 | 1) {
-    const current = draft.designs[key]?.columns;
-    if (!current) return;
+    const current = currentColumns(key);
     const i = current.findIndex((c) => c.key === columnKey);
     const j = i + dir;
     if (i < 0 || j < 0 || j >= current.length) return;
     const next = [...current];
     const [item] = next.splice(i, 1);
     next.splice(j, 0, item!);
-    patchDesign(key, { columns: next });
+    patchColumns(key, next);
   }
 
   function setColumnLabel(key: string, columnKey: string, label: string) {
-    const current = draft.designs[key]?.columns;
-    if (!current) return;
-    patchDesign(key, { columns: current.map((c) => (c.key === columnKey ? (label.trim() ? { ...c, label: label.trim() } : { key: c.key }) : c)) });
+    const current = currentColumns(key);
+    const next = current.map((c) =>
+      c.key === columnKey ? (label.trim() ? { ...c, label: label.trim() } : { key: c.key }) : c
+    );
+    patchColumns(key, next);
   }
 
   async function save() {

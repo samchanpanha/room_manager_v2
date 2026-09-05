@@ -126,7 +126,7 @@ export function NewLeaseForm({
             <div className="space-y-1.5">
               <Label htmlFor="l-member">Member (verified/active, not blacklisted)</Label>
               <Select id="l-member" value={memberProfileId} onChange={(e) => setMemberProfileId(e.target.value)} required>
-                <option value="">— select member —</option>
+                <option value=""><Tx>— select member —</Tx></option>
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.label}
@@ -179,8 +179,8 @@ export function NewLeaseForm({
                   <option value="">—</option>
                   {visibleRooms.map((r) => (
                     <option key={r.id} value={r.id}>
-                      {r.label} · {r.status} · {r.capacity} bed(s)
-                    </option>
+                      {r.label} · {r.status} · {r.capacity} <Tx>bed(s)
+                    </Tx></option>
                   ))}
                 </Select>
               </div>
@@ -190,7 +190,7 @@ export function NewLeaseForm({
                 <div className="space-y-1.5">
                   <Label htmlFor="l-bed">Bed (optional — co-living)</Label>
                   <Select id="l-bed" value={bedId} onChange={(e) => setBedId(e.target.value)}>
-                    <option value="">Entire room {room.wholeRoomFree ? "(free)" : "(taken)"}</option>
+                    <option value=""><Tx>Entire room </Tx>{room.wholeRoomFree ? "(free)" : "(taken)"}</option>
                     {room.beds.map((b) => (
                       <option key={b.id} value={b.id} disabled={b.taken}>
                         {b.label} {b.taken ? "(leased)" : ""}
@@ -200,9 +200,9 @@ export function NewLeaseForm({
                 </div>
                 <div className="flex items-end">
                   <p className="text-xs text-muted-foreground">
-                    Status: {room.status} · capacity {room.capacity} · list price {(room.basePriceMinor / 100).toFixed(2)}/mo. One
+                    <Tx>Status: </Tx>{room.status} <Tx>· capacity </Tx>{room.capacity} <Tx>· list price </Tx>{(room.basePriceMinor / 100).toFixed(2)}<Tx>/mo. One
                     active lease per bed; capacity enforced at activation.
-                  </p>
+                  </Tx></p>
                 </div>
               </div>
             ) : null}
@@ -230,8 +230,8 @@ export function NewLeaseForm({
               <div className="space-y-1.5">
                 <Label htmlFor="l-proration">Proration basis</Label>
                 <Select id="l-proration" value={proration} onChange={(e) => setProration(e.target.value)}>
-                  <option value="calendar">Calendar days</option>
-                  <option value="thirty_day">30-day month</option>
+                  <option value="calendar"><Tx>Calendar days</Tx></option>
+                  <option value="thirty_day"><Tx>30-day month</Tx></option>
                 </Select>
               </div>
               <div className="space-y-1.5">
@@ -258,8 +258,8 @@ export function NewLeaseForm({
               </div>
               <label className="flex items-end gap-2 pb-2 text-sm">
                 <input type="checkbox" className="h-4 w-4" checked={autoRenew} onChange={(e) => setAutoRenew(e.target.checked)} />
-                Auto-renew
-              </label>
+                <Tx>Auto-renew
+              </Tx></label>
             </div>
           </section>
 

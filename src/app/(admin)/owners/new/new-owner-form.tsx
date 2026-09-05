@@ -103,17 +103,17 @@ export function NewOwnerForm({ unownedBuildings }: { unownedBuildings: BuildingO
           <section className="space-y-3">
             <label className="flex items-center gap-2 text-sm font-medium">
               <input type="checkbox" checked={withPayout} onChange={(e) => setWithPayout(e.target.checked)} className="h-4 w-4" />
-              Payout method (primary)
-            </label>
+              <Tx>Payout method (primary)
+            </Tx></label>
             {withPayout ? (
               <div className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="o-kind">Kind</Label>
                   <Select id="o-kind" name="kind" defaultValue="BANK">
-                    <option value="BANK">Bank transfer</option>
-                    <option value="MOBILE_MONEY">Mobile money</option>
-                    <option value="CASH">Cash</option>
-                    <option value="OTHER">Other</option>
+                    <option value="BANK"><Tx>Bank transfer</Tx></option>
+                    <option value="MOBILE_MONEY"><Tx>Mobile money</Tx></option>
+                    <option value="CASH"><Tx>Cash</Tx></option>
+                    <option value="OTHER"><Tx>Other</Tx></option>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
@@ -159,8 +159,8 @@ export function NewOwnerForm({ unownedBuildings }: { unownedBuildings: BuildingO
           <section className="space-y-3">
             <label className="flex items-center gap-2 text-sm font-medium">
               <input type="checkbox" checked={withLogin} onChange={(e) => setWithLogin(e.target.checked)} className="h-4 w-4" />
-              Create portal login (OWNER role — sees only their buildings, statements, documents)
-            </label>
+              <Tx>Create portal login (OWNER role — sees only their buildings, statements, documents)
+            </Tx></label>
             {withLogin ? (
               <div className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
                 <div className="space-y-1.5">

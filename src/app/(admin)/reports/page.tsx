@@ -12,7 +12,9 @@ import { applyReportDesign, designReport, resolveReportKeys, summaryLabel } from
 import { formatMinor } from "@/lib/money";
 import { getSettings } from "@/lib/settings";
 import { getT } from "@/lib/locale-server";
+import { REPORTS } from "@/lib/reports/registry";
 import { ReportPicker } from "./report-picker";
+import { ReportsConfigToggle } from "./config-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +42,14 @@ export default async function ReportsPage({
   const scope = await reportScope(user);
   if (!scope.allowed) redirect("/dashboard");
   const settings = await getSettings();
+
+  // M28 readers may tune the optional config; only M28:update can write it.
+  const canConfigure = hasModuleAccess(user, "read", "M28");
+  const [activeUsers] = await Promise.all([
+    canConfigure
+      ? prisma.user.findMany({ where: { status: "active" }, select: { id: true, name: true, email: true }, orderBy: { name: "asc" } })
+      : Promise.resolve([] as Array<{ id: string; name: string; email: string }>)
+  ]);
 
   // §5 role scope first, then the optional develop/assign configuration.
   const allowedKeys = resolveReportKeys(visibleReportKeys(user), settings.reports, user.id);
@@ -78,6 +88,15 @@ export default async function ReportsPage({
         properties={properties}
         current={{ key: currentKey, from: sp.from, to: sp.to, month: sp.month, propertyId: sp.propertyId }}
       />
+
+      {canConfigure ? (
+        <ReportsConfigToggle
+          reports={REPORTS.map((r) => ({ key: r.key, title: r.title, category: r.category, columns: r.columns.map((c) => ({ key: c.key, label: c.label })) }))}
+          users={activeUsers}
+          value={settings.reports}
+          canWrite={hasModuleAccess(user, "update", "M28")}
+        />
+      ) : null}
 
       {designedResult ? (
         <>

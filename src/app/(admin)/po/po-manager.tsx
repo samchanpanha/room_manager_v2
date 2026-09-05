@@ -158,7 +158,7 @@ export function PoManager({ canWrite, defaultPropertyId, visibleProperties }: Po
                     <span className="text-sm">{o.supplierName || "No supplier"}</span>
                     <Badge className={cn(STATUS_COLOR[o.status] ?? "")}>{STATUS_LABEL[o.status] ?? o.status}</Badge>
                     <span className="text-sm text-muted-foreground">
-                      ordered {money(o.totalMinor)} · received {money(o.receivedMinor)}
+                      <Tx>ordered </Tx>{money(o.totalMinor)} <Tx>· received </Tx>{money(o.receivedMinor)}
                     </span>
                     {o.note ? <span className="text-xs text-muted-foreground">{o.note}</span> : null}
                     <div className="ml-auto flex gap-2">
@@ -183,7 +183,7 @@ export function PoManager({ canWrite, defaultPropertyId, visibleProperties }: Po
                     {o.lines.map((l) => (
                       <li key={l.id}>
                         {(l.stockItem?.name ?? "item")} — {qty(l.qtyMilli, l.stockItem?.unit ?? "u")} @ {money(l.unitCostMilli / 1000)}
-                        {l.receivedMilli > 0 ? <span className="text-emerald-600"> · received {qty(l.receivedMilli, l.stockItem?.unit ?? "u")}</span> : null}
+                        {l.receivedMilli > 0 ? <span className="text-emerald-600"> <Tx>· received </Tx>{qty(l.receivedMilli, l.stockItem?.unit ?? "u")}</span> : null}
                       </li>
                     ))}
                   </ul>
@@ -370,7 +370,7 @@ function ReceiveDialog({ po, remaining, busy, onClose, onDone }: {
           return (
             <div key={l.id} className="flex items-center gap-2 text-sm">
               <span className="flex-1">{l.stockItem?.name}</span>
-              <span className="text-muted-foreground">{qty(remain, l.stockItem?.unit ?? "u")} remaining</span>
+              <span className="text-muted-foreground">{qty(remain, l.stockItem?.unit ?? "u")} <Tx>remaining</Tx></span>
               <Input
                 type="number"
                 className="w-28"

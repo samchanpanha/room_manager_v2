@@ -68,9 +68,9 @@ export default async function SettingsPage() {
               <Tx>Stored AES-256-GCM encrypted; only &quot;configured + last 4&quot; is ever displayed. Env fallback applies until set.</Tx>
             </p>
             <ul className="mb-3 space-y-1 text-sm">
-              <li>Payment webhook secret: {settings.providers.paymentCredentials.configured ? `configured (••${settings.providers.paymentCredentials.last4})` : "env default"}</li>
-              <li>Telegram bot token: {settings.providers.telegramBotToken.configured ? `configured (••${settings.providers.telegramBotToken.last4})` : "env default"}</li>
-              <li>Object storage driver: {activeStorageDriver() === "s3" ? "S3-compatible" : "dev disk"}</li>
+              <li><Tx>Payment webhook secret: </Tx>{settings.providers.paymentCredentials.configured ? `configured (••${settings.providers.paymentCredentials.last4})` : "env default"}</li>
+              <li><Tx>Telegram bot token: </Tx>{settings.providers.telegramBotToken.configured ? `configured (••${settings.providers.telegramBotToken.last4})` : "env default"}</li>
+              <li><Tx>Object storage driver: </Tx>{activeStorageDriver() === "s3" ? "S3-compatible" : "dev disk"}</li>
             </ul>
             {canWrite && <SecretForms />}
           </CardContent>

@@ -87,7 +87,7 @@ export default async function MembersPage({
             <Tx>Status</Tx>
           </label>
           <Select id="f-status" name="status" defaultValue={sp.status ?? ""}>
-            <option value="">All statuses</option>
+            <option value=""><Tx>All statuses</Tx></option>
             {MEMBER_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {titleCase(s)}
@@ -100,7 +100,7 @@ export default async function MembersPage({
             <Tx>Property</Tx>
           </label>
           <Select id="f-prop" name="propertyId" defaultValue={sp.propertyId ?? ""}>
-            <option value="">All properties</option>
+            <option value=""><Tx>All properties</Tx></option>
             {properties.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.code} · {p.name}

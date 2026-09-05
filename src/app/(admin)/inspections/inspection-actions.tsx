@@ -126,9 +126,9 @@ function CreateDialog({ busy, leases, onDone }: { busy: boolean; leases: { id: s
             <div className="space-y-1.5">
               <Label htmlFor="insp-type">Type</Label>
               <Select id="insp-type" name="type" defaultValue="move_in" required>
-                <option value="move_in">Move-in</option>
-                <option value="move_out">Move-out</option>
-                <option value="periodic">Periodic</option>
+                <option value="move_in"><Tx>Move-in</Tx></option>
+                <option value="move_out"><Tx>Move-out</Tx></option>
+                <option value="periodic"><Tx>Periodic</Tx></option>
               </Select>
             </div>
             <div className="space-y-1.5">
@@ -212,15 +212,15 @@ function CompleteDialog({ busy, onDone }: { busy: boolean; onDone: (items: ItemR
                   required
                 />
                 <Select className="sm:col-span-2" value={row.result} onChange={(e) => update(ix, { result: e.target.value as ItemRow["result"] })}>
-                  <option value="pass">pass</option>
-                  <option value="fail">fail</option>
-                  <option value="na">n/a</option>
+                  <option value="pass"><Tx>pass</Tx></option>
+                  <option value="fail"><Tx>fail</Tx></option>
+                  <option value="na"><Tx>n/a</Tx></option>
                 </Select>
                 {row.result === "fail" ? (
                   <Select className="sm:col-span-2" value={row.severity ?? "minor"} onChange={(e) => update(ix, { severity: e.target.value })}>
-                    <option value="minor">minor</option>
-                    <option value="major">major</option>
-                    <option value="critical">critical</option>
+                    <option value="minor"><Tx>minor</Tx></option>
+                    <option value="major"><Tx>major</Tx></option>
+                    <option value="critical"><Tx>critical</Tx></option>
                   </Select>
                 ) : (
                   <div className="sm:col-span-2" />

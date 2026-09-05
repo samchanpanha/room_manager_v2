@@ -87,7 +87,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                 <Link href={`/leases/${invoice.leaseId}`} className="underline underline-offset-4">
                   {invoice.lease.code}
                 </Link>{" "}
-                (room {invoice.lease.room.number})
+                <Tx>(room </Tx>{invoice.lease.room.number})
               </>
             ) : null}
           </p>
@@ -194,7 +194,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Issued</dt>
+                  <dt className="text-muted-foreground"><Tx>Issued</Tx></dt>
                   <dd>{invoice.issuedAt?.toISOString().slice(0, 10) ?? "—"}</dd>
                 </div>
                 <div className="flex justify-between">

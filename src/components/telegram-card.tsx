@@ -90,10 +90,10 @@ export function TelegramCard() {
           <p className="text-muted-foreground"><Tx>Loading…</Tx></p>
         ) : !state.linked ? (
           <>
-            <p className="text-muted-foreground">Get rent receipts and updates in Telegram. Generate a code, then send <span className="font-mono">/link &lt;code&gt;</span> to the bot.</p>
+            <p className="text-muted-foreground"><Tx>Get rent receipts and updates in Telegram. Generate a code, then send </Tx><span className="font-mono"><Tx>/link &lt;code&gt;</Tx></span> <Tx>to the bot.</Tx></p>
             {code ? (
               <div className="rounded-md border border-dashed px-3 py-2">
-                <p className="text-xs text-muted-foreground">One-time code (expires {new Date(code.expiresAt).toLocaleTimeString()}):</p>
+                <p className="text-xs text-muted-foreground"><Tx>One-time code (expires </Tx>{new Date(code.expiresAt).toLocaleTimeString()}):</p>
                 <p className="font-mono text-lg font-semibold tracking-widest">{code.code}</p>
                 <a href={code.deepLink} target="_blank" rel="noreferrer" className="text-xs underline underline-offset-4">
                   <Tx>Open the bot →</Tx>
@@ -108,7 +108,7 @@ export function TelegramCard() {
         ) : (
           <>
             <p className="text-muted-foreground">
-              Linked{state.displayName ? ` to ${state.displayName}` : ""} · chat {state.chatMasked} · since{" "}
+              <Tx>Linked</Tx>{state.displayName ? ` to ${state.displayName}` : ""} <Tx>· chat </Tx>{state.chatMasked} <Tx>· since</Tx>{" "}
               {state.linkedAt ? new Date(state.linkedAt).toLocaleDateString() : "—"}
             </p>
             <div className="space-y-1.5">

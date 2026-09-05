@@ -69,7 +69,11 @@ export async function createPurchaseOrder(
     if (!Number.isInteger(l.qtyMilli) || l.qtyMilli <= 0) return { ok: false, code: "INVALID_QTY", message: "Each qty must be a positive integer" };
     if (!Number.isInteger(l.unitCostMinor) || l.unitCostMinor < 0) return { ok: false, code: "INVALID_COST", message: "Unit cost must be a non-negative integer" };
   }
-  const ids = [...new Set(input.lines.map((l) => l.stockItemId))];
+  const stockItemIds = input.lines.map((l) => l.stockItemId);
+  if (new Set(stockItemIds).size !== stockItemIds.length) {
+    return { ok: false, code: "DUPLICATE_ITEM", message: "A stock item can appear in at most one line per purchase order" };
+  }
+  const ids = [...new Set(stockItemIds)];
   const items = await stockItemsOf(input.propertyId, ids);
   if (items.length !== ids.length) return { ok: false, code: "ITEM_MISMATCH", message: "One or more stock items are missing, inactive, or belong to another property" };
 
@@ -79,7 +83,6 @@ export async function createPurchaseOrder(
     if (!supplier) return { ok: false, code: "SUPPLIER_NOT_FOUND", message: "Supplier not found" };
     supplierName = supplier.name;
   }
-  if (input.supplierId && !supplierName) supplierName = "";
 
   const code = await nextNumber("PO", (n) => `PO-${new Date().getUTCFullYear()}-${String(n).padStart(4, "0")}`);
 
@@ -164,6 +167,10 @@ export async function receivePurchaseOrder(
   for (const r of received) {
     if (!Number.isInteger(r.qtyMilli) || r.qtyMilli <= 0) return { ok: false, code: "INVALID_QTY", message: "Received qty must be a positive integer" };
   }
+  const lineIds = received.map((r) => r.lineId);
+  if (new Set(lineIds).size !== lineIds.length) {
+    return { ok: false, code: "DUPLICATE_LINE", message: "Each line can be received at most once per request" };
+  }
   const po = await purchaseOrderById(id);
   if (!po) return { ok: false, code: "NOT_FOUND", message: "Purchase order not found" };
   if (po.status === "received") return { ok: false, code: "ALREADY_RECEIVED", message: "This purchase order has already been received" };
@@ -172,72 +179,86 @@ export async function receivePurchaseOrder(
   const linesById = new Map(po.lines.map((l) => [l.id, l]));
   if (received.some((r) => !linesById.has(r.lineId))) return { ok: false, code: "LINE_MISMATCH", message: "One or more received lines don't belong to this purchase order" };
 
-  const result = await prisma.$transaction(
-    async (tx) => {
-      let receivedMinor = 0;
-      let movements = 0;
-      for (const r of received) {
-        const line = linesById.get(r.lineId)!;
-        const remaining = line.qtyMilli - line.receivedMilli;
-        if (r.qtyMilli > remaining) {
-          throw Object.assign(new Error(`Over-receipt on "${line.stockItem.name}": ${r.qtyMilli / 1000} received vs ${remaining / 1000} remaining`), { code: "OVER_RECEIPT" });
+  try {
+    const result = await prisma.$transaction(
+      async (tx) => {
+        let receivedMinor = 0;
+        let movements = 0;
+        for (const r of received) {
+          const line = linesById.get(r.lineId)!;
+          const remaining = line.qtyMilli - line.receivedMilli;
+          if (r.qtyMilli > remaining) {
+            throw Object.assign(new Error(`Over-receipt on "${line.stockItem.name}": ${r.qtyMilli / 1000} received vs ${remaining / 1000} remaining`), { code: "OVER_RECEIPT" });
+          }
+          const applied = await applyMovement(
+            tx,
+            line.stockItemId,
+            "purchase",
+            r.qtyMilli,
+            line.unitCostMilli,
+            actor,
+            { purchaseOrderId: po.id, note: `PO ${po.code}` }
+          );
+          void applied;
+          movements += 1;
+          receivedMinor += poLineTotalMinor(r.qtyMilli, line.unitCostMilli);
+          await tx.purchaseOrderLine.update({
+            where: { id: line.id },
+            data: { receivedMilli: line.receivedMilli + r.qtyMilli }
+          });
         }
-        const applied = await applyMovement(
-          tx,
-          line.stockItemId,
-          "purchase",
-          r.qtyMilli,
-          line.unitCostMilli,
-          actor,
-          { purchaseOrderId: po.id, note: `PO ${po.code}` }
-        );
-        void applied;
-        movements += 1;
-        receivedMinor += poLineTotalMinor(r.qtyMilli, line.unitCostMilli);
-        await tx.purchaseOrderLine.update({
-          where: { id: line.id },
-          data: { receivedMilli: line.receivedMilli + r.qtyMilli }
+        const allReceived = po.lines.every((l) => {
+          const updated = received.find((r) => r.lineId === l.id);
+          return l.receivedMilli + (updated?.qtyMilli ?? 0) >= l.qtyMilli;
         });
-      }
-      const allReceived = po.lines.every((l) => {
-        const updated = received.find((r) => r.lineId === l.id);
-        return l.receivedMilli + (updated?.qtyMilli ?? 0) >= l.qtyMilli;
-      });
-      const status: PoStatus = allReceived ? "received" : "placed";
-      await tx.purchaseOrder.update({
-        where: { id: po.id },
-        data: {
-          status,
-          receivedAt: allReceived ? new Date() : po.receivedAt
-        }
-      });
-      return { receivedMinor, movements, status };
-    },
-    HEAVY_TX
-  );
+        const status: PoStatus = allReceived ? "received" : "placed";
+        await tx.purchaseOrder.update({
+          where: { id: po.id },
+          data: {
+            status,
+            receivedAt: allReceived ? new Date() : po.receivedAt
+          }
+        });
+        return { receivedMinor, movements, status };
+      },
+      HEAVY_TX
+    );
 
-  await logAudit({
-    actorId: actor.id,
-    actorName: actor.name,
-    module: "M29",
-    action: "po.received",
-    entityType: "purchase_order",
-    entityId: po.code,
-    summary: `Purchase order ${po.code}: received ${received.length} line(s) (${result.movements} movement(s), ${(result.receivedMinor / 100).toFixed(2)}), status ${result.status}`,
-    propertyId: po.propertyId,
-    after: { received: received.length, receivedMinor: result.receivedMinor, status: result.status },
-    ip
-  });
-  await emitDomainEvent("po.received", { code: po.code, receivedMinor: result.receivedMinor, status: result.status }, po.propertyId);
-  for (const r of received) {
-    const line = linesById.get(r.lineId)!;
-    await emitDomainEvent("stock.purchased", { stockItemId: line.stockItemId, qtyMilli: r.qtyMilli, unitCostMinor: line.unitCostMilli / 1000 }, po.propertyId);
-    const after = await prisma.stockItem.findUniqueOrThrow({ where: { id: line.stockItemId } });
-    if (isLowStock(after.qtyMilli, after.minQtyMilli)) {
-      await emitDomainEvent("stock.low", { stockItemId: after.id, name: after.name, qtyMilli: after.qtyMilli, minQtyMilli: after.minQtyMilli }, po.propertyId);
+    await logAudit({
+      actorId: actor.id,
+      actorName: actor.name,
+      module: "M29",
+      action: "po.received",
+      entityType: "purchase_order",
+      entityId: po.code,
+      summary: `Purchase order ${po.code}: received ${received.length} line(s) (${result.movements} movement(s), ${(result.receivedMinor / 100).toFixed(2)}), status ${result.status}`,
+      propertyId: po.propertyId,
+      after: { received: received.length, receivedMinor: result.receivedMinor, status: result.status },
+      ip
+    });
+    await emitDomainEvent("po.received", { code: po.code, receivedMinor: result.receivedMinor, status: result.status }, po.propertyId);
+    for (const r of received) {
+      const line = linesById.get(r.lineId)!;
+      await emitDomainEvent("stock.purchased", { stockItemId: line.stockItemId, qtyMilli: r.qtyMilli, unitCostMinor: line.unitCostMilli / 1000 }, po.propertyId);
+      const after = await prisma.stockItem.findUniqueOrThrow({ where: { id: line.stockItemId } });
+      if (isLowStock(after.qtyMilli, after.minQtyMilli)) {
+        await emitDomainEvent("stock.low", { stockItemId: after.id, name: after.name, qtyMilli: after.qtyMilli, minQtyMilli: after.minQtyMilli }, po.propertyId);
+      }
     }
+    return { ok: true, data: { id: po.id, code: po.code, status: result.status, movements: result.movements, receivedMinor: result.receivedMinor } };
+  } catch (e) {
+    return receiveError(e);
   }
-  return { ok: true, data: { id: po.id, code: po.code, status: result.status, movements: result.movements, receivedMinor: result.receivedMinor } };
+}
+
+/// Map known movement-engine failures (over-receipt, missing item) back to a
+/// clean Result so the API returns 4xx — unexpected errors still propagate.
+function receiveError(e: unknown): Result<never> {
+  const err = e as { code?: string; message?: string };
+  if (err.code === "OVER_RECEIPT" || err.code === "NOT_FOUND" || err.code === "INSUFFICIENT_STOCK") {
+    return { ok: false, code: err.code, message: err.message ?? "Receiving stock failed" };
+  }
+  throw e;
 }
 
 export async function voidPurchaseOrder(id: string, actor: ActorCtx, ip?: string | null): Promise<Result<{ id: string; code: string }>> {

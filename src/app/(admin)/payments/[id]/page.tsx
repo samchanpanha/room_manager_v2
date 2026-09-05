@@ -63,7 +63,7 @@ export default async function PaymentDetailPage({ params }: { params: Promise<{ 
             <Link href={`/members/${payment.memberProfileId}`} className="underline underline-offset-4">
               {payment.member.party.name}
             </Link>{" "}
-            · {payment.method.replaceAll("_", " ")} · received {timeAgo(payment.receivedAt)}
+            · {payment.method.replaceAll("_", " ")} <Tx>· received </Tx>{timeAgo(payment.receivedAt)}
           </p>
         </div>
         <PaymentActions

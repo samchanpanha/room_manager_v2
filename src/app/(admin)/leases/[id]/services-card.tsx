@@ -88,9 +88,9 @@ export function ServicesCard({
             <Input placeholder="Service (e.g. WiFi)" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} />
             <Input placeholder="Amount" type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} required />
             <Select value={model} onChange={(e) => setModel(e.target.value)}>
-              <option value="fixed_monthly">fixed monthly</option>
-              <option value="per_use">per use</option>
-              <option value="metered">metered</option>
+              <option value="fixed_monthly"><Tx>fixed monthly</Tx></option>
+              <option value="per_use"><Tx>per use</Tx></option>
+              <option value="metered"><Tx>metered</Tx></option>
             </Select>
             <Button type="submit" size="sm" disabled={busy}>
               Add
@@ -105,7 +105,7 @@ export function ServicesCard({
               <li key={s.id} className="flex items-center justify-between py-2">
                 <span>{s.name}</span>
                 <span className="flex items-center gap-3">
-                  <span className="tabular-nums">{money(s.amountMinor)}/mo</span>
+                  <span className="tabular-nums">{money(s.amountMinor)}<Tx>/mo</Tx></span>
                   {canUpdate && status === "draft" ? (
                     <Button size="sm" variant="ghost" className="text-destructive" disabled={busy} onClick={() => remove(s.id, s.name)}>
                       ✕

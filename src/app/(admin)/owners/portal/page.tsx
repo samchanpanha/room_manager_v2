@@ -100,8 +100,8 @@ export default async function OwnerPortalPage() {
                     <div>
                       <p className="font-medium">{b.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {b.property.name} · {b.floors.length} floors · {brooms.length} rooms
-                      </p>
+                        {b.property.name} · {b.floors.length} <Tx>floors · </Tx>{brooms.length} <Tx>rooms
+                      </Tx></p>
                     </div>
                     <Badge variant={bocc > 0 ? "success" : "secondary"}>
                       {brooms.length > 0 ? Math.round((bocc / brooms.length) * 100) : 0}%
@@ -175,7 +175,7 @@ export default async function OwnerPortalPage() {
               {statements.map((st) => (
                 <li key={st.id} className="flex items-center justify-between py-2">
                   <span>
-                    <span className="font-mono text-xs">{st.code}</span> · {st.month} · net $={(st.netMinor / 100).toFixed(2)}
+                    <span className="font-mono text-xs">{st.code}</span> · {st.month} <Tx>· net $=</Tx>{(st.netMinor / 100).toFixed(2)}
                   </span>
                   <span className="flex items-center gap-2">
                     <Badge variant={st.status === "paid" ? "success" : st.status === "approved" ? "info" : "warning"}>{st.status}</Badge>
@@ -193,7 +193,7 @@ export default async function OwnerPortalPage() {
       ) : null}
 
       <p className="mt-6 text-xs text-muted-foreground">
-        You are seeing only buildings owned by you — enforced server-side (OWN scope).{" "}
+        <Tx>You are seeing only buildings owned by you — enforced server-side (OWN scope).</Tx>{" "}
         <Link href="/properties" className="underline underline-offset-4">
           <Tx>Browse your properties →</Tx>
         </Link>

@@ -229,7 +229,7 @@ function ProfileTab({ member, canUpdate }: { member: MemberView; canUpdate: bool
               </Button>
             ))}
             {member.nextStatuses.length === 0 && canUpdate ? (
-              <span className="text-xs text-muted-foreground">terminal state{member.blacklisted ? " (blacklisted)" : ""}</span>
+              <span className="text-xs text-muted-foreground"><Tx>terminal state</Tx>{member.blacklisted ? " (blacklisted)" : ""}</span>
             ) : null}
           </div>
           {canUpdate ? (
@@ -512,7 +512,7 @@ function DocumentsTab({
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
                     {d.fileName} · {formatBytes(d.sizeBytes)}
-                    {d.expiryDate ? ` · expires ${d.expiryDate.slice(0, 10)}` : ""} · by {d.uploadedBy}
+                    {d.expiryDate ? ` · expires ${d.expiryDate.slice(0, 10)}` : ""} <Tx>· by </Tx>{d.uploadedBy}
                   </p>
                 </div>
                 <div className="flex gap-1.5">

@@ -163,8 +163,8 @@ function ProfileTab({ ownerId, profile, canUpdate }: { ownerId: string; profile:
             <div className="space-y-1.5">
               <Label htmlFor="op-status">Status</Label>
               <Select id="op-status" name="status" defaultValue={profile.status} disabled={!canUpdate}>
-                <option value="active">active</option>
-                <option value="archived">archived</option>
+                <option value="active"><Tx>active</Tx></option>
+                <option value="archived"><Tx>archived</Tx></option>
               </Select>
             </div>
           </div>
@@ -291,10 +291,10 @@ function PayoutTab({ ownerId, methods, canUpdate }: { ownerId: string; methods: 
             <div className="space-y-1.5">
               <Label htmlFor="pm-kind">Kind</Label>
               <Select id="pm-kind" name="kind" defaultValue="BANK">
-                <option value="BANK">Bank transfer</option>
-                <option value="MOBILE_MONEY">Mobile money</option>
-                <option value="CASH">Cash</option>
-                <option value="OTHER">Other</option>
+                <option value="BANK"><Tx>Bank transfer</Tx></option>
+                <option value="MOBILE_MONEY"><Tx>Mobile money</Tx></option>
+                <option value="CASH"><Tx>Cash</Tx></option>
+                <option value="OTHER"><Tx>Other</Tx></option>
               </Select>
             </div>
             <div className="space-y-1.5">
@@ -311,8 +311,8 @@ function PayoutTab({ ownerId, methods, canUpdate }: { ownerId: string; methods: 
             </div>
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="isPrimary" className="h-4 w-4" /> Set as primary
-          </label>
+            <input type="checkbox" name="isPrimary" className="h-4 w-4" /> <Tx>Set as primary
+          </Tx></label>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
@@ -390,8 +390,8 @@ function BuildingsTab({
                 <div>
                   <p className="font-medium">{b.label}</p>
                   <p className="text-xs text-muted-foreground">
-                    {b.floors} floors · {b.rooms} rooms · {b.rooms > 0 ? Math.round((b.occupied / b.rooms) * 100) : 0}% occupied
-                  </p>
+                    {b.floors} <Tx>floors · </Tx>{b.rooms} <Tx>rooms · </Tx>{b.rooms > 0 ? Math.round((b.occupied / b.rooms) * 100) : 0}<Tx>% occupied
+                  </Tx></p>
                 </div>
                 {canUpdate ? (
                   <Button size="sm" variant="ghost" className="text-destructive" disabled={busy} onClick={() => unassign(b.id, b.label)}>
@@ -415,7 +415,7 @@ function BuildingsTab({
                 <div className="min-w-64 flex-1 space-y-1.5">
                   <Label htmlFor="ab-select">Building</Label>
                   <Select id="ab-select" value={selected} onChange={(e) => setSelected(e.target.value)}>
-                    <option value="">— choose —</option>
+                    <option value=""><Tx>— choose —</Tx></option>
                     {unownedBuildings.map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.label}

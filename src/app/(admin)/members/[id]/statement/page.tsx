@@ -77,7 +77,7 @@ export default async function MemberStatementPage({ params }: { params: Promise<
                     </Link>{" "}
                     <Badge variant={i.status === "overdue" ? "destructive" : "info"}>{i.status.replaceAll("_", " ")}</Badge>
                   </span>
-                  <span className="tabular-nums">{formatMinor(i.amountDueMinor)} due</span>
+                  <span className="tabular-nums">{formatMinor(i.amountDueMinor)} <Tx>due</Tx></span>
                 </li>
               ))}
             </ul>

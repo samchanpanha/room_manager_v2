@@ -7,6 +7,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Input, Label, Select } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
 
+import { Tx } from "@/components/i18n-text";
 interface CatalogRef {
   id: string;
   name: string;
@@ -192,7 +193,7 @@ function AssignForm({
         <div className="space-y-1.5">
           <Label htmlFor="sa-slot">Parking slot (optional)</Label>
           <Select id="sa-slot" name="parkingSlotCode" defaultValue="">
-            <option value="">— none —</option>
+            <option value=""><Tx>— none —</Tx></option>
             {slots.map((s) => (
               <option key={s.code} value={s.code}>
                 {s.label}
@@ -203,7 +204,7 @@ function AssignForm({
         <div className="space-y-1.5">
           <Label htmlFor="sa-wifi">WiFi account (optional)</Label>
           <Select id="sa-wifi" name="wifiSsid" defaultValue="">
-            <option value="">— none —</option>
+            <option value=""><Tx>— none —</Tx></option>
             {wifi.map((w) => (
               <option key={w.ssid} value={w.ssid}>
                 {w.label}

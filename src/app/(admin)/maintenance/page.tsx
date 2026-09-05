@@ -104,14 +104,14 @@ export default async function MaintenancePage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant={STATUS_VARIANT[t.status] ?? "secondary"}>{t.status}</Badge>
-                      {t.assignedToId ? <span className="block text-xs text-muted-foreground">tech {t.assignedToId.slice(-4)}</span> : null}
-                      {t.vendorName ? <span className="block text-xs text-muted-foreground">vendor {t.vendorName}</span> : null}
+                      {t.assignedToId ? <span className="block text-xs text-muted-foreground"><Tx>tech </Tx>{t.assignedToId.slice(-4)}</span> : null}
+                      {t.vendorName ? <span className="block text-xs text-muted-foreground"><Tx>vendor </Tx>{t.vendorName}</span> : null}
                     </TableCell>
                     <TableCell className="text-xs">
                       {breached ? (
                         <Badge variant="destructive">breached</Badge>
                       ) : openStates.includes(t.status) ? (
-                        <span className="text-muted-foreground">due {t.slaDueAt.toISOString().slice(5, 16).replace("T", " ")}</span>
+                        <span className="text-muted-foreground"><Tx>due </Tx>{t.slaDueAt.toISOString().slice(5, 16).replace("T", " ")}</span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -140,9 +140,9 @@ export default async function MaintenancePage() {
         </CardContent>
       </Card>
       <p className="mt-3 text-xs text-muted-foreground">
-        Escalation notifications ride M21 (Phase 19); breaches are flagged and audited by the daily SLA sweep
-        (<span className="font-mono">POST /api/jobs/sla-sweep</span>). Material costs can reference M15 stock items (Phase 14 wires consumption).
-      </p>
+        <Tx>Escalation notifications ride M21 (Phase 19); breaches are flagged and audited by the daily SLA sweep
+        (</Tx><span className="font-mono"><Tx>POST /api/jobs/sla-sweep</Tx></span><Tx>). Material costs can reference M15 stock items (Phase 14 wires consumption).
+      </Tx></p>
     </div>
   );
 }

@@ -154,7 +154,7 @@ async function TariffSection({ isGlobal }: { isGlobal: boolean }) {
                 <TableCell>{t.name}</TableCell>
                 <TableCell className="uppercase">{t.utilityType}</TableCell>
                 <TableCell>{t.propertyId ? "property" : "organisation"}</TableCell>
-                <TableCell className="tabular-nums">{formatMinor(t.unitRateMinor)}/unit</TableCell>
+                <TableCell className="tabular-nums">{formatMinor(t.unitRateMinor)}<Tx>/unit</Tx></TableCell>
                 <TableCell className="text-xs text-muted-foreground">{t.tiers ? `${(t.tiers as unknown[]).length} tier(s)` : "flat"}</TableCell>
                 <TableCell>{t.effectiveFrom.toISOString().slice(0, 10)}</TableCell>
               </TableRow>
@@ -170,8 +170,8 @@ async function TariffSection({ isGlobal }: { isGlobal: boolean }) {
         </Table>
         {isGlobal ? (
           <p className="mt-3 text-xs text-muted-foreground">
-            Create tariffs via <code className="rounded bg-muted px-1">POST /api/tariffs</code> (UI form arrives with the settings phase).
-          </p>
+            <Tx>Create tariffs via </Tx><code className="rounded bg-muted px-1"><Tx>POST /api/tariffs</Tx></code> <Tx>(UI form arrives with the settings phase).
+          </Tx></p>
         ) : null}
       </CardContent>
     </Card>
