@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import { DEFAULT_LOCALE, tfIn, tIn, tNavIn, type Locale } from "@/lib/i18n";
+import { DEFAULT_LOCALE, tfIn, tIn, tNavIn, tUiIn, type Locale } from "@/lib/i18n";
 
 /// Locale flows down as React context from the root layout's resolved value —
 /// SSR and hydration always agree, and there is no module state to race.
@@ -22,6 +22,7 @@ export function useT() {
     locale,
     t: (key: string) => tIn(locale, key),
     tf: (key: string, vars: Record<string, string | number>) => tfIn(locale, key, vars),
-    tNav: (label: string) => tNavIn(locale, label)
+    tNav: (label: string) => tNavIn(locale, label),
+    tUi: (label: string) => tUiIn(locale, label)
   };
 }
