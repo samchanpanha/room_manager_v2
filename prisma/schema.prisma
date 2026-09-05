@@ -30,27 +30,27 @@ model Party {
 }
 
 model User {
-  id           String                   @id @default(cuid())
-  email        String                   @unique
-  name         String
-  passwordHash String
-  status       String                   @default("active") // active | disabled
-  totpEnabled  Boolean                  @default(false)
-  partyId      String?
-  party        Party?                   @relation(fields: [partyId], references: [id])
-  createdAt    DateTime                 @default(now())
-  updatedAt    DateTime                 @updatedAt
-  sessions     Session[]
-  roles        UserRole[]
-  assignments  UserPropertyAssignment[]
-  auditLogs    AuditLog[]               @relation("AuditActor")
-  telegramLinks TelegramLink[] @relation("TelegramLinks")
-  documents    DocumentRegistry[]
-  kioskPinHash String? // §M23 kiosk PIN (scrypt) — clock in/out without a browser session
-  totpSecret   String? // §M27 TOTP shared secret, sealed (AES-256-GCM) with SETTINGS_ENC_KEY
-  attendanceRecords   AttendanceRecord[]
+  id                   String                   @id @default(cuid())
+  email                String                   @unique
+  name                 String
+  passwordHash         String
+  status               String                   @default("active") // active | disabled
+  totpEnabled          Boolean                  @default(false)
+  partyId              String?
+  party                Party?                   @relation(fields: [partyId], references: [id])
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  sessions             Session[]
+  roles                UserRole[]
+  assignments          UserPropertyAssignment[]
+  auditLogs            AuditLog[]               @relation("AuditActor")
+  telegramLinks        TelegramLink[]           @relation("TelegramLinks")
+  documents            DocumentRegistry[]
+  kioskPinHash         String? // §M23 kiosk PIN (scrypt) — clock in/out without a browser session
+  totpSecret           String? // §M27 TOTP shared secret, sealed (AES-256-GCM) with SETTINGS_ENC_KEY
+  attendanceRecords    AttendanceRecord[]
   attendanceExceptions AttendanceException[]
-  resolvedExceptions  AttendanceException[] @relation("ExceptionResolver")
+  resolvedExceptions   AttendanceException[]    @relation("ExceptionResolver")
 }
 
 model Session {
@@ -119,50 +119,51 @@ model UserPropertyAssignment {
 // ───────────────────────── M04 Physical inventory ─────────────────────────
 
 model Property {
-  id            String                   @id @default(cuid())
-  code          String                   @unique
-  name          String
-  address       String?
-  status        String                   @default("active") // active | archived (soft delete only with no lease history)
-  createdAt     DateTime                 @default(now())
-  buildings     Building[]
-  assignedUsers UserPropertyAssignment[]
-  members       MemberProfile[]
-  documents     DocumentRegistry[]
-  leases        Lease[]
-  invoices      Invoice[]
-  ParkingSlot   ParkingSlot[]
-  WifiAccount   WifiAccount[]
-  inspections   Inspection[]
-  tickets       MaintenanceTicket[]
-  complaints    Complaint[]
-  stockItems    StockItem[]
-  posSessions   PosSession[]
-  posSales      PosSale[]
-  stocktakes    Stocktake[]
-  overtimeRule  OvertimeRule?
-  expenseCategories  ExpenseCategory[]
-  expenses           Expense[]
-  recurringExpenses  RecurringExpense[]
-  ownerStatements    OwnerStatement[]
-  announcements      Announcement[]
-  geoLat            Float?
-  geoLng            Float?
-  geofenceRadiusM   Int? // optional kiosk geofence (§M23); punches outside → exception
-  shifts            Shift[]
-  attendanceRecords AttendanceRecord[]
+  id                   String                   @id @default(cuid())
+  code                 String                   @unique
+  name                 String
+  address              String?
+  status               String                   @default("active") // active | archived (soft delete only with no lease history)
+  createdAt            DateTime                 @default(now())
+  buildings            Building[]
+  assignedUsers        UserPropertyAssignment[]
+  members              MemberProfile[]
+  documents            DocumentRegistry[]
+  leases               Lease[]
+  invoices             Invoice[]
+  ParkingSlot          ParkingSlot[]
+  WifiAccount          WifiAccount[]
+  inspections          Inspection[]
+  tickets              MaintenanceTicket[]
+  complaints           Complaint[]
+  stockItems           StockItem[]
+  posSessions          PosSession[]
+  posSales             PosSale[]
+  stocktakes           Stocktake[]
+  purchaseOrders       PurchaseOrder[]
+  overtimeRule         OvertimeRule?
+  expenseCategories    ExpenseCategory[]
+  expenses             Expense[]
+  recurringExpenses    RecurringExpense[]
+  ownerStatements      OwnerStatement[]
+  announcements        Announcement[]
+  geoLat               Float?
+  geoLng               Float?
+  geofenceRadiusM      Int? // optional kiosk geofence (§M23); punches outside → exception
+  shifts               Shift[]
+  attendanceRecords    AttendanceRecord[]
   attendanceExceptions AttendanceException[]
 }
 
 model Building {
-  id         String          @id @default(cuid())
+  id         String           @id @default(cuid())
   propertyId String
-  property   Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  property   Property         @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   ownerId    String?
-  owner      OwnerProfile?   @relation(fields: [ownerId], references: [id])
+  owner      OwnerProfile?    @relation(fields: [ownerId], references: [id])
   name       String
   address    String?
-  createdAt  DateTime        @default(now())
+  createdAt  DateTime         @default(now())
   floors     Floor[]
   contracts  OwnerContract[]
   statements OwnerStatement[]
@@ -293,8 +294,8 @@ model MemberProfile {
   complaints         Complaint[]
   posSales           PosSale[]
   otpCodes           MemberOtp[]
-  telegramLinkCodes  TelegramLinkCode[] @relation("TelegramLinkCodes")
-  telegramLinks      TelegramLink[]     @relation("TelegramLinks")
+  telegramLinkCodes  TelegramLinkCode[]  @relation("TelegramLinkCodes")
+  telegramLinks      TelegramLink[]      @relation("TelegramLinks")
 
   @@index([status])
   @@index([homePropertyId])
@@ -357,20 +358,20 @@ model DocumentRegistry {
 /// as the current-ownership link; M05 owner contracts become the authoritative
 /// source in Phase 5 and keep the pointer in sync.
 model OwnerProfile {
-  id            String              @id @default(cuid())
-  partyId       String              @unique
-  party         Party               @relation(fields: [partyId], references: [id])
-  status        String              @default("active") // active | archived
-  companyName   String?
-  notes         String?
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  payoutMethods OwnerPayoutMethod[]
-  telegramLinkCodes TelegramLinkCode[] @relation("TelegramLinkCodes")
-  telegramLinks     TelegramLink[]     @relation("TelegramLinks")
-  buildings     Building[]
-  contracts     OwnerContract[]
-  statements    OwnerStatement[]
+  id                String              @id @default(cuid())
+  partyId           String              @unique
+  party             Party               @relation(fields: [partyId], references: [id])
+  status            String              @default("active") // active | archived
+  companyName       String?
+  notes             String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  payoutMethods     OwnerPayoutMethod[]
+  telegramLinkCodes TelegramLinkCode[]  @relation("TelegramLinkCodes")
+  telegramLinks     TelegramLink[]      @relation("TelegramLinks")
+  buildings         Building[]
+  contracts         OwnerContract[]
+  statements        OwnerStatement[]
 }
 
 model OwnerPayoutMethod {
@@ -1186,63 +1187,93 @@ model ComplaintComment {
 /// (kg, liters) stays exact; costs are minor units × 1000 (avgCostMilli).
 /// On-hand is NEVER edited directly — only via StockMovement rows (§M15).
 model StockItem {
-  id             String             @id @default(cuid())
+  id             String              @id @default(cuid())
   name           String
-  category       String // beverage | snack | grocery | supply | part | other
-  unit           String // pcs | kg | l | box …
-  qtyMilli       Int                @default(0) // on-hand (milli units)
-  avgCostMilli   Int                @default(0) // moving-average unit cost (minor×1000)
-  minQtyMilli    Int                @default(0) // low-stock alert threshold
+  category       String // snapshotted category path (e.g. "Beverages/Cold") — mirror of categoryId
+  categoryId     String? // M15 hierarchy (parent/child); null = uncategorized
+  categoryRef    StockCategory?      @relation("StockItemCategory", fields: [categoryId], references: [id])
+  unit           String // pcs | kg | l | box … (from the m28.units list)
+  packUnit       String? // buy/pack unit, e.g. "carton" — 1 packUnit = packSize × unit
+  packSize       Int? // e.g. 12 (1 carton = 12 bottle)
+  qtyMilli       Int                 @default(0) // on-hand (milli units)
+  avgCostMilli   Int                 @default(0) // moving-average unit cost (minor×1000)
+  minQtyMilli    Int                 @default(0) // low-stock alert threshold
   supplierId     String?
-  supplier       Supplier?          @relation(fields: [supplierId], references: [id])
+  supplier       Supplier?           @relation(fields: [supplierId], references: [id])
   propertyId     String
-  property       Property           @relation(fields: [propertyId], references: [id])
-  isActive       Boolean            @default(true)
-  movements      StockMovement[]    @relation("StockMovements")
-  transfersIn    StockMovement[]    @relation("StockTransferTarget")
+  property       Property            @relation(fields: [propertyId], references: [id])
+  isActive       Boolean             @default(true)
+  movements      StockMovement[]     @relation("StockMovements")
+  transfersIn    StockMovement[]     @relation("StockTransferTarget")
   stocktakeLines StocktakeLine[]
   posProducts    PosProduct[]
   ticketCosts    MaintenanceCost[]
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  poLines        PurchaseOrderLine[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
   @@unique([name, propertyId])
-  @@index([propertyId, category])
+  @@index([propertyId, categoryId])
+}
+
+/// M15 inventory hierarchy — two-level parent/child categories. `propertyId`
+/// is nullable: null = shared/global categories (POS products), set = that
+/// property's stock categories. Deleting a category that is still in use is
+/// refused; archive (isActive=false) instead.
+model StockCategory {
+  id         String             @id @default(cuid())
+  propertyId String? // null = shared (products/catalog)
+  parentId   String?
+  parent     StockCategory?     @relation("CategoryTree", fields: [parentId], references: [id])
+  children   StockCategory[]    @relation("CategoryTree")
+  name       String
+  sortOrder  Int                @default(0)
+  isActive   Boolean            @default(true)
+  stockItems StockItem[]        @relation("StockItemCategory")
+  products   PosProduct[]
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@unique([name, parentId, propertyId])
+  @@index([propertyId, parentId])
 }
 
 model Supplier {
-  id         String      @id @default(cuid())
-  name       String      @unique
-  phone      String?
-  email      String?
-  notes      String?
-  stockItems StockItem[]
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id             String          @id @default(cuid())
+  name           String          @unique
+  phone          String?
+  email          String?
+  notes          String?
+  stockItems     StockItem[]
+  purchaseOrders PurchaseOrder[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 }
 
 /// Append-only stock movements (purchase, sale, consumption, maintenance_use,
 /// adjustment, transfer) — the only way on-hand changes. qtyMilli is signed
 /// (+ increases / − decreases on-hand at the source item).
 model StockMovement {
-  id             String       @id @default(cuid())
-  stockItemId    String
-  stockItem      StockItem    @relation("StockMovements", fields: [stockItemId], references: [id])
-  type           String // purchase | sale | consumption | maintenance_use | adjustment | transfer
-  qtyMilli       Int // signed delta applied to stockItem (transfers: negative here)
-  qtyAfterMilli  Int // on-hand snapshot after applying
+  id                String         @id @default(cuid())
+  stockItemId       String
+  stockItem         StockItem      @relation("StockMovements", fields: [stockItemId], references: [id])
+  type              String // purchase | sale | consumption | maintenance_use | adjustment | transfer
+  qtyMilli          Int // signed delta applied to stockItem (transfers: negative here)
+  qtyAfterMilli     Int // on-hand snapshot after applying
   avgCostAfterMilli Int // moving-average snapshot after applying
-  valueMilli     Int // signed stock-value delta (minor×1000)
-  unitCostMilli  Int? // purchase: per-unit cost
-  saleId         String? // POS sale (type sale)
-  sale           PosSale?     @relation(fields: [saleId], references: [id])
-  ticketId       String? // maintenance_use: consuming ticket (MaintenanceCost link)
-  stocktakeId    String? // adjustment produced by a stocktake
-  targetItemId   String? // transfer: destination item
-  targetItem     StockItem?   @relation("StockTransferTarget", fields: [targetItemId], references: [id])
-  note           String?
-  createdById    String?
-  createdAt      DateTime     @default(now())
+  valueMilli        Int // signed stock-value delta (minor×1000)
+  unitCostMilli     Int? // purchase: per-unit cost
+  saleId            String? // POS sale (type sale)
+  sale              PosSale?       @relation(fields: [saleId], references: [id])
+  ticketId          String? // maintenance_use: consuming ticket (MaintenanceCost link)
+  stocktakeId       String? // adjustment produced by a stocktake
+  purchaseOrderId   String? // purchase received against a PO (M29)
+  purchaseOrder     PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  targetItemId      String? // transfer: destination item
+  targetItem        StockItem?     @relation("StockTransferTarget", fields: [targetItemId], references: [id])
+  note              String?
+  createdById       String?
+  createdAt         DateTime       @default(now())
 
   @@index([stockItemId, createdAt])
   @@index([type])
@@ -1252,32 +1283,74 @@ model StockMovement {
 /// stocktake with counted quantities writes adjustment movements for every
 /// variance ≠ 0 and snapshots the valuation delta.
 model Stocktake {
-  id          String          @id @default(cuid())
-  code        String          @unique // STK-YYYY-NNNN
-  propertyId  String
-  property    Property        @relation(fields: [propertyId], references: [id])
-  status      String          @default("completed") // completed | cancelled
-  valueDeltaMilli Int         @default(0) // Σ adjustment value (minor×1000)
-  note        String?
-  lines       StocktakeLine[]
-  createdById String?
-  createdAt   DateTime        @default(now())
+  id              String          @id @default(cuid())
+  code            String          @unique // STK-YYYY-NNNN
+  propertyId      String
+  property        Property        @relation(fields: [propertyId], references: [id])
+  status          String          @default("completed") // completed | cancelled
+  valueDeltaMilli Int             @default(0) // Σ adjustment value (minor×1000)
+  note            String?
+  lines           StocktakeLine[]
+  createdById     String?
+  createdAt       DateTime        @default(now())
 
   @@index([propertyId])
 }
 
 model StocktakeLine {
-  id             String    @id @default(cuid())
-  stocktakeId    String
-  stocktake      Stocktake @relation(fields: [stocktakeId], references: [id])
-  stockItemId    String
-  stockItem      StockItem @relation(fields: [stockItemId], references: [id])
-  expectedMilli  Int
-  countedMilli   Int
-  varianceMilli  Int
-  createdAt      DateTime  @default(now())
+  id            String    @id @default(cuid())
+  stocktakeId   String
+  stocktake     Stocktake @relation(fields: [stocktakeId], references: [id])
+  stockItemId   String
+  stockItem     StockItem @relation(fields: [stockItemId], references: [id])
+  expectedMilli Int
+  countedMilli  Int
+  varianceMilli Int
+  createdAt     DateTime  @default(now())
 
   @@unique([stocktakeId, stockItemId])
+}
+
+// ─────────────────────── M29 Purchase Orders ───────────────────────
+
+/// Purchase order (M29): a buying plan against stock items. A PO records what
+/// was ordered, tracked against what was received. Receiving posts one `purchase`
+/// StockMovement per line (moving-average in) so on-hand only ever changes via
+/// the movement engine. Statuses: draft → placed → received (or → void).
+model PurchaseOrder {
+  id           String              @id @default(cuid())
+  code         String              @unique // PO-YYYY-NNNN
+  propertyId   String
+  property     Property            @relation(fields: [propertyId], references: [id])
+  supplierId   String?
+  supplier     Supplier?           @relation(fields: [supplierId], references: [id])
+  supplierName String              @default("") // snapshot for display/quick-orders
+  status       String              @default("draft") // draft | placed | received | void
+  note         String?
+  placedAt     DateTime?
+  receivedAt   DateTime?
+  createdById  String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  lines        PurchaseOrderLine[]
+  movements    StockMovement[]
+
+  @@index([propertyId, createdAt])
+  @@index([status])
+}
+
+model PurchaseOrderLine {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  stockItemId     String
+  stockItem       StockItem     @relation(fields: [stockItemId], references: [id])
+  qtyMilli        Int // ordered quantity (milli units)
+  unitCostMilli   Int // ordered unit cost (minor×1000, matches StockMovement.unitCostMilli)
+  receivedMilli   Int           @default(0) // cumulative received quantity
+  createdAt       DateTime      @default(now())
+
+  @@unique([purchaseOrderId, stockItemId])
 }
 
 // ─────────────────────── M14 POS ───────────────────────
@@ -1288,8 +1361,10 @@ model PosProduct {
   id          String        @id @default(cuid())
   name        String        @unique
   priceMinor  Int
-  category    String?
-  barcode     String?   @unique // EAN-13 / UPC / SKU for scanning + label printing
+  category    String? // snapshotted category path — mirror of categoryId
+  categoryId  String?
+  categoryRef StockCategory? @relation(fields: [categoryId], references: [id])
+  barcode     String?       @unique // EAN-13 / UPC / SKU for scanning + label printing
   sku         String? // human-friendly stock-keeping unit
   description String?
   stockItemId String? // sales decrement this stock item
@@ -1302,20 +1377,20 @@ model PosProduct {
 
 /// Cash-drawer session: open → close with expected-vs-counted variance (§M14).
 model PosSession {
-  id                 String    @id @default(cuid())
-  propertyId         String
-  property           Property  @relation(fields: [propertyId], references: [id])
-  status             String    @default("open") // open | closed
-  openingFloatMinor  Int        @default(0)
-  expectedCashMinor  Int        @default(0) // float + Σ cash sales (server-side)
-  countedCashMinor   Int?
-  varianceMinor      Int?
-  closeNote          String?
-  openedById         String
-  openedAt           DateTime  @default(now())
-  closedById         String?
-  closedAt           DateTime?
-  sales              PosSale[]
+  id                String    @id @default(cuid())
+  propertyId        String
+  property          Property  @relation(fields: [propertyId], references: [id])
+  status            String    @default("open") // open | closed
+  openingFloatMinor Int       @default(0)
+  expectedCashMinor Int       @default(0) // float + Σ cash sales (server-side)
+  countedCashMinor  Int?
+  varianceMinor     Int?
+  closeNote         String?
+  openedById        String
+  openedAt          DateTime  @default(now())
+  closedById        String?
+  closedAt          DateTime?
+  sales             PosSale[]
 
   @@index([propertyId, status])
 }
@@ -1324,22 +1399,24 @@ model PosSession {
 /// the total to the member's account as a one-time invoice line. Every sale
 /// gets a receipt PDF auto-filed to M17.
 model PosSale {
-  id              String        @id @default(cuid())
-  code            String        @unique // SAL-YYYY-NNNN
+  id              String          @id @default(cuid())
+  code            String          @unique // SAL-YYYY-NNNN
   sessionId       String
-  session         PosSession    @relation(fields: [sessionId], references: [id])
+  session         PosSession      @relation(fields: [sessionId], references: [id])
   propertyId      String
-  property        Property      @relation(fields: [propertyId], references: [id])
+  property        Property        @relation(fields: [propertyId], references: [id])
   method          String // cash | qr | card | room_charge
-  totalMinor      Int
+  totalMinor      Int // gross line total
+  discountMinor   Int             @default(0) // sale-level discount (gross − discount = settled)
+  discountLabel   String? // e.g. "10% off" or "member 1.00"
   memberProfileId String? // room_charge target member
-  member          MemberProfile? @relation(fields: [memberProfileId], references: [id])
-  invoiceId       String?  @unique // room_charge: the issued one-time invoice
-  invoice         Invoice? @relation("PosSaleInvoice", fields: [invoiceId], references: [id])
+  member          MemberProfile?  @relation(fields: [memberProfileId], references: [id])
+  invoiceId       String?         @unique // room_charge: the issued one-time invoice
+  invoice         Invoice?        @relation("PosSaleInvoice", fields: [invoiceId], references: [id])
   ref             String? // qr/card reference
   receiptDocId    String? // M17 registry (receipt PDF)
   soldById        String
-  createdAt       DateTime      @default(now())
+  createdAt       DateTime        @default(now())
   items           PosSaleItem[]
   stockMovements  StockMovement[]
 
@@ -1367,16 +1444,16 @@ model PosSaleItem {
 /// Named shift template per property. Minutes are offsets from local midnight;
 /// endMinute may exceed 1440 (night shift crossing midnight).
 model Shift {
-  id           String   @id @default(cuid())
+  id           String             @id @default(cuid())
   propertyId   String
-  property     Property @relation(fields: [propertyId], references: [id])
+  property     Property           @relation(fields: [propertyId], references: [id])
   name         String
   startMinute  Int // 0..1439
   endMinute    Int // start+1..2879 (>1440 crosses midnight)
-  graceMinutes Int      @default(10) // late if clock-in > start + grace
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  graceMinutes Int                @default(10) // late if clock-in > start + grace
+  isActive     Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
   records      AttendanceRecord[]
 
   @@unique([propertyId, name])
@@ -1385,27 +1462,27 @@ model Shift {
 /// Simple overtime multipliers (§M23): minutes beyond the shift span count as
 /// overtime at multiplierBp basis points (15000 = ×1.5). One active rule per property.
 model OvertimeRule {
-  id             String   @id @default(cuid())
-  propertyId     String   @unique
-  property       Property @relation(fields: [propertyId], references: [id])
-  afterMinutes   Int      @default(0) // OT only beyond this much unscheduled time
-  multiplierBp   Int      @default(15000) // ×1.5 payroll multiplier
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id           String   @id @default(cuid())
+  propertyId   String   @unique
+  property     Property @relation(fields: [propertyId], references: [id])
+  afterMinutes Int      @default(0) // OT only beyond this much unscheduled time
+  multiplierBp Int      @default(15000) // ×1.5 payroll multiplier
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 /// One punch pair per staff per day (workDate = UTC midnight of clock-in).
 /// Clock in/out via kiosk PIN, mobile session, or a manager's manual entry —
 /// every edit carries who/why and is audited (§M23 "no edit without audit").
 model AttendanceRecord {
-  id              String    @id @default(cuid())
+  id              String                @id @default(cuid())
   userId          String
-  user            User      @relation(fields: [userId], references: [id])
+  user            User                  @relation(fields: [userId], references: [id])
   propertyId      String
-  property        Property  @relation(fields: [propertyId], references: [id])
+  property        Property              @relation(fields: [propertyId], references: [id])
   shiftId         String?
-  shift           Shift?    @relation(fields: [shiftId], references: [id])
+  shift           Shift?                @relation(fields: [shiftId], references: [id])
   workDate        DateTime // UTC midnight of the clock-in day
   clockInAt       DateTime
   clockOutAt      DateTime?
@@ -1423,8 +1500,8 @@ model AttendanceRecord {
   editedAt        DateTime?
   editReason      String?
   createdById     String? // set on manual creation
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
   exceptions      AttendanceException[]
 
   @@unique([userId, workDate])
@@ -1463,15 +1540,15 @@ model AttendanceException {
 /// Expense category mapped to a ledger expense account (§M20): 5000 Operating
 /// or 5100 Bank Fees — validated app-level against SYSTEM_ACCOUNTS.
 model ExpenseCategory {
-  id          String   @id @default(cuid())
+  id          String             @id @default(cuid())
   propertyId  String
-  property    Property @relation(fields: [propertyId], references: [id])
+  property    Property           @relation(fields: [propertyId], references: [id])
   name        String
   accountCode String // 5000 | 5100
-  chargeTo    String   @default("company") // company | passthrough | owner_maintenance (M24 statement deduction)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  chargeTo    String             @default("company") // company | passthrough | owner_maintenance (M24 statement deduction)
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   expenses    Expense[]
   budgets     ExpenseBudget[]
   recurrings  RecurringExpense[]
@@ -1558,37 +1635,37 @@ model RecurringExpense {
 /// (accrual DR 3900 / CR 2200) → paid (payout DR 2200 / CR cash|bank,
 /// refType `payout` — Owner Payable nets to 0). PDF auto-files to M17.
 model OwnerStatement {
-  id                     String        @id @default(cuid())
-  code                   String        @unique // STM-YYYY-NNNN
-  ownerProfileId         String
-  ownerProfile           OwnerProfile  @relation(fields: [ownerProfileId], references: [id])
-  contractId             String
-  contract               OwnerContract @relation(fields: [contractId], references: [id])
-  buildingId             String
-  building               Building      @relation(fields: [buildingId], references: [id])
-  propertyId             String
-  property               Property      @relation(fields: [propertyId], references: [id])
-  month                  String // YYYY-MM
-  status                 String        @default("draft")
-  collectedMinor         Int // collections confirmed in the month against the building's leases
-  grossShareMinor        Int // collected × share% | fixedRentMinor
-  managementFeeMinor     Int
-  passthroughMinor       Int // approved M20 expenses chargeTo=passthrough (building, month)
-  ownerMaintenanceMinor  Int // approved M20 expenses chargeTo=owner_maintenance
-  adjustmentsMinor       Int           @default(0)
-  netMinor               Int
-  adjustmentsReason      String?
-  lineSnapshot           String // JSON audit snapshot of the computation
-  ledgerTxId             String?       @unique // approval accrual
-  paidVia                String? // cash | bank_transfer
-  paidAt                 DateTime?
-  paidById               String?
-  statementDocId         String?       @unique // M17 PDF
-  generatedById          String?
-  approvedById           String?
-  approvedAt             DateTime?
-  createdAt              DateTime      @default(now())
-  updatedAt              DateTime      @updatedAt
+  id                    String        @id @default(cuid())
+  code                  String        @unique // STM-YYYY-NNNN
+  ownerProfileId        String
+  ownerProfile          OwnerProfile  @relation(fields: [ownerProfileId], references: [id])
+  contractId            String
+  contract              OwnerContract @relation(fields: [contractId], references: [id])
+  buildingId            String
+  building              Building      @relation(fields: [buildingId], references: [id])
+  propertyId            String
+  property              Property      @relation(fields: [propertyId], references: [id])
+  month                 String // YYYY-MM
+  status                String        @default("draft")
+  collectedMinor        Int // collections confirmed in the month against the building's leases
+  grossShareMinor       Int // collected × share% | fixedRentMinor
+  managementFeeMinor    Int
+  passthroughMinor      Int // approved M20 expenses chargeTo=passthrough (building, month)
+  ownerMaintenanceMinor Int // approved M20 expenses chargeTo=owner_maintenance
+  adjustmentsMinor      Int           @default(0)
+  netMinor              Int
+  adjustmentsReason     String?
+  lineSnapshot          String // JSON audit snapshot of the computation
+  ledgerTxId            String?       @unique // approval accrual
+  paidVia               String? // cash | bank_transfer
+  paidAt                DateTime?
+  paidById              String?
+  statementDocId        String?       @unique // M17 PDF
+  generatedById         String?
+  approvedById          String?
+  approvedAt            DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
   @@unique([contractId, month])
   @@index([ownerProfileId, month])
@@ -1603,17 +1680,17 @@ model OwnerStatement {
 /// verification materializes the member's User (role MEMBER) and opens a
 /// normal M01 session. Codes are stored hashed, single-use, max 5 attempts.
 model MemberOtp {
-  id             String    @id @default(cuid())
-  identifier     String // normalized: lowercased email, or phone as given
-  channel        String    @default("email") // email | sms (delivery v1 = dev echo)
-  codeHash       String
+  id              String        @id @default(cuid())
+  identifier      String // normalized: lowercased email, or phone as given
+  channel         String        @default("email") // email | sms (delivery v1 = dev echo)
+  codeHash        String
   memberProfileId String
-  memberProfile  MemberProfile @relation(fields: [memberProfileId], references: [id], onDelete: Cascade)
-  expiresAt      DateTime
-  attempts       Int       @default(0)
-  consumedAt     DateTime?
-  requestedIp    String?
-  createdAt      DateTime  @default(now())
+  memberProfile   MemberProfile @relation(fields: [memberProfileId], references: [id], onDelete: Cascade)
+  expiresAt       DateTime
+  attempts        Int           @default(0)
+  consumedAt      DateTime?
+  requestedIp     String?
+  createdAt       DateTime      @default(now())
 
   @@index([identifier, consumedAt, createdAt])
 }
@@ -1621,14 +1698,14 @@ model MemberOtp {
 /// Portal announcements (§M25 dashboard). propertyId null = all properties.
 /// Managed by M25:update holders (Admin+); read by members in scope.
 model Announcement {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   propertyId  String?
   property    Property? @relation(fields: [propertyId], references: [id])
   title       String
   body        String
-  publishedAt DateTime @default(now())
+  publishedAt DateTime  @default(now())
   createdById String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   @@index([propertyId, publishedAt])
 }
@@ -1637,16 +1714,16 @@ model Announcement {
 /// bot /link <code>"). Short-lived, single-use, bound to a member or owner
 /// profile; verification happens in the signed bot webhook.
 model TelegramLinkCode {
-  id             String    @id @default(cuid())
-  code           String    @unique // 8 chars A-Z2-9 (no 0/O/1/I)
-  principalType  String // member | owner
+  id              String         @id @default(cuid())
+  code            String         @unique // 8 chars A-Z2-9 (no 0/O/1/I)
+  principalType   String // member | owner
   memberProfileId String?
-  memberProfile  MemberProfile? @relation("TelegramLinkCodes", fields: [memberProfileId], references: [id], onDelete: Cascade)
-  ownerProfileId String?
-  ownerProfile   OwnerProfile?  @relation("TelegramLinkCodes", fields: [ownerProfileId], references: [id], onDelete: Cascade)
-  expiresAt      DateTime
-  consumedAt     DateTime?
-  createdAt      DateTime  @default(now())
+  memberProfile   MemberProfile? @relation("TelegramLinkCodes", fields: [memberProfileId], references: [id], onDelete: Cascade)
+  ownerProfileId  String?
+  ownerProfile    OwnerProfile?  @relation("TelegramLinkCodes", fields: [ownerProfileId], references: [id], onDelete: Cascade)
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  createdAt       DateTime       @default(now())
 
   @@index([principalType, memberProfileId, consumedAt])
   @@index([principalType, ownerProfileId, consumedAt])
@@ -1656,8 +1733,8 @@ model TelegramLinkCode {
 /// RBDC owner whose own data commands return. prefs = JSON template toggles
 /// (§M21 "per-user preference toggles").
 model TelegramLink {
-  id              String    @id @default(cuid())
-  chatId          String    @unique // Telegram chat id (string — may exceed int53 in theory)
+  id              String         @id @default(cuid())
+  chatId          String         @unique // Telegram chat id (string — may exceed int53 in theory)
   telegramUserId  String?
   displayName     String? // from.first_name / @username for the admin UI
   principalType   String // member | owner | user
@@ -1667,8 +1744,8 @@ model TelegramLink {
   ownerProfile    OwnerProfile?  @relation("TelegramLinks", fields: [ownerProfileId], references: [id], onDelete: Cascade)
   userId          String?
   linkedUser      User?          @relation("TelegramLinks", fields: [userId], references: [id], onDelete: Cascade)
-  prefs           String    @default("{}") // JSON: {invoiceIssued,paymentReceived,overdueReminder,ticketUpdates,complaintUpdates,lowStock,statementReady,occupancyDigest}
-  linkedAt        DateTime  @default(now())
+  prefs           String         @default("{}") // JSON: {invoiceIssued,paymentReceived,overdueReminder,ticketUpdates,complaintUpdates,lowStock,statementReady,occupancyDigest}
+  linkedAt        DateTime       @default(now())
   unlinkedAt      DateTime?
 
   @@index([principalType, memberProfileId])

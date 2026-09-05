@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 interface DialogProps {
@@ -12,7 +13,9 @@ interface DialogProps {
   wide?: boolean;
 }
 
-/// Lightweight controlled dialog (focus-trap-free; sufficient for admin forms).
+/// Lightweight controlled dialog. Rendered through a portal onto document.body:
+/// some parents (sticky headers with backdrop-blur, transforms) act as a
+/// containing block for position:fixed children, which would clip the overlay.
 export function Dialog({ open, onClose, title, description, children, wide }: DialogProps) {
   useEffect(() => {
     if (!open) return;
@@ -24,8 +27,8 @@ export function Dialog({ open, onClose, title, description, children, wide }: Di
   }, [open, onClose]);
 
   if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center">
       <div className="absolute inset-0" onClick={onClose} aria-hidden />
       <div
         role="dialog"
@@ -39,6 +42,7 @@ export function Dialog({ open, onClose, title, description, children, wide }: Di
         {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
         <div className="mt-4">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

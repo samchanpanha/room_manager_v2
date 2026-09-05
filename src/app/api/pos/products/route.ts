@@ -9,6 +9,7 @@ const createSchema = z.object({
   name: z.string().min(2).max(120),
   price: z.coerce.number().positive().max(100_000),
   category: z.string().max(40).optional(),
+  categoryId: z.string().min(1).nullable().optional(),
   barcode: z.string().max(32).optional(),
   sku: z.string().max(40).optional(),
   description: z.string().max(500).optional(),
@@ -19,12 +20,26 @@ const updateSchema = z.object({
   name: z.string().min(2).max(120).optional(),
   price: z.coerce.number().positive().max(100_000).optional(),
   category: z.string().max(40).nullable().optional(),
+  categoryId: z.string().min(1).nullable().optional(),
   barcode: z.string().max(32).nullable().optional(),
   sku: z.string().max(40).nullable().optional(),
   description: z.string().max(500).nullable().optional(),
   isActive: z.boolean().optional(),
   stockItemId: z.string().min(1).nullable().optional()
 });
+
+/// Resolve a category id to its "Parent/Child" path snapshot (mirrors the
+/// legacy string column so reports/tills that read `category` keep working).
+async function resolvePosCategory(categoryId: string | undefined | null, fallback: string | null | undefined): Promise<{ categoryId: string | null; category: string | null }> {
+  if (categoryId) {
+    const cat = await prisma.stockCategory.findUnique({ where: { id: categoryId } });
+    if (cat) {
+      const parent = cat.parentId ? await prisma.stockCategory.findUnique({ where: { id: cat.parentId } }) : null;
+      return { categoryId: cat.id, category: parent ? `${parent.name}/${cat.name}` : cat.name };
+    }
+  }
+  return { categoryId: null, category: fallback?.trim() || null };
+}
 
 /// Normalize EAN-13 barcodes (add check digit when 12 digits are typed).
 function barcodeOrNull(raw: string | undefined | null): { barcode: string | null; error?: string } {
@@ -48,6 +63,7 @@ export async function GET() {
       name: p.name,
       priceMinor: p.priceMinor,
       category: p.category,
+      categoryId: p.categoryId,
       barcode: p.barcode,
       sku: p.sku,
       description: p.description,
@@ -71,11 +87,13 @@ export async function POST(req: Request) {
     if (dup) return fail(409, "BARCODE_TAKEN", `A product with barcode ${bc.barcode} already exists`);
   }
 
+  const cat = await resolvePosCategory(parsed.data.categoryId, parsed.data.category);
   const product = await prisma.posProduct.create({
     data: {
       name: parsed.data.name.trim(),
       priceMinor: Math.round(parsed.data.price * 100),
-      category: parsed.data.category ?? null,
+      category: cat.category,
+      categoryId: cat.categoryId,
       barcode: bc.barcode,
       sku: parsed.data.sku?.trim() ?? null,
       description: parsed.data.description?.trim() ?? null,
@@ -108,7 +126,13 @@ export async function PATCH(req: Request) {
   const data: Record<string, unknown> = { barcode: bc.barcode };
   if (parsed.data.name !== undefined) data.name = parsed.data.name.trim();
   if (parsed.data.price !== undefined) data.priceMinor = Math.round(parsed.data.price * 100);
-  if (parsed.data.category !== undefined) data.category = parsed.data.category;
+  if (parsed.data.categoryId !== undefined) {
+    const cat = await resolvePosCategory(parsed.data.categoryId, parsed.data.category);
+    data.categoryId = cat.categoryId;
+    data.category = cat.category;
+  } else if (parsed.data.category !== undefined) {
+    data.category = parsed.data.category;
+  }
   if (parsed.data.sku !== undefined) data.sku = parsed.data.sku?.trim() ?? null;
   if (parsed.data.description !== undefined) data.description = parsed.data.description?.trim() ?? null;
   if (parsed.data.isActive !== undefined) data.isActive = parsed.data.isActive;

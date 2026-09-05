@@ -3,15 +3,29 @@ import { clientIp, fail, ok, parseBody } from "@/lib/api";
 import { getAuthUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { can, hasModuleAccess } from "@/lib/rbac/can";
-import { createStockItem, valuationReport } from "@/lib/operations/stock-service";
+import { createStockItem, updateStockItem, valuationReport } from "@/lib/operations/stock-service";
 
 const createSchema = z.object({
   name: z.string().min(2).max(120),
-  category: z.enum(["beverage", "snack", "grocery", "supply", "part", "other"]),
+  category: z.string().max(120).optional(),
+  categoryId: z.string().min(1).nullable().optional(),
   unit: z.string().min(1).max(20),
+  packUnit: z.string().trim().min(1).max(20).nullable().optional(),
+  packSize: z.coerce.number().int().min(2).max(10_000).nullable().optional(),
   minQty: z.coerce.number().min(0).max(1_000_000).optional(),
   supplierId: z.string().min(1).optional(),
   propertyId: z.string().min(1)
+});
+
+const updateSchema = z.object({
+  name: z.string().min(2).max(120).optional(),
+  categoryId: z.string().min(1).nullable().optional(),
+  unit: z.string().min(1).max(20).optional(),
+  packUnit: z.string().trim().min(1).max(20).nullable().optional(),
+  packSize: z.coerce.number().int().min(2).max(10_000).nullable().optional(),
+  minQty: z.coerce.number().min(0).max(1_000_000).optional(),
+  supplierId: z.string().min(1).nullable().optional(),
+  isActive: z.boolean().optional()
 });
 
 /// M15 list — the valuation report (on-hand × moving average) + low-stock.
@@ -38,8 +52,11 @@ export async function POST(req: Request) {
   const result = await createStockItem(
     {
       name: parsed.data.name,
-      category: parsed.data.category,
+      category: parsed.data.category ?? "other",
+      categoryId: parsed.data.categoryId ?? undefined,
       unit: parsed.data.unit,
+      packUnit: parsed.data.packUnit ?? undefined,
+      packSize: parsed.data.packSize ?? undefined,
       minQtyMilli: parsed.data.minQty != null ? Math.round(parsed.data.minQty * 1000) : undefined,
       supplierId: parsed.data.supplierId,
       propertyId: parsed.data.propertyId
@@ -49,4 +66,37 @@ export async function POST(req: Request) {
   );
   if (!result.ok) return fail(result.code === "NOT_FOUND" ? 404 : 422, result.code, result.message);
   return ok(result.data, 201);
+}
+
+export async function PATCH(req: Request) {
+  const url = new URL(req.url);
+  const id = url.searchParams.get("id");
+  if (!id) return fail(400, "ID_REQUIRED", "Stock item id query param is required");
+  const parsed = await parseBody(req, updateSchema);
+  if (parsed.response) return parsed.response;
+  const user = await getAuthUser();
+  if (!user) return fail(401, "UNAUTHENTICATED", "Sign in required");
+  if (!hasModuleAccess(user, "update", "M15")) return fail(403, "FORBIDDEN", "Missing permission M15:update");
+
+  const existing = await prisma.stockItem.findUnique({ where: { id } });
+  if (!existing) return fail(404, "NOT_FOUND", "Stock item not found");
+  if (!can(user, "update", "M15", { propertyId: existing.propertyId })) return fail(403, "FORBIDDEN", "Missing permission M15:update for this property");
+
+  const result = await updateStockItem(
+    id,
+    {
+      name: parsed.data.name,
+      categoryId: parsed.data.categoryId,
+      unit: parsed.data.unit,
+      packUnit: parsed.data.packUnit,
+      packSize: parsed.data.packSize,
+      minQtyMilli: parsed.data.minQty != null ? Math.round(parsed.data.minQty * 1000) : undefined,
+      supplierId: parsed.data.supplierId,
+      isActive: parsed.data.isActive
+    },
+    { id: user.id, name: user.name },
+    clientIp(req)
+  );
+  if (!result.ok) return fail(result.code === "NOT_FOUND" ? 404 : 422, result.code, result.message);
+  return ok(result.data);
 }

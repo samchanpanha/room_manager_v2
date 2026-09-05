@@ -25,6 +25,7 @@ exports[`RBDC default permission matrix (INTENT.md §5) > locks the full matrix 
     "M24": "M",
     "M26": "M",
     "M28": "R",
+    "M29": "R",
   },
   "ADMIN": {
     "M01": "M",
@@ -55,6 +56,7 @@ exports[`RBDC default permission matrix (INTENT.md §5) > locks the full matrix 
     "M26": "M",
     "M27": "M",
     "M28": "M",
+    "M29": "M",
   },
   "MEMBER": {
     "M02": "O",
@@ -118,6 +120,7 @@ exports[`RBDC default permission matrix (INTENT.md §5) > locks the full matrix 
     "M24": "R",
     "M26": "M",
     "M28": "R",
+    "M29": "M",
   },
   "STAFF": {
     "M02": "W",
@@ -139,6 +142,7 @@ exports[`RBDC default permission matrix (INTENT.md §5) > locks the full matrix 
     "M22": "W",
     "M23": "O",
     "M26": "R",
+    "M29": "W",
   },
   "SUPER_ADMIN": {
     "M01": "F",
@@ -169,6 +173,7 @@ exports[`RBDC default permission matrix (INTENT.md §5) > locks the full matrix 
     "M26": "F",
     "M27": "F",
     "M28": "F",
+    "M29": "F",
   },
 }
 `;

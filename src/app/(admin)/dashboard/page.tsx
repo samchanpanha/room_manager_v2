@@ -1,25 +1,36 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth/session";
-import { formatMinor, } from "@/lib/money";
+import { formatMinor } from "@/lib/money";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/misc";
 import { NAV } from "@/lib/nav";
 import { MODULE_BY_KEY } from "@/lib/rbac/catalog";
+import { can } from "@/lib/rbac/can";
 import { ROOM_STATUSES } from "@/lib/rooms/status";
 import { getDashboardKpis } from "@/lib/reports/service";
 import { reportScope } from "@/lib/reports/scope";
-import { getSettings } from "@/lib/settings";
+import { getFeatureFlags, getSettings } from "@/lib/settings";
+import { moduleAccent } from "@/lib/tabs";
+import { navIcon } from "@/lib/icons";
+import { Icon } from "@/components/icon";
 import { timeAgo, titleCase } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
+
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
 
 export default async function DashboardPage() {
   const dashUser = await getAuthUser();
   const dashScope = dashUser ? await reportScope(dashUser) : { allowed: false, global: true, propertyIds: [] };
   const kpis = dashUser && dashScope.allowed ? await getDashboardKpis(dashScope) : null;
-  const [propertyCount, buildingCount, roomCount, bedCount, userCount, memberCount, rooms, recentAudit, settings] = await Promise.all([
+  const [propertyCount, buildingCount, roomCount, bedCount, userCount, memberCount, rooms, recentAudit, settings, flags] = await Promise.all([
     prisma.property.count(),
     prisma.building.count(),
     prisma.room.count(),
@@ -28,7 +39,8 @@ export default async function DashboardPage() {
     prisma.memberProfile.count(),
     prisma.room.findMany({ select: { status: true, basePriceMinor: true } }),
     prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
-    getSettings()
+    getSettings(),
+    getFeatureFlags()
   ]);
 
   const byStatus = Object.fromEntries(ROOM_STATUSES.map((s) => [s, rooms.filter((r) => r.status === s).length])) as Record<string, number>;
@@ -38,13 +50,24 @@ export default async function DashboardPage() {
 
   const stubCount = NAV.flatMap((g) => g.items).filter((i) => i.phase).length;
 
+  const quickLaunch = NAV.flatMap((g) => g.items).filter(
+    (i) => i.href && (!i.module || (dashUser && can(dashUser, "read", i.module) && flags[i.module] !== false))
+  );
+
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {`${settings.org.name} · ${settings.locale.currency} · ${settings.locale.timezone}`} — phases 0–3 live          (kernel, RBDC, properties, members & documents)
-        </p>
+    <div data-tour="dashboard">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {greeting()}, {dashUser?.name.split(" ")[0] ?? "there"}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {`${settings.org.name} · ${settings.locale.currency} · ${settings.locale.timezone}`} — open a module below or from the menu; each page opens in its own tab.
+          </p>
+        </div>
+        <Link href="/reports" className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
+          Open Reports →
+        </Link>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -65,6 +88,30 @@ export default async function DashboardPage() {
           <StatCard label="Occupancy (M26)" value={`${kpis.occupancyPct}%`} sub="same room-status source" />
         </div>
       ) : null}
+
+      <Card className="mt-6" data-tour="launch">
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-base">Quick launch</CardTitle>
+          <span className="text-xs text-muted-foreground">one click opens a new tab</span>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {quickLaunch.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href!}
+                className="flex items-center gap-2.5 rounded-lg border p-3 text-sm transition-colors hover:border-primary/40 hover:bg-accent"
+              >
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${moduleAccent(item.module)}/20`}>
+                  <Icon name={navIcon(item.label)} className={`h-4 w-4 ${moduleAccent(item.module)}`} />
+                </span>
+                <span className="min-w-0 flex-1 truncate font-medium">{item.label}</span>
+                {item.module ? <span className="font-mono text-[10px] text-muted-foreground">{item.module}</span> : null}
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Card>
@@ -120,7 +167,7 @@ export default async function DashboardPage() {
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle className="text-base">Build plan</CardTitle>
+          <CardTitle className="text-base">Progress</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
@@ -131,7 +178,7 @@ export default async function DashboardPage() {
             <Badge variant="outline">{stubCount} modules queued · phases 3–22</Badge>
           </div>
           <p className="mt-3 text-sm text-muted-foreground">
-            Next up: Phase 4 — Owners (owner records + portal login scoping), then leases and the billing engine.
+            Live modules: billing (M06–M13), operations (M14–M23), finance (M24, M26), comms (M21, M25) and admin (M01, M27–M29).
           </p>
         </CardContent>
       </Card>

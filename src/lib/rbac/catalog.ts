@@ -52,7 +52,8 @@ export const MODULES: ModuleDef[] = [
   { key: "M25", slug: "tenant-portal", name: "Tenant Portal" },
   { key: "M26", slug: "reports", name: "Reports" },
   { key: "M27", slug: "security", name: "Security" },
-  { key: "M28", slug: "settings", name: "Settings" }
+  { key: "M28", slug: "settings", name: "Settings" },
+  { key: "M29", slug: "po", name: "Purchase Orders" }
 ];
 
 export const MODULE_BY_KEY = new Map(MODULES.map((m) => [m.key, m]));
@@ -98,22 +99,23 @@ export const MATRIX: Record<RoleKey, Partial<Record<string, MatrixLetter>>> = {
     M01: "M", M02: "M", M03: "M", M04: "M", M05: "M", M06: "M", M07: "M", M08: "R",
     M09: "M", M10: "M", M11: "M", M12: "M", M13: "M", M14: "M", M15: "M", M16: "M",
     M17: "M", M18: "M", M19: "M", M20: "M", M21: "M", M22: "M", M23: "M", M24: "M",
-    M25: "M", M26: "M", M27: "M", M28: "M"
+    M25: "M", M26: "M", M27: "M", M28: "M", M29: "M"
   },
   PROPERTY_MANAGER: {
     M01: "R", M02: "M", M03: "R", M04: "M", M05: "M", M06: "R", M07: "M", M09: "M",
     M10: "M", M11: "M", M12: "M", M13: "R", M14: "M", M15: "M", M16: "M", M17: "M",
-    M18: "M", M19: "M", M20: "R", M22: "M", M23: "M", M24: "R", M26: "M", M28: "R"
+    M18: "M", M19: "M", M20: "R", M22: "M", M23: "M", M24: "R", M26: "M", M28: "R",
+    M29: "M"
   },
   ACCOUNTANT: {
     M01: "R", M02: "R", M03: "R", M04: "R", M05: "R", M06: "M", M07: "M", M08: "M",
     M09: "M", M10: "M", M11: "R", M12: "R", M13: "M", M14: "R", M15: "R", M16: "R",
-    M17: "R", M20: "M", M23: "R", M24: "M", M26: "M", M28: "R"
+    M17: "R", M20: "M", M23: "R", M24: "M", M26: "M", M28: "R", M29: "R"
   },
   STAFF: {
     M02: "W", M04: "R", M05: "R", M07: "R", M09: "W", M10: "R", M11: "W", M12: "W",
     M13: "W", M14: "W", M15: "W", M16: "W", M17: "R", M18: "W", M19: "W", M20: "W",
-    M22: "W", M23: "O", M26: "R"
+    M22: "W", M23: "O", M26: "R", M29: "W"
   },
   OWNER: {
     M02: "R", M03: "O", M04: "R", M05: "R", M07: "R", M08: "O", M09: "R", M10: "R",

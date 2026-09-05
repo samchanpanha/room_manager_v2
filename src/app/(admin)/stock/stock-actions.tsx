@@ -9,14 +9,16 @@ import { useToast } from "@/components/toast";
 
 interface Props {
   mode: "create";
-  items: { id: string; label: string; propertyId: string; unit: string }[];
+  items: { id: string; label: string; propertyId: string; unit: string; packUnit: string | null; packSize: number | null }[];
   suppliers: { id: string; label: string }[];
   properties: string[];
   tickets: { id: string; label: string }[];
   canWriteTickets: boolean;
+  categories: { value: string; label: string }[];
+  units: string[];
 }
 
-export function StockActions({ items, suppliers, properties, tickets, canWriteTickets }: Props) {
+export function StockActions({ items, suppliers, properties, tickets, canWriteTickets, categories, units }: Props) {
   const router = useRouter();
   const { push } = useToast();
   const [busy, setBusy] = useState(false);
@@ -40,15 +42,19 @@ export function StockActions({ items, suppliers, properties, tickets, canWriteTi
       <PurchaseDialog busy={busy} items={items} onDone={(b) => post("/api/stock/purchase", b, "Purchase recorded")} />
       <ConsumeDialog busy={busy} items={items} onDone={(b) => post("/api/stock/consume", b, "Consumption recorded")} />
       <TransferDialog busy={busy} items={items} onDone={(b) => post("/api/stock/transfer", b, "Transfer recorded")} />
-      <NewitemDialog busy={busy} suppliers={suppliers} properties={properties} onDone={(b) => post("/api/stock/items", b, "Item created")} />
+      <NewitemDialog busy={busy} suppliers={suppliers} properties={properties} categories={categories} units={units} onDone={(b) => post("/api/stock/items", b, "Item created")} />
       <StocktakeDialog busy={busy} items={items} onDone={(b) => post("/api/stock/stocktakes", b, "Stocktake completed")} />
       {canWriteTickets && tickets.length > 0 && items.length > 0 ? <PartDialog busy={busy} items={items} tickets={tickets} onDone={(ticketId, b) => post(`/api/maintenance/tickets/${ticketId}/consume-part`, b, "Part consumed onto ticket")} /> : null}
     </div>
   );
 }
 
-function PurchaseDialog({ busy, items, onDone }: { busy: boolean; items: { id: string; label: string; unit: string }[]; onDone: (b: Record<string, unknown>) => Promise<void> }) {
+function PurchaseDialog({ busy, items, onDone }: { busy: boolean; items: { id: string; label: string; unit: string; packUnit: string | null; packSize: number | null }[]; onDone: (b: Record<string, unknown>) => Promise<void> }) {
   const [open, setOpen] = useState(false);
+  const [itemId, setItemId] = useState(items[0]?.id ?? "");
+  const [buyUnit, setBuyUnit] = useState<"unit" | "pack">("unit");
+  const item = items.find((i) => i.id === itemId) ?? null;
+  const pack = item && item.packUnit && item.packSize ? { unit: item.packUnit, size: item.packSize } : null;
   return (
     <>
       <Button size="sm" onClick={() => setOpen(true)}>
@@ -59,13 +65,27 @@ function PurchaseDialog({ busy, items, onDone }: { busy: boolean; items: { id: s
           onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
-            void onDone({ stockItemId: String(fd.get("stockItemId")), qty: Number(fd.get("qty")), unitCost: Number(fd.get("unitCost")), note: String(fd.get("note") ?? "") || undefined }).then(() => setOpen(false));
+            void onDone({
+              stockItemId: itemId,
+              qty: Number(fd.get("qty")),
+              unitCost: Number(fd.get("unitCost")),
+              ...(buyUnit === "pack" ? { unit: "pack" } : {}),
+              note: String(fd.get("note") ?? "") || undefined
+            }).then(() => setOpen(false));
           }}
           className="space-y-4"
         >
           <div className="space-y-1.5">
             <Label htmlFor="po-item">Item</Label>
-            <Select id="po-item" name="stockItemId" defaultValue={items[0]?.id} required>
+            <Select
+              id="po-item"
+              value={itemId}
+              onChange={(e) => {
+                setItemId(e.target.value);
+                setBuyUnit("unit");
+              }}
+              required
+            >
               {items.map((i) => (
                 <option key={i.id} value={i.id}>
                   {i.label}
@@ -73,13 +93,25 @@ function PurchaseDialog({ busy, items, onDone }: { busy: boolean; items: { id: s
               ))}
             </Select>
           </div>
+          {pack ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="po-buyunit">Purchase unit</Label>
+              <Select id="po-buyunit" value={buyUnit} onChange={(e) => setBuyUnit(e.target.value as "unit" | "pack")}>
+                <option value="unit">per {item!.unit}</option>
+                <option value="pack">per {pack.unit}</option>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                1 {pack.unit} = {pack.size} {item!.unit}
+              </p>
+            </div>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="po-qty">Quantity</Label>
+              <Label htmlFor="po-qty">Quantity {buyUnit === "pack" && pack ? `(${pack.unit})` : item ? `(${item.unit})` : ""}</Label>
               <Input id="po-qty" name="qty" type="number" step="0.001" min="0.001" required />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="po-cost">Unit cost</Label>
+              <Label htmlFor="po-cost">Unit cost {buyUnit === "pack" && pack ? `per ${pack.unit}` : "per unit"}</Label>
               <Input id="po-cost" name="unitCost" type="number" step="0.01" min="0.01" required />
             </div>
           </div>
@@ -209,8 +241,9 @@ function TransferDialog({ busy, items, onDone }: { busy: boolean; items: { id: s
   );
 }
 
-function NewitemDialog({ busy, suppliers, properties, onDone }: { busy: boolean; suppliers: { id: string; label: string }[]; properties: string[]; onDone: (b: Record<string, unknown>) => Promise<void> }) {
+function NewitemDialog({ busy, suppliers, properties, categories, units, onDone }: { busy: boolean; suppliers: { id: string; label: string }[]; properties: string[]; categories: { value: string; label: string }[]; units: string[]; onDone: (b: Record<string, unknown>) => Promise<void> }) {
   const [open, setOpen] = useState(false);
+  const [unitInput, setUnitInput] = useState("");
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
@@ -223,8 +256,10 @@ function NewitemDialog({ busy, suppliers, properties, onDone }: { busy: boolean;
             const fd = new FormData(e.currentTarget);
             void onDone({
               name: String(fd.get("name")),
-              category: String(fd.get("category")),
+              categoryId: String(fd.get("categoryId") ?? "") || undefined,
               unit: String(fd.get("unit")),
+              packUnit: String(fd.get("packUnit") ?? "") || null,
+              packSize: Number(fd.get("packSize") ?? "") || null,
               minQty: Number(fd.get("minQty") ?? 0) || 0,
               supplierId: String(fd.get("supplierId") ?? "") || undefined,
               propertyId: String(fd.get("propertyId"))
@@ -239,21 +274,40 @@ function NewitemDialog({ busy, suppliers, properties, onDone }: { busy: boolean;
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ni-cat">Category</Label>
-              <Select id="ni-cat" name="category" defaultValue="beverage" required>
-                {["beverage", "snack", "grocery", "supply", "part", "other"].map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+              <Select id="ni-cat" name="categoryId" defaultValue="">
+                <option value="">— uncategorized</option>
+                {categories.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
                   </option>
                 ))}
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ni-unit">Unit</Label>
-              <Input id="ni-unit" name="unit" maxLength={20} placeholder="pcs / kg / l / box" required />
+              <Input id="ni-unit" name="unit" maxLength={20} list="unit-options" placeholder="pcs / kg / l / box" value={unitInput} onChange={(e) => setUnitInput(e.target.value)} required />
+              <datalist id="unit-options">
+                {units.map((u) => (
+                  <option key={u} value={u} />
+                ))}
+              </datalist>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ni-min">Low-stock threshold</Label>
               <Input id="ni-min" name="minQty" type="number" step="0.001" min="0" defaultValue={0} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ni-packunit">Pack unit (optional)</Label>
+              <Input id="ni-packunit" name="packUnit" maxLength={20} list="pack-unit-options" placeholder="e.g. carton" />
+              <datalist id="pack-unit-options">
+                {units.map((u) => (
+                  <option key={u} value={u} />
+                ))}
+              </datalist>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ni-packsize">1 pack = how many {unitInput.trim() || "units"}?</Label>
+              <Input id="ni-packsize" name="packSize" type="number" step="1" min="2" placeholder="e.g. 12" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ni-sup">Supplier</Label>

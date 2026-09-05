@@ -14,13 +14,18 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const [flags, settings] = await Promise.all([getFeatureFlags(), getSettings()]);
   setActiveCurrency(settings.locale.currency); // §M28 org-wide display currency
   for (const m of MODULES) {
-    // M28 feature flags hide optional modules (POS/Stock/Telegram) org-wide
+    // M28 feature flags hide optional modules (POS/Stock/Telegram/PO) org-wide
     moduleAllowed[m.key] = hasModuleAccess(user, "read", m.key) && flags[m.key] !== false;
   }
   moduleAllowed["OWNER_PORTAL"] = user.roles.includes("OWNER");
 
   return (
-    <Shell user={{ name: user.name, email: user.email, roles: user.roles }} moduleAllowed={moduleAllowed}>
+    <Shell
+      user={{ name: user.name, email: user.email, roles: user.roles }}
+      moduleAllowed={moduleAllowed}
+      org={{ name: settings.org.name, legalName: settings.org.legalName, logo: settings.org.logo }}
+      menu={{ side: settings.menu.side }}
+    >
       {children}
     </Shell>
   );

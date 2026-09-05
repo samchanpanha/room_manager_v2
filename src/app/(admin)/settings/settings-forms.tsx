@@ -47,6 +47,9 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
   const [lateFee, setLateFee] = useState(settings.lateFee);
   const [printer, setPrinter] = useState(settings.printer);
   const [telegram, setTelegram] = useState(settings.telegram);
+  const [menu, setMenu] = useState(settings.menu);
+  const [units, setUnits] = useState(settings.units.units);
+  const [newUnit, setNewUnit] = useState("");
   const [templates, setTemplates] = useState({
     "invoice.issued": settings.templates["invoice.issued"] ?? "",
     "payment.confirmed": settings.templates["payment.confirmed"] ?? "",
@@ -159,6 +162,70 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
           </label>
           <Field label="Receipt copies"><Input type="number" min={1} max={5} value={printer.receiptCopies} disabled={!canWrite} onChange={(e) => setPrinter({ ...printer, receiptCopies: Math.max(1, Math.min(5, Number(e.target.value) || 1)) })} /></Field>
           {canWrite && <Button size="sm" disabled={busy} onClick={() => void save("printer", printer, "Printer settings saved")}>Save printers</Button>}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Sidebar</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">Where the app menu sits in the shell. Applies on next reload.</p>
+          <select
+            className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+            value={menu.side}
+            disabled={!canWrite}
+            onChange={(e) => setMenu({ side: e.target.value as Settings["menu"]["side"] })}
+          >
+            <option value="left">Left</option>
+            <option value="right">Right</option>
+          </select>
+          {canWrite && <Button size="sm" disabled={busy} onClick={() => void save("menu", menu, "Sidebar position saved")}>Save sidebar</Button>}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Stock units</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">Measurement units offered when creating stock items and POS products. Items keep their unit even if the list changes.</p>
+          <div className="flex flex-wrap gap-1.5">
+            {units.map((u) => (
+              <span key={u} className="inline-flex items-center gap-1 rounded-full border bg-muted px-2.5 py-0.5 text-xs">
+                {u}
+                {canWrite && (
+                  <button type="button" className="text-muted-foreground hover:text-destructive" aria-label={`Remove ${u}`} onClick={() => setUnits(units.filter((x) => x !== u))}>
+                    ×
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+          {canWrite && (
+            <div className="flex gap-2">
+              <Input
+                value={newUnit}
+                placeholder="Add a unit (e.g. gallon)"
+                onChange={(e) => setNewUnit(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newUnit.trim()) {
+                    e.preventDefault();
+                    setUnits([...units, newUnit.trim()]);
+                    setNewUnit("");
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                size="sm"
+                disabled={!newUnit.trim() || units.includes(newUnit.trim())}
+                onClick={() => {
+                  setUnits([...units, newUnit.trim()]);
+                  setNewUnit("");
+                }}
+              >
+                Add
+              </Button>
+            </div>
+          )}
+          {canWrite && <Button size="sm" disabled={busy} onClick={() => void save("units", { units }, "Stock units saved")}>Save units</Button>}
         </CardContent>
       </Card>
 

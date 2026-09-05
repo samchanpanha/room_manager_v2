@@ -16,6 +16,7 @@ export type ClientProduct = {
   name: string;
   priceMinor: number;
   category: string | null;
+  categoryId: string | null;
   barcode: string | null;
   sku: string | null;
   description: string | null;
@@ -26,13 +27,14 @@ export type ClientProduct = {
 interface Props {
   products: ClientProduct[];
   stockItems: { id: string; label: string }[];
-  categories: string[];
+  categories: { value: string; label: string }[];
+  legacyCategories: string[];
   canWrite: boolean;
 }
 
-const emptyForm = { id: "", name: "", price: "", category: "", barcode: "", sku: "", description: "", stockItemId: "", isActive: true };
+const emptyForm = { id: "", name: "", price: "", category: "", categoryId: "", barcode: "", sku: "", description: "", stockItemId: "", isActive: true };
 
-export function ProductsClient({ products, stockItems, categories, canWrite }: Props) {
+export function ProductsClient({ products, stockItems, categories, legacyCategories, canWrite }: Props) {
   const router = useRouter();
   const { push } = useToast();
   const [busy, setBusy] = useState(false);
@@ -53,6 +55,7 @@ export function ProductsClient({ products, stockItems, categories, canWrite }: P
       name: p.name,
       price: (p.priceMinor / 100).toFixed(2),
       category: p.category ?? "",
+      categoryId: p.categoryId ?? "",
       barcode: p.barcode ?? "",
       sku: p.sku ?? "",
       description: p.description ?? "",
@@ -69,7 +72,7 @@ export function ProductsClient({ products, stockItems, categories, canWrite }: P
     const body: Record<string, unknown> = {
       name: form.name,
       price: Number(form.price),
-      category: form.category || null,
+      categoryId: form.categoryId || null,
       barcode: form.barcode || null,
       sku: form.sku || null,
       description: form.description || null,
@@ -117,7 +120,7 @@ export function ProductsClient({ products, stockItems, categories, canWrite }: P
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <Select className="h-9 w-44" value={printCategory} onChange={(e) => setPrintCategory(e.target.value)}>
             <option value="">All categories</option>
-            {categories.map((c) => (
+            {legacyCategories.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
@@ -217,12 +220,19 @@ export function ProductsClient({ products, stockItems, categories, canWrite }: P
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pp-category">Category</Label>
-              <Input id="pp-category" list="pp-categories" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} maxLength={40} />
-              <datalist id="pp-categories">
+              <Select id="pp-category" value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>
+                <option value="">— uncategorized —</option>
                 {categories.map((c) => (
-                  <option key={c} value={c} />
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
                 ))}
-              </datalist>
+              </Select>
+              {form.categoryId ? (
+                <p className="text-xs text-muted-foreground">Saved as: {categories.find((c) => c.value === form.categoryId)?.label.trim() ?? form.category}</p>
+              ) : form.category ? (
+                <p className="text-xs text-muted-foreground">Legacy category string: {form.category}</p>
+              ) : null}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pp-barcode">Barcode (EAN-13)</Label>

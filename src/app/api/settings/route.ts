@@ -5,7 +5,7 @@ import { hasModuleAccess } from "@/lib/rbac/can";
 import { z } from "zod";
 
 const patchSchema = z.object({
-  group: z.enum(["org", "locale", "billing", "lateFee", "retention", "features", "templates", "printer", "telegram"]),
+  group: z.enum(["org", "locale", "billing", "lateFee", "retention", "features", "templates", "printer", "telegram", "menu", "units"]),
   patch: z.record(z.string(), z.unknown())
 });
 

@@ -16,26 +16,69 @@ const HEAVY_TX = { timeout: 20000, maxWait: 10000 };
 export interface ItemInput {
   name: string;
   category: string;
+  categoryId?: string;
   unit: string;
+  packUnit?: string | null;
+  packSize?: number | null;
   minQtyMilli?: number;
   supplierId?: string;
   propertyId: string;
 }
 
+/// "1 carton = 12 bottle": packUnit is the buy unit, packSize how many base
+/// units it holds. A pack is only valid when both sides are set, packSize ≥ 2
+/// and the pack unit differs from the item's base unit.
+function validatePack(input: { unit: string; packUnit?: string | null; packSize?: number | null }): string | null {
+  const packUnit = input.packUnit?.trim();
+  const hasUnit = Boolean(packUnit);
+  const hasSize = input.packSize != null && input.packSize > 0;
+  if (!hasUnit && !hasSize) return null;
+  if (!hasUnit || !hasSize) return "Both pack unit and pack size are required together";
+  if (input.packSize! < 2) return "Pack size must be at least 2";
+  if (packUnit!.toLowerCase() === input.unit.trim().toLowerCase()) return "Pack unit and base unit must differ";
+  return null;
+}
+
+/// Resolve the legacy string snapshot ("Parent/Child") for a category id.
+/// Falls back to the caller-supplied string (or "other") when unknown.
+async function resolveCategorySnapshot(categoryId: string | undefined | null, fallback: string | null | undefined): Promise<string> {
+  if (categoryId) {
+    const cat = await prisma.stockCategory.findUnique({ where: { id: categoryId } });
+    if (cat) {
+      const parent = cat.parentId ? await prisma.stockCategory.findUnique({ where: { id: cat.parentId } }) : null;
+      return parent ? `${parent.name}/${cat.name}` : cat.name;
+    }
+  }
+  return fallback?.trim() || "other";
+}
+
 export async function createStockItem(input: ItemInput, actor: ActorCtx, ip?: string | null): Promise<Result<{ id: string }>> {
   if (input.name.trim().length < 2) return { ok: false, code: "NAME_REQUIRED", message: "Item name (2+ chars) is required" };
   if (input.unit.trim().length < 1) return { ok: false, code: "UNIT_REQUIRED", message: "Unit is required (pcs, kg, l, box…)" };
+  const packErr = validatePack(input);
+  if (packErr) return { ok: false, code: "INVALID_PACK", message: packErr };
   if (input.supplierId) {
     const supplier = await prisma.supplier.findUnique({ where: { id: input.supplierId } });
     if (!supplier) return { ok: false, code: "NOT_FOUND", message: "Supplier not found" };
   }
+  if (input.categoryId) {
+    const cat = await prisma.stockCategory.findUnique({ where: { id: input.categoryId } });
+    if (!cat) return { ok: false, code: "NOT_FOUND", message: "Category not found" };
+    if (cat.propertyId !== null && cat.propertyId !== input.propertyId) {
+      return { ok: false, code: "SCOPE_MISMATCH", message: "Category belongs to a different property" };
+    }
+  }
   const dup = await prisma.stockItem.findUnique({ where: { name_propertyId: { name: input.name.trim(), propertyId: input.propertyId } } });
   if (dup) return { ok: false, code: "DUPLICATE", message: `Item "${input.name.trim()}" already exists on this property` };
+  const category = await resolveCategorySnapshot(input.categoryId, input.category);
   const item = await prisma.stockItem.create({
     data: {
       name: input.name.trim(),
-      category: input.category,
+      category,
+      categoryId: input.categoryId ?? null,
       unit: input.unit.trim(),
+      packUnit: input.packUnit?.trim() || null,
+      packSize: input.packSize ?? null,
       minQtyMilli: input.minQtyMilli ?? 0,
       supplierId: input.supplierId ?? null,
       propertyId: input.propertyId
@@ -55,17 +98,89 @@ export async function createStockItem(input: ItemInput, actor: ActorCtx, ip?: st
   return { ok: true, data: { id: item.id } };
 }
 
+export interface ItemPatch {
+  name?: string;
+  categoryId?: string | null;
+  unit?: string;
+  packUnit?: string | null;
+  packSize?: number | null;
+  minQtyMilli?: number;
+  supplierId?: string | null;
+  isActive?: boolean;
+}
+
+/// Update item metadata (never qty/avg cost — those only change via
+/// movements). Category string snapshot is re-derived when categoryId changes.
+export async function updateStockItem(id: string, patch: ItemPatch, actor: ActorCtx, ip?: string | null): Promise<Result<{ id: string }>> {
+  const item = await prisma.stockItem.findUnique({ where: { id } });
+  if (!item) return { ok: false, code: "NOT_FOUND", message: "Stock item not found" };
+  if (patch.name !== undefined && (patch.name.trim().length < 2 || patch.name.trim().length > 120)) {
+    return { ok: false, code: "NAME_REQUIRED", message: "Item name (2–120 chars) is required" };
+  }
+  if (patch.unit !== undefined && patch.unit.trim().length < 1) {
+    return { ok: false, code: "UNIT_REQUIRED", message: "Unit is required" };
+  }
+  const packErr = validatePack({
+    unit: patch.unit?.trim() ?? item.unit,
+    packUnit: patch.packUnit !== undefined ? patch.packUnit?.trim() || null : item.packUnit,
+    packSize: patch.packSize !== undefined ? patch.packSize : item.packSize
+  });
+  if (packErr) return { ok: false, code: "INVALID_PACK", message: packErr };
+  if (patch.name !== undefined && patch.name.trim() !== item.name) {
+    const dup = await prisma.stockItem.findUnique({ where: { name_propertyId: { name: patch.name.trim(), propertyId: item.propertyId } } });
+    if (dup) return { ok: false, code: "DUPLICATE", message: `Item "${patch.name.trim()}" already exists on this property` };
+  }
+
+  const data: Record<string, unknown> = {};
+  if (patch.name !== undefined) data.name = patch.name.trim();
+  if (patch.unit !== undefined) data.unit = patch.unit.trim();
+  if (patch.packUnit !== undefined) data.packUnit = patch.packUnit?.trim() || null;
+  if (patch.packSize !== undefined) data.packSize = patch.packSize ?? null;
+  if (patch.minQtyMilli !== undefined) data.minQtyMilli = Math.max(0, Math.round(patch.minQtyMilli));
+  if (patch.supplierId !== undefined) data.supplierId = patch.supplierId || null;
+  if (patch.isActive !== undefined) data.isActive = patch.isActive;
+
+  if (patch.categoryId !== undefined) {
+    const next = patch.categoryId ?? null;
+    if (next !== null) {
+      const cat = await prisma.stockCategory.findUnique({ where: { id: next } });
+      if (!cat) return { ok: false, code: "NOT_FOUND", message: "Category not found" };
+      if (cat.propertyId !== null && cat.propertyId !== item.propertyId) {
+        return { ok: false, code: "SCOPE_MISMATCH", message: "Category belongs to a different property" };
+      }
+    }
+    data.categoryId = next;
+    data.category = await resolveCategorySnapshot(next, "other");
+  }
+
+  const updated = await prisma.stockItem.update({ where: { id }, data });
+  await logAudit({
+    actorId: actor.id,
+    actorName: actor.name,
+    module: "M15",
+    action: "stock_item.updated",
+    entityType: "stock_item",
+    entityId: updated.id,
+    summary: `Stock item "${updated.name}" updated${data.category ? ` — category ${data.category}` : ""}`,
+    propertyId: item.propertyId,
+    ip
+  });
+  return { ok: true, data: { id: updated.id } };
+}
+
 interface MovementOpts {
   ticketId?: string;
   saleId?: string;
   stocktakeId?: string;
+  purchaseOrderId?: string;
   targetItemId?: string;
   note?: string;
 }
 
 /// Core movement applier (must run inside a transaction): validates stock,
 /// applies the signed delta, updates the moving average and writes the row.
-async function applyMovement(
+/// Exported for M29 Purchase Orders so PO receipts reuse the same engine.
+export async function applyMovement(
   tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
   stockItemId: string,
   type: string,
@@ -109,6 +224,7 @@ async function applyMovement(
       saleId: opts.saleId ?? null,
       ticketId: opts.ticketId ?? null,
       stocktakeId: opts.stocktakeId ?? null,
+      purchaseOrderId: opts.purchaseOrderId ?? null,
       targetItemId: opts.targetItemId ?? null,
       note: opts.note ?? null,
       createdById: actor.id
@@ -131,9 +247,12 @@ export async function applyStockSale(
 }
 
 /// Purchase stock (§M15): +qty at unit cost, moving-average absorbed.
+/// With `inPacks` the qty is in the item's pack unit ("1 carton = 12 bottle"):
+/// on-hand grows by qty × packSize and the per-pack cost is divided by
+/// packSize before entering the average.
 export async function purchaseStock(
   stockItemId: string,
-  input: { qtyMilli: number; unitCostMinor: number; note?: string },
+  input: { qtyMilli: number; unitCostMinor: number; note?: string; inPacks?: boolean },
   actor: ActorCtx,
   ip?: string | null
 ): Promise<Result<{ qtyAfterMilli: number; avgCostMilli: number }>> {
@@ -142,9 +261,19 @@ export async function purchaseStock(
   if (!Number.isInteger(input.qtyMilli) || input.qtyMilli <= 0) return { ok: false, code: "INVALID_QTY", message: "qtyMilli must be a positive integer" };
   if (!Number.isInteger(input.unitCostMinor) || input.unitCostMinor <= 0) return { ok: false, code: "INVALID_COST", message: "unitCostMinor must be a positive integer" };
 
+  let qtyMilli = input.qtyMilli;
+  let unitCostMilli = input.unitCostMinor * 1000;
+  if (input.inPacks) {
+    if (!item.packUnit || !item.packSize) {
+      return { ok: false, code: "INVALID_PACK", message: `"${item.name}" has no pack unit defined` };
+    }
+    qtyMilli = input.qtyMilli * item.packSize;
+    unitCostMilli = Math.round((input.unitCostMinor * 1000) / item.packSize);
+  }
+
   const result = await prisma.$transaction(
     async (tx) => {
-      const r = await applyMovement(tx, stockItemId, "purchase", input.qtyMilli, input.unitCostMinor * 1000, actor, { note: input.note });
+      const r = await applyMovement(tx, stockItemId, "purchase", qtyMilli, unitCostMilli, actor, { note: input.note });
       return r;
     },
     HEAVY_TX
@@ -156,11 +285,11 @@ export async function purchaseStock(
     action: "stock.purchased",
     entityType: "stock_item",
     entityId: stockItemId,
-    summary: `Purchased ${input.qtyMilli / 1000} ${item.unit} of "${item.name}" @ ${(input.unitCostMinor / 100).toFixed(2)} — on hand ${result.qtyAfterMilli / 1000}, avg cost ${(result.avgCostAfterMilli / 100_000).toFixed(4)}`,
+    summary: `Purchased ${input.inPacks ? `${input.qtyMilli / 1000} ${item.packUnit} (${qtyMilli / 1000} ${item.unit})` : `${input.qtyMilli / 1000} ${item.unit}`} of "${item.name}" @ ${input.inPacks ? `${(input.unitCostMinor / 100).toFixed(2)}/${item.packUnit}` : (input.unitCostMinor / 100).toFixed(2)} — on hand ${result.qtyAfterMilli / 1000}, avg cost ${(result.avgCostAfterMilli / 100_000).toFixed(4)}`,
     propertyId: item.propertyId,
     ip
   });
-  await emitDomainEvent("stock.purchased", { stockItemId, qtyMilli: input.qtyMilli, unitCostMinor: input.unitCostMinor }, item.propertyId);
+  await emitDomainEvent("stock.purchased", { stockItemId, qtyMilli, unitCostMinor: Math.round(unitCostMilli / 1000), inPacks: Boolean(input.inPacks) }, item.propertyId);
   if (isLowStock(result.qtyAfterMilli, item.minQtyMilli)) {
     await emitDomainEvent("stock.low", { stockItemId, name: item.name, qtyMilli: result.qtyAfterMilli, minQtyMilli: item.minQtyMilli }, item.propertyId);
   }
@@ -370,7 +499,10 @@ export async function valuationReport(propertyId: string) {
     id: i.id,
     name: i.name,
     category: i.category,
+    categoryId: i.categoryId,
     unit: i.unit,
+    packUnit: i.packUnit,
+    packSize: i.packSize,
     qtyMilli: i.qtyMilli,
     avgCostMilli: i.avgCostMilli,
     valueMinor: Math.round(valuationMilli(i.qtyMilli, i.avgCostMilli) / 1000),

@@ -81,6 +81,16 @@ export interface RetentionSettings {
   sessionDays: number;
 }
 
+export interface MenuSettings {
+  /// Shell sidebar position — "left" (default) or "right".
+  side: "left" | "right";
+}
+
+/// Stock/POS measurement units offered when creating items & products.
+export interface UnitsSettings {
+  units: string[];
+}
+
 /// §M28 notification templates: per-event overrides for the Telegram notifier.
 /// Values support {var} placeholders (code, total, due, receipt, …); events
 /// without an override use the code-level default template.
@@ -97,7 +107,8 @@ export type FeatureFlags = Record<string, boolean>;
 export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
   M14: true, // POS
   M15: true, // Stock
-  M21: true // Telegram bot
+  M21: true, // Telegram bot
+  M29: true // Purchase Orders
 };
 
 const ORG: GroupDefLike & { defaults: OrgSettings } = {
@@ -139,13 +150,21 @@ const RETENTION: GroupDefLike & { defaults: RetentionSettings } = {
   key: "m28.retention",
   defaults: { outboxDays: 90, eventDays: 365, otpDays: 7, sessionDays: 30 }
 };
+const MENU: GroupDefLike & { defaults: MenuSettings } = {
+  key: "m28.menu",
+  defaults: { side: "left" }
+};
+const UNITS: GroupDefLike & { defaults: UnitsSettings } = {
+  key: "m28.units",
+  defaults: { units: ["pcs", "kg", "l", "box", "m", "pack", "bottle", "can", "packet", "dozen", "carton", "case"] }
+};
 const FEATURES: GroupDefLike & { defaults: FeatureFlags } = { key: "m28.features", defaults: DEFAULT_FEATURE_FLAGS };
 const TEMPLATES: GroupDefLike & { defaults: TemplateSettings } = { key: "m28.templates", defaults: {} };
 const PROVIDERS: GroupDefLike & { defaults: Record<string, string> } = { key: "m28.providers", defaults: {} };
 
-const GROUPS: Record<SettingsGroupName, GroupDefLike> = { org: ORG, locale: LOCALE, billing: BILLING, lateFee: LATE_FEE, retention: RETENTION, features: FEATURES, templates: TEMPLATES, printer: PRINTER, telegram: TELEGRAM_BOT };
+const GROUPS: Record<SettingsGroupName, GroupDefLike> = { org: ORG, locale: LOCALE, billing: BILLING, lateFee: LATE_FEE, retention: RETENTION, features: FEATURES, templates: TEMPLATES, printer: PRINTER, telegram: TELEGRAM_BOT, menu: MENU, units: UNITS };
 
-export type SettingsGroupName = "org" | "locale" | "billing" | "lateFee" | "retention" | "features" | "templates" | "printer" | "telegram";
+export type SettingsGroupName = "org" | "locale" | "billing" | "lateFee" | "retention" | "features" | "templates" | "printer" | "telegram" | "menu" | "units";
 
 async function readGroup<T extends object>(def: GroupDefLike): Promise<T> {
   const row = await prisma.setting.findUnique({ where: { key: def.key } });
@@ -188,9 +207,11 @@ export async function getSettings(): Promise<{
   templates: TemplateSettings;
   printer: PrinterSettings;
   telegram: TelegramBotSettings;
+  menu: MenuSettings;
+  units: UnitsSettings;
   providers: { paymentCredentials: { configured: boolean; last4: string | null }; telegramBotToken: { configured: boolean; last4: string | null } };
 }> {
-  const [org, locale, billing, lateFee, retention, features, templates, printer, telegram, providers] = await Promise.all([
+  const [org, locale, billing, lateFee, retention, features, templates, printer, telegram, menu, units, providers] = await Promise.all([
     readGroup<OrgSettings>(ORG),
     readGroup<LocaleSettings>(LOCALE),
     readGroup<BillingSettings>(BILLING),
@@ -200,6 +221,8 @@ export async function getSettings(): Promise<{
     readGroup<TemplateSettings>(TEMPLATES),
     readGroup<PrinterSettings>(PRINTER),
     readGroup<TelegramBotSettings>(TELEGRAM_BOT),
+    readGroup<MenuSettings>(MENU),
+    readGroup<UnitsSettings>(UNITS),
     readGroup<Record<string, string>>(PROVIDERS)
   ]);
   return {
@@ -212,6 +235,8 @@ export async function getSettings(): Promise<{
     templates,
     printer,
     telegram,
+    menu,
+    units,
     providers: {
       paymentCredentials: maskSecret(providers.paymentCredentials ?? null),
       telegramBotToken: maskSecret(providers.telegramBotToken ?? null)

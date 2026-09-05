@@ -14,6 +14,8 @@ export interface PosReceiptData {
   propertyName: string;
   method: string;
   totalMinor: number;
+  discountMinor?: number;
+  discountLabel?: string;
   memberName?: string;
   invoiceCode?: string;
   barcode?: string; // EAN-13 for the first line, printed as barcode
@@ -88,9 +90,19 @@ function PosReceiptPage({ data }: { data: PosReceiptData }) {
             <Text style={styles.grand}>Total</Text>
             <Text style={styles.grand}>{money(data.totalMinor, data.currency)}</Text>
           </View>
+          {data.discountMinor ? (
+            <View style={styles.totalsRow}>
+              <Text style={{ fontSize: 8, color: "#6B7280" }}>{data.discountLabel ?? "Discount"}</Text>
+              <Text style={{ fontSize: 8, color: "#6B7280" }}>−{money(data.discountMinor, data.currency)}</Text>
+            </View>
+          ) : null}
+          <View style={styles.totalsRow}>
+            <Text style={styles.grand}>Due</Text>
+            <Text style={styles.grand}>{money(data.discountMinor ? data.totalMinor - (data.discountMinor ?? 0) : data.totalMinor, data.currency)}</Text>
+          </View>
           <View style={styles.totalsRow}>
             <Text style={{ fontSize: 8, color: "#6B7280" }}>Paid via {data.method.replace("_", " ")}</Text>
-            <Text style={{ fontSize: 8, color: "#6B7280" }}>{money(data.totalMinor, data.currency)}</Text>
+            <Text style={{ fontSize: 8, color: "#6B7280" }}>{money(data.discountMinor ? data.totalMinor - (data.discountMinor ?? 0) : data.totalMinor, data.currency)}</Text>
           </View>
         </View>
         {data.barcode ? <Ean13Code dataUrl={data.barcode} /> : null}

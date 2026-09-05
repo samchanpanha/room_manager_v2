@@ -61,9 +61,10 @@ export async function closeSession(
   if (!Number.isInteger(input.countedCashMinor) || input.countedCashMinor < 0) {
     return { ok: false, code: "INVALID_COUNT", message: "countedCashMinor must be a non-negative integer" };
   }
-  const agg = await prisma.posSale.aggregate({ where: { sessionId, method: "cash" }, _sum: { totalMinor: true }, _count: true });
+  const agg = await prisma.posSale.aggregate({ where: { sessionId, method: "cash" }, _sum: { totalMinor: true, discountMinor: true }, _count: true });
   const allSales = await prisma.posSale.count({ where: { sessionId } });
-  const expected = session.openingFloatMinor + (agg._sum.totalMinor ?? 0);
+  const cashNetMinor = (agg._sum.totalMinor ?? 0) - (agg._sum.discountMinor ?? 0);
+  const expected = session.openingFloatMinor + cashNetMinor;
   const variance = input.countedCashMinor - expected;
   await prisma.posSession.update({
     where: { id: sessionId },
@@ -96,10 +97,18 @@ export interface SaleLineInput {
 /// (1300 → 4900), and files the receipt PDF. Lines carry product/price
 /// snapshots.
 export async function recordSale(
-  input: { sessionId: string; method: string; lines: SaleLineInput[]; memberProfileId?: string; ref?: string },
+  input: {
+    sessionId: string;
+    method: string;
+    lines: SaleLineInput[];
+    memberProfileId?: string;
+    ref?: string;
+    discountMinor?: number;
+    discountLabel?: string;
+  },
   actor: ActorCtx,
   ip?: string | null
-): Promise<Result<{ code: string; saleId: string; totalMinor: number; invoiceCode?: string }>> {
+): Promise<Result<{ code: string; saleId: string; totalMinor: number; discountMinor: number; netMinor: number; invoiceCode?: string }>> {
   const session = await prisma.posSession.findUnique({ where: { id: input.sessionId } });
   if (!session) return { ok: false, code: "NOT_FOUND", message: "Session not found" };
   if (session.status !== "open") return { ok: false, code: "SESSION_CLOSED", message: "Session is closed — open a new one" };
@@ -122,6 +131,15 @@ export async function recordSale(
     totalMinor += lineMinor;
     return { product, qtyMilli: l.qtyMilli, lineMinor };
   });
+
+  // Sale-level discount is deducted from the gross line total. The settled
+  // amount (net) is what hits the drawer (cash/qr/card) or the invoice.
+  const discountMinor = input.discountMinor ?? 0;
+  if (discountMinor < 0 || discountMinor > totalMinor || !Number.isInteger(discountMinor)) {
+    return { ok: false, code: "INVALID_DISCOUNT", message: `Discount must be 0–${(totalMinor / 100).toFixed(2)}` };
+  }
+  const discountLabel = discountMinor > 0 ? (input.discountLabel?.trim().slice(0, 80) || "Discount") : undefined;
+  const netMinor = totalMinor - discountMinor;
 
   let memberProfileId: string | null = null;
   if (input.method === "room_charge") {
@@ -151,6 +169,8 @@ export async function recordSale(
           propertyId: session.propertyId,
           method: input.method,
           totalMinor,
+          discountMinor,
+          discountLabel,
           memberProfileId,
           ref: input.ref ?? null,
           soldById: actor.id,
@@ -187,8 +207,9 @@ export async function recordSale(
             periodEnd: new Date(),
             dueDate: new Date(Date.now() + 7 * 86_400_000),
             subtotalMinor: totalMinor,
-            totalMinor,
-            amountDueMinor: totalMinor,
+            discountMinor: discountMinor > 0 ? discountMinor : 0,
+            totalMinor: netMinor,
+            amountDueMinor: netMinor,
             createdById: actor.id,
             items: {
               create: computed.map((c) => ({
@@ -210,22 +231,22 @@ export async function recordSale(
           memberId: memberProfileId,
           actorId: actor.id,
           lines: [
-            { code: ACC.RENT_RECEIVABLE, debit: totalMinor, credit: 0 },
-            { code: ACC.OTHER_REVENUE, debit: 0, credit: totalMinor }
+            { code: ACC.RENT_RECEIVABLE, debit: netMinor, credit: 0 },
+            { code: ACC.OTHER_REVENUE, debit: 0, credit: netMinor }
           ]
         });
         return { created, invoiceCode: invoice.code };
       }
       // cash/qr/card settle immediately: DR drawer / CR other revenue
       await postTransaction(tx, {
-        memo: `POS ${code} (${input.method})`,
+        memo: `POS ${code} (${input.method})${discountMinor > 0 ? ` — discount ${(discountMinor / 100).toFixed(2)}` : ""}`,
         refType: "pos_sale",
         refId: created.id,
         propertyId: session.propertyId,
         actorId: actor.id,
         lines: [
-          { code: DRAIN_ACCOUNT[input.method], debit: totalMinor, credit: 0 },
-          { code: ACC.OTHER_REVENUE, debit: 0, credit: totalMinor }
+          { code: DRAIN_ACCOUNT[input.method], debit: netMinor, credit: 0 },
+          { code: ACC.OTHER_REVENUE, debit: 0, credit: netMinor }
         ]
       });
       return { created, invoiceCode: undefined as string | undefined };
@@ -240,17 +261,17 @@ export async function recordSale(
     action: "pos.sale",
     entityType: "pos_sale",
     entityId: sale.created.id,
-    summary: `POS sale ${code}: ${(totalMinor / 100).toFixed(2)} via ${input.method}${memberProfileId ? ` charged to member ${memberProfileId.slice(-6)} (invoice ${sale.invoiceCode})` : ""} — ${computed.length} line(s)`,
+    summary: `POS sale ${code}: ${(totalMinor / 100).toFixed(2)}${discountMinor > 0 ? ` − ${(discountMinor / 100).toFixed(2)} = ${(netMinor / 100).toFixed(2)}` : ""} via ${input.method}${memberProfileId ? ` charged to member ${memberProfileId.slice(-6)} (invoice ${sale.invoiceCode})` : ""} — ${computed.length} line(s)`,
     propertyId: session.propertyId,
-    after: { code, totalMinor, method: input.method, invoiceCode: sale.invoiceCode },
+    after: { code, totalMinor, discountMinor, netMinor, method: input.method, invoiceCode: sale.invoiceCode },
     ip
   });
-  await emitDomainEvent("pos.sale", { code, saleId: sale.created.id, totalMinor, method: input.method, invoiceCode: sale.invoiceCode }, session.propertyId);
+  await emitDomainEvent("pos.sale", { code, saleId: sale.created.id, totalMinor, discountMinor, netMinor, method: input.method, invoiceCode: sale.invoiceCode }, session.propertyId);
 
   // Receipt PDF (§M14 "receipt printing") after commit — never blocks a sale.
   await fileSaleReceipt(sale.created.id).catch(() => undefined);
 
-  return { ok: true, data: { code, saleId: sale.created.id, totalMinor, invoiceCode: sale.invoiceCode } };
+  return { ok: true, data: { code, saleId: sale.created.id, totalMinor, discountMinor, netMinor, invoiceCode: sale.invoiceCode } };
 }
 
 /// Render the receipt PDF bytes for a sale. `copies` (1–12) repeats the slip
@@ -286,6 +307,8 @@ export async function buildSaleReceiptBytes(saleId: string, copies = 1): Promise
         propertyName: sale.property.name,
         method: sale.method,
         totalMinor: sale.totalMinor,
+        discountMinor: sale.discountMinor,
+        discountLabel: sale.discountLabel ?? undefined,
         memberName: sale.member?.party.name,
         invoiceCode: sale.invoiceId ? "see invoice" : undefined,
         createdAt: sale.createdAt,

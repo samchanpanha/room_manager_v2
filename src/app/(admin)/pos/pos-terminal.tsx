@@ -16,6 +16,7 @@ export type PosProduct = {
   name: string;
   priceMinor: number;
   category: string | null;
+  categoryId: string | null;
   barcode: string | null;
   stock: { id: string; name: string; qtyMilli: number; unit: string } | null;
 };
@@ -25,6 +26,7 @@ export type PosSaleRow = {
   code: string;
   method: string;
   totalMinor: number;
+  discountMinor: number;
   createdAt: string;
   memberName?: string;
   invoiceId: string | null;
@@ -75,6 +77,9 @@ export function PosTerminal({ property, openSession, sales, products, members, c
   const [closeNote, setCloseNote] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const [closeDialog, setCloseDialog] = useState(false);
+  const [discountMode, setDiscountMode] = useState<"percent" | "amount">("percent");
+  const [discountValue, setDiscountValue] = useState("");
+  const [tendered, setTendered] = useState("");
   const scanRef = useRef<HTMLInputElement>(null);
 
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
@@ -82,7 +87,7 @@ export function PosTerminal({ property, openSession, sales, products, members, c
     () =>
       products.filter(
         (p) =>
-          (!filterCat || (p.category ?? "") === filterCat) &&
+          (!filterCat || (p.category ?? "") === filterCat || (p.category ?? "").startsWith(`${filterCat}/`)) &&
           (!query ||
             p.name.toLowerCase().includes(query.toLowerCase()) ||
             (p.barcode ? digitsOnly(p.barcode).includes(digitsOnly(query)) && digitsOnly(query).length >= 4 : false))
@@ -95,6 +100,14 @@ export function PosTerminal({ property, openSession, sales, products, members, c
     .filter((l): l is { product: PosProduct; qty: number } => Boolean(l.product) && l.qty > 0);
 
   const totalMinor = cartLines.reduce((sum, l) => sum + l.product.priceMinor * l.qty, 0);
+  const numericDiscount = Number(discountValue) || 0;
+  const discountMinor =
+    discountMode === "percent"
+      ? Math.round((totalMinor * Math.max(0, Math.min(100, numericDiscount))) / 100)
+      : Math.round(Math.max(0, Math.min(totalMinor, numericDiscount * 100)));
+  const netMinor = totalMinor - discountMinor;
+  const tenderedMinor = Math.round((Number(tendered) || 0) * 100);
+  const changeMinor = tenderedMinor > 0 ? tenderedMinor - netMinor : 0;
   const cashExpected = openSession ? openSession.openingFloatMinor + openSession.cashSalesMinor : 0;
   const outOfStockOnHand = (p: PosProduct): number => {
     if (!p.stock) return Number.POSITIVE_INFINITY;
@@ -178,16 +191,25 @@ export function PosTerminal({ property, openSession, sales, products, members, c
 
   function charge() {
     const lines = cartLines.map((l) => ({ productId: l.product.id, qty: l.qty }));
-    void post(
-      "/api/pos/sales",
-      { sessionId: openSession?.id, method, lines, memberProfileId: method === "room_charge" ? memberId || undefined : undefined, ref: ref || undefined },
-      "Sale recorded",
-      (data) => {
-        printHints(data);
-        setCart({});
-        setRef("");
-      }
-    );
+    const body: Record<string, unknown> = {
+      sessionId: openSession?.id,
+      method,
+      lines,
+      memberProfileId: method === "room_charge" ? memberId || undefined : undefined,
+      ref: ref || undefined
+    };
+    if (discountMinor > 0) {
+      body.discountMinor = discountMinor;
+      body.discountLabel = discountMode === "percent" ? `${Math.round(numericDiscount)}% off` : "Discount";
+    }
+    void post("/api/pos/sales", body, "Sale recorded", (data) => {
+      printHints(data);
+      setCart({});
+      setRef("");
+      setDiscountValue("");
+      setTendered("");
+      setDiscountMode("percent");
+    });
   }
 
   const printFrame = printUrl ? (
@@ -404,13 +426,67 @@ export function PosTerminal({ property, openSession, sales, products, members, c
                 <span className="text-2xl font-bold tabular-nums">{formatMinor(totalMinor)}</span>
               </div>
 
+              {cartLines.length > 0 ? (
+                <div className="rounded-md border border-input p-2">
+                  <div className="mb-1 flex items-center gap-1">
+                    <span className="text-xs font-medium text-muted-foreground">Discount</span>
+                    <div className="ml-auto flex overflow-hidden rounded-md border border-input text-xs">
+                      <button
+                        className={`px-2 py-0.5 ${discountMode === "percent" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground"}`}
+                        onClick={() => setDiscountMode("percent")}
+                      >
+                        %
+                      </button>
+                      <button
+                        className={`px-2 py-0.5 ${discountMode === "amount" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground"}`}
+                        onClick={() => setDiscountMode("amount")}
+                      >
+                        $
+                      </button>
+                    </div>
+                    <Input
+                      className="h-7 w-24 text-right"
+                      type="number"
+                      min="0"
+                      step={discountMode === "percent" ? 1 : 0.01}
+                      placeholder={discountMode === "percent" ? "0%" : "0.00"}
+                      value={discountValue}
+                      onChange={(e) => setDiscountValue(e.target.value)}
+                    />
+                  </div>
+                  {discountMinor > 0 ? (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{discountMode === "percent" ? `${Math.round(numericDiscount)}% off` : "Discount"}</span>
+                      <span className="tabular-nums text-destructive">−{formatMinor(discountMinor)}</span>
+                    </div>
+                  ) : null}
+                  <div className="flex items-center justify-between border-t border-border/60 pt-1 text-sm font-semibold">
+                    <span className="text-muted-foreground">Due</span>
+                    <span className="tabular-nums">{formatMinor(netMinor)}</span>
+                  </div>
+                </div>
+              ) : null}
+
+              {cartLines.length > 0 && method === "cash" ? (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs">Cash received</Label>
+                    <Input className="h-8 w-32 text-right" type="number" min="0" step="0.01" placeholder="Tendered amount" value={tendered} onChange={(e) => setTendered(e.target.value)} />
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Change due</span>
+                    <span className={`font-semibold tabular-nums ${changeMinor > 0 ? "text-success" : "text-muted-foreground"}`}>{changeMinor > 0 ? formatMinor(changeMinor) : "—"}</span>
+                  </div>
+                </div>
+              ) : null}
+
               <Button
                 size="lg"
                 className="w-full"
-                disabled={!canWrite || !openSession || busy || cartLines.length === 0 || (method === "room_charge" && !memberId)}
+                disabled={!canWrite || !openSession || busy || cartLines.length === 0 || (method === "room_charge" && !memberId) || (method === "cash" && Number(tendered) > 0 && changeMinor < 0)}
                 onClick={charge}
               >
-                {method === "room_charge" ? "Charge to room" : `Take ${METHOD_LABELS[method] ?? method}`}
+                {method === "room_charge" ? "Charge to room" : method === "cash" && Number(tendered) > 0 ? `Take ${formatMinor(netMinor)} (change ${formatMinor(Math.max(0, changeMinor))})` : `Take ${METHOD_LABELS[method] ?? method}`}
               </Button>
             </div>
           </CardContent>
@@ -448,7 +524,10 @@ export function PosTerminal({ property, openSession, sales, products, members, c
                     <Badge variant={s.method === "room_charge" ? "warning" : s.method === "cash" ? "secondary" : "info"}>{s.method.replace("_", " ")}</Badge>
                     {s.memberName ? <span className="block text-xs text-muted-foreground">{s.memberName}</span> : null}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{formatMinor(s.totalMinor)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatMinor(s.totalMinor)}
+                    {s.discountMinor > 0 ? <span className="block text-xs text-destructive">−disc {formatMinor(s.discountMinor)} · net {formatMinor(s.totalMinor - s.discountMinor)}</span> : null}
+                  </TableCell>
                   <TableCell>
                     {s.invoiceId ? (
                       <a href={`/invoices/${s.invoiceId}`} className="text-xs underline underline-offset-4">

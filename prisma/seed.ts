@@ -698,8 +698,9 @@ async function seedInspectionTemplates(): Promise<void> {
 
 
 
-/// M14/M15: demo suppliers, stock items (zero on-hand — purchases happen via
-/// flows) and POS products linked to stock (§M14 "products link to stock item").
+/// M14/M15/M30: demo suppliers, hierarchical stock categories, stock items
+/// (zero on-hand — purchases happen via flows) and POS products linked to
+/// stock (§M14 "products link to stock item").
 async function seedStockPos(): Promise<void> {
   const property = await db.property.findUniqueOrThrow({ where: { code: "BLR" } });
   const suppliers = [
@@ -709,29 +710,55 @@ async function seedStockPos(): Promise<void> {
   for (const sup of suppliers) {
     await db.supplier.upsert({ where: { name: sup.name }, create: sup, update: sup });
   }
-  const items: Array<{ name: string; category: string; unit: string; minQtyMilli: number; supplier: string; priceMinor: number; barcode?: string; product?: boolean }> = [
-    { name: "Coca-Cola can 330ml", category: "beverage", unit: "pcs", minQtyMilli: 12_000, supplier: "Angkor Wholesale", priceMinor: 100, barcode: "8890000001006" },
-    { name: "Drinking water 1.5L", category: "beverage", unit: "pcs", minQtyMilli: 24_000, supplier: "Angkor Wholesale", priceMinor: 60, barcode: "8890000002003" },
-    { name: "Instant noodles pack", category: "snack", unit: "pcs", minQtyMilli: 10_000, supplier: "Mekong Supplies", priceMinor: 150, barcode: "8890000003000" },
-    { name: "Laundry detergent 1kg", category: "supply", unit: "box", minQtyMilli: 4_000, supplier: "Mekong Supplies", priceMinor: 450, barcode: "8890000004007" },
-    { name: "Coffee beans", category: "grocery", unit: "kg", minQtyMilli: 2_000, supplier: "Angkor Wholesale", priceMinor: 1200, barcode: "8890000005004" }
+
+  // M30 category hierarchy (shared catalogue + BLR-owned stock categories).
+  const catDefs: Array<{ name: string; parent?: string; shared?: boolean }> = [
+    { name: "Beverages" },
+    { name: "Cold", parent: "Beverages" },
+    { name: "Hot", parent: "Beverages" },
+    { name: "Snacks" },
+    { name: "Groceries" },
+    { name: "Cleaning", shared: true },
+    { name: "Parts", shared: true }
+  ];
+  const catIds = new Map<string, string>();
+  for (const def of catDefs) {
+    const parent = def.parent ? catIds.get(def.parent) ?? null : null;
+    const propertyId = def.shared ? null : property.id;
+    const existing = await db.stockCategory.findFirst({ where: { name: def.name, parentId: parent, propertyId } });
+    const cat = existing
+      ? await db.stockCategory.update({ where: { id: existing.id }, data: { parentId: parent, propertyId, sortOrder: catIds.size, isActive: true } })
+      : await db.stockCategory.create({ data: { name: def.name, parentId: parent, propertyId, sortOrder: catIds.size } });
+    catIds.set(def.name, cat.id);
+  }
+
+  const items: Array<{ name: string; categoryId: string; unit: string; packUnit?: string; packSize?: number; minQtyMilli: number; supplier: string; priceMinor: number; barcode?: string }> = [
+    { name: "Coca-Cola can 330ml", categoryId: "Cold", unit: "can", packUnit: "carton", packSize: 12, minQtyMilli: 12_000, supplier: "Angkor Wholesale", priceMinor: 100, barcode: "8890000001006" },
+    { name: "Drinking water 1.5L", categoryId: "Cold", unit: "bottle", packUnit: "case", packSize: 24, minQtyMilli: 24_000, supplier: "Angkor Wholesale", priceMinor: 60, barcode: "8890000002003" },
+    { name: "Instant noodles pack", categoryId: "Snacks", unit: "pcs", minQtyMilli: 10_000, supplier: "Mekong Supplies", priceMinor: 150, barcode: "8890000003000" },
+    { name: "Laundry detergent 1kg", categoryId: "Cleaning", unit: "box", minQtyMilli: 4_000, supplier: "Mekong Supplies", priceMinor: 450, barcode: "8890000004007" },
+    { name: "Coffee beans", categoryId: "Hot", unit: "kg", minQtyMilli: 2_000, supplier: "Angkor Wholesale", priceMinor: 1200, barcode: "8890000005004" }
   ];
   for (const it of items) {
     const supplier = await db.supplier.findUniqueOrThrow({ where: { name: it.supplier } });
+    const categoryId = catIds.get(it.categoryId) ?? null;
+    const categoryPath = catDefs.find((c) => c.name === it.categoryId)?.parent
+      ? `${catDefs.find((c) => c.name === it.categoryId)?.parent}/${it.categoryId}`
+      : it.categoryId;
     const item = await db.stockItem.upsert({
       where: { name_propertyId: { name: it.name, propertyId: property.id } },
-      create: { name: it.name, category: it.category, unit: it.unit, minQtyMilli: it.minQtyMilli, supplierId: supplier.id, propertyId: property.id },
-      update: { minQtyMilli: it.minQtyMilli, supplierId: supplier.id, isActive: true }
+      create: { name: it.name, category: categoryPath, categoryId, unit: it.unit, packUnit: it.packUnit ?? null, packSize: it.packSize ?? null, minQtyMilli: it.minQtyMilli, supplierId: supplier.id, propertyId: property.id },
+      update: { minQtyMilli: it.minQtyMilli, supplierId: supplier.id, category: categoryPath, categoryId, unit: it.unit, packUnit: it.packUnit ?? null, packSize: it.packSize ?? null, isActive: true }
     });
     await db.posProduct.upsert({
       where: { name: it.name },
-      create: { name: it.name, priceMinor: it.priceMinor, category: it.category, barcode: it.barcode ?? null, stockItemId: item.id, isActive: true },
-      update: { priceMinor: it.priceMinor, barcode: it.barcode ?? null, stockItemId: item.id, isActive: true }
+      create: { name: it.name, priceMinor: it.priceMinor, category: categoryPath, categoryId, barcode: it.barcode ?? null, stockItemId: item.id, isActive: true },
+      update: { priceMinor: it.priceMinor, category: categoryPath, categoryId, barcode: it.barcode ?? null, stockItemId: item.id, isActive: true }
     });
   }
   await db.posProduct.upsert({
     where: { name: "Print / scan service" },
-    create: { name: "Print / scan service", priceMinor: 25, category: "service", isActive: true },
+    create: { name: "Print / scan service", priceMinor: 25, category: "Service", isActive: true },
     update: { priceMinor: 25, isActive: true }
   });
 }

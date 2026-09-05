@@ -58,6 +58,7 @@ export const NAV: NavGroup[] = [
       { label: "POS", href: "/pos", module: "M14" },
       { label: "POS Catalog", href: "/pos/products", module: "M14" },
       { label: "Stock", href: "/stock", module: "M15" },
+      { label: "Purchase Orders", href: "/po", module: "M29" },
       { label: "Attendance", href: "/attendance", module: "M23" }
     ]
   },

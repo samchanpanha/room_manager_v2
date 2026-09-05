@@ -41,11 +41,13 @@ CREATE TABLE "StockMovement" (
     "ticketId" TEXT,
     "stocktakeId" TEXT,
     "targetItemId" TEXT,
+    "purchaseOrderId" TEXT,
     "note" TEXT,
     "createdById" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "StockMovement_stockItemId_fkey" FOREIGN KEY ("stockItemId") REFERENCES "StockItem" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "StockMovement_saleId_fkey" FOREIGN KEY ("saleId") REFERENCES "PosSale" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "StockMovement_purchaseOrderId_fkey" FOREIGN KEY ("purchaseOrderId") REFERENCES "PurchaseOrder" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "StockMovement_targetItemId_fkey" FOREIGN KEY ("targetItemId") REFERENCES "StockItem" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
