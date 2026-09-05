@@ -12,6 +12,14 @@ import { Tx } from "@/components/i18n-text";
 
 type Settings = Awaited<ReturnType<typeof getSettings>>;
 
+interface RentAlertRun {
+  reminders: number;
+  overdue: number;
+  upcomingCount: number;
+  overdueCount: number;
+  horizonDays: number;
+}
+
 async function send(url: string, method: string, body: unknown): Promise<{ ok: boolean; message?: string }> {
   const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = (await res.json().catch(() => ({}))) as { message?: string };
@@ -43,6 +51,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export function SettingsForms({ settings, canWrite }: { settings: Settings; canWrite: boolean }) {
   const { busy, save } = useSave();
+  const { push } = useToast();
+  const [alertsBusy, setAlertsBusy] = useState(false);
   const [org, setOrg] = useState(settings.org);
   const [locale, setLocale] = useState(settings.locale);
   const [billing, setBilling] = useState({ ...settings.billing, dunningDays: settings.billing.dunningDays.join(",") });
@@ -63,6 +73,25 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
       window.localStorage.setItem("pageSize:global", String(settings.table.pageSize));
     }
   }, [settings.table.pageSize]);
+
+  async function runAlerts() {
+    setAlertsBusy(true);
+    try {
+      const res = await fetch("/api/jobs/rent-alerts", { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as Partial<RentAlertRun> & { message?: string };
+      if (!res.ok) {
+        push({ title: "Rent alerts run", description: data.message ?? "Job failed", variant: "destructive" });
+        return;
+      }
+      push({
+        title: "Rent alerts run",
+        description: `Sent ${data.reminders ?? 0} reminder(s) and ${data.overdue ?? 0} overdue notice(s) — ${data.upcomingCount ?? 0} upcoming and ${data.overdueCount ?? 0} overdue in the next ${data.horizonDays ?? 0} days`,
+        variant: "success"
+      });
+    } finally {
+      setAlertsBusy(false);
+    }
+  }
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -309,6 +338,12 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
           </Field>
           <Field label="Flag overdue after (days)">
             <Input type="number" value={settings.rentAlerts.overdueDays} disabled={!canWrite} onChange={(e) => void save("alerts", { overdueDays: Number(e.target.value) }, "Alert horizon saved")} />
+          </Field>
+          <Field label="Run alerts now">
+            <p className="text-xs text-muted-foreground"><Tx>Scans open rent invoices and fires one reminder/overdue notice per invoice per cycle — delivered to member chats by the Telegram dispatch job.</Tx></p>
+            <Button size="sm" variant="outline" disabled={!canWrite || alertsBusy} onClick={() => void runAlerts()}>
+              {alertsBusy ? "Running…" : "Run alerts now"}
+            </Button>
           </Field>
         </CardContent>
       </Card>

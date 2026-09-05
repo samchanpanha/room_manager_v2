@@ -43,6 +43,11 @@ export const uiCopy: PhraseTable = {
     "Reset to all reports": "កំណត់ឡើងវិញទៅរាល់របាយការណ៍",
     "Reset design": "កំណត់ការរចនាឡើងវិញ",
     "Save reports configuration": "រក្សាទុកការកំណត់របាយការណ៍",
+    "Run alerts now": "ដំណើរការការជូនដំណឹងឥឡូវនេះ",
+    "Running…": "កំពុងដំណើរការ…",
+    "Rent alerts run": "ការជូនដំណឹងប្រាក់ឈ្នួលបានដំណើរការ",
+    "Scans open rent invoices and fires one reminder/overdue notice per invoice per cycle — delivered to member chats by the Telegram dispatch job.":
+      "ស្កេនវិក្កយបត្រជួលដែលបើកចំហ ហើយផ្ញើការរំលឹក/ការជូនដំណឹងហួសកំណត់មួយក្នុងមួយវិក្កយបត្រក្នុងមួយវដ្ត — បញ្ជូនទៅការសន្ទនាសមាជិកដោយការងារបញ្ជូន Telegram ។",
     "(UI form arrives with the settings phase).": "(ចំណុចប្រទាក់ UI នឹងមកដល់ក្នុងដំណាក់កាលការកំណត់)។",
     "(level": "(ជាន់",
     "(room": "(បន្ទប់",
@@ -261,6 +266,11 @@ export const uiCopy: PhraseTable = {
     "Reset to all reports": "重置为所有报告",
     "Reset design": "重置设计",
     "Save reports configuration": "保存报告配置",
+    "Run alerts now": "立即运行提醒",
+    "Running…": "运行中…",
+    "Rent alerts run": "房租提醒已运行",
+    "Scans open rent invoices and fires one reminder/overdue notice per invoice per cycle — delivered to member chats by the Telegram dispatch job.":
+      "扫描未结清的房租发票，每个周期每张发票发送一次提醒/逾期通知——由 Telegram 派发任务送达成员聊天。",
     "(UI form arrives with the settings phase).": "（UI 表单将在设置阶段提供）。",
     "(level": "（楼层",
     "(room": "（房间",
