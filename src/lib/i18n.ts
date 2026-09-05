@@ -18,6 +18,7 @@
 ///   2. Org-wide default — §M28 Settings → Locale → Language (`m28.locale.locale`).
 ///   3. English.
 import { lookupPhrase, mergePhrases, type PhraseTable } from "@/lib/locales/phrase-table";
+import { uiActions } from "@/lib/locales/ui-actions";
 import { uiColumns } from "@/lib/locales/ui-columns";
 import { uiCommon } from "@/lib/locales/ui-common";
 import { uiFields } from "@/lib/locales/ui-fields";
@@ -25,6 +26,7 @@ import { uiGuide } from "@/lib/locales/ui-guide";
 import { uiLabels } from "@/lib/locales/ui-labels";
 import { uiMessages } from "@/lib/locales/ui-messages";
 import { uiPages } from "@/lib/locales/ui-pages";
+import { uiErrors } from "@/lib/locales/ui-errors";
 import { uiExtra } from "@/lib/locales/ui-extra";
 import { uiPortal } from "@/lib/locales/ui-portal";
 import { uiProse } from "@/lib/locales/ui-prose";
@@ -664,7 +666,9 @@ export const UI_PHRASES: PhraseTable = mergePhrases(
   uiReports,
   uiGuide,
   uiLabels,
-  uiCopy
+  uiCopy,
+  uiActions,
+  uiErrors
 );
 
 /// Translate an authored English UI string into `locale`.

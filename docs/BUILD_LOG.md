@@ -1459,3 +1459,61 @@ lint ✅ · typecheck ✅ · tests ✅ 144/144 (22 payments) · seed ✅ (`db:re
 invoices/ledger rows) · audit-on-mutation ✅ (record/confirm/fail/refund all logged, gateway
 attributed) · ledger ✅ balanced through every payment flow · RBDC negatives ✅ live · no `any` ·
 webhook idempotency ✅ (unique keys + replay-ignore).
+
+## Cross-cutting — i18n coverage sweep (EN/KM/ZH) across all modules — 2026-09-05
+
+Follow-up to the phrase-table i18n work: a report that "some elements, columns
+and fields still don't change language" turned out to be **coverage**, not
+plumbing. Every string already routes through `tUi()` (the `<Tx>` wrap pass was
+complete — `scripts/find-untranslated.mjs` reports 0 unwrapped nodes outside the
+PDF renderers), but ~430 authored English phrases had **no km/zh entry**, so
+they fell back to English by design.
+
+**New audit tooling**
+- `scripts/i18n-scan.mjs` — AST walk (TypeScript compiler API) over every
+  `src/**/*.ts(x)` outside `/api/`, collecting the strings the older regex
+  extractor missed: JSX text nodes, translatable JSX attributes
+  (`title`/`description`/`label`/`placeholder`/`hint`/`aria-label`/…) and
+  `label:`/`title:`/`description:`/`hint:` **object properties** — which is
+  where column definitions, select option lists, nav/tab configs, report
+  metadata and the seeded RBDC role descriptions live. Each candidate is filtered
+  by an `isPhrase()` heuristic (rejects ids, camelCase, kebab-case, URLs, enum
+  tokens, pure numerics) and then checked against the phrase tables using the
+  **same** normalization as the runtime lookup, so a hit here is a phrase that
+  genuinely renders in English. Exits non-zero when gaps remain.
+- `scripts/i18n-coverage.mjs` — the narrower cross-check of
+  `i18n-strings.json` (from `extract-strings.mjs`) against the tables.
+
+**New phrase tables** (registered in `UI_PHRASES`, `src/lib/i18n.ts`)
+- `src/lib/locales/ui-actions.ts` (~212 phrases × 2 locales): action buttons,
+  the `…`-suffixed dialog triggers used by every module's action bar
+  (`Adjust…`, `Approve…`, `Consume…`, `Stocktake…`, `Void…`, …), the `+ New …`
+  creation triggers, all ten §M28 settings save buttons, room-type and scope
+  option labels (`Standard`/`Deluxe`/`Studio`/`Suite`, `Global (all properties)`,
+  `Shared (all properties / till)`), placeholders, dashboard stat suffixes
+  (`awaiting payout:`, `low stock:`, `open exceptions:`) and descriptive card copy.
+- `src/lib/locales/ui-errors.ts` (~209 phrases × 2 locales): service-layer
+  validation and business-rule messages thrown by `src/lib/**/service.ts` —
+  these reach the user through the toast provider, which already translates
+  every title/description at render — plus the `SYSTEM_ACCOUNTS` ledger names
+  (`Rent Receivable`, `Deposit Liability`, `Owner Payable`, …). Field-shaped
+  messages keep the API identifier verbatim (`amountMinor must be a positive
+  integer` → `amountMinor 必须为正整数`): the identifier is what the contract
+  calls it, so translating it would make the message *harder* to act on.
+
+**Verification**
+- `node scripts/check-locales.mjs` → ALL CLEAN, **km = zh = 2083** (was 1662).
+- `node scripts/i18n-scan.mjs` → 482 → **61** remaining, and every one is
+  intentional: 49 are inside the `@react-pdf/renderer` documents (they render
+  with Helvetica, which has no Khmer or CJK glyphs — translating them without
+  first registering a Unicode font would print tofu, so that is a separate piece
+  of work), and 12 are brand names (`RentManager`) or sample-data placeholder
+  text (`Chan Ling`, `Bassac Lane Residence`, `e.g. Sunrise Wholesale`).
+- `tests/i18n-ui.test.ts` +8 specs (26 total, 35 with `i18n.test.ts`, all green)
+  pinning the dialog triggers, settings save buttons, creation triggers,
+  room-type options, service validation messages, ledger account names and role
+  descriptions — plus a guard that record data and field identifiers survive
+  translation untouched.
+- `tsc --noEmit`: 735 diagnostics before **and** after the change (all
+  pre-existing `TS7006` implicit-any noise from the un-generated Prisma client
+  in this environment) — zero new errors.
