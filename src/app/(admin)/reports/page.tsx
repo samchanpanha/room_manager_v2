@@ -10,6 +10,7 @@ import { runReport } from "@/lib/reports/service";
 import { formatMinor } from "@/lib/money";
 import { getSettings } from "@/lib/settings";
 import { ReportPicker } from "./report-picker";
+import { getT } from "@/lib/locale-server";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function ReportsPage({
   if (!user) redirect("/login");
   if (!hasModuleAccess(user, "read", "M26")) redirect("/dashboard");
   const sp = await searchParams;
+  const { t } = await getT();
 
   const scope = await reportScope(user);
   if (!scope.allowed) redirect("/dashboard");
@@ -34,7 +36,7 @@ export default async function ReportsPage({
   const enabled = settings.reports.enabledKeys.length === 0 ? null : new Set(settings.reports.enabledKeys);
   const allowed = new Set(visibleReportKeys(user).filter((key) => (!enabled || enabled.has(key)) && (assigned.length === 0 || assigned.includes(key))));
   const reports = [...REPORT_BY_KEY.values()].filter((r) => allowed.has(r.key));
-  if (reports.length === 0) return <PageHeader title="Reports" description="No reports are currently assigned or enabled for your account." />;
+  if (reports.length === 0) return <PageHeader title={t("reports.page.title")} description={t("reports.page.noAccess")} />;
   const currentKey = sp.key && allowed.has(sp.key) ? sp.key : reports[0]!.key;
 
   const [properties, result] = await Promise.all([
@@ -46,7 +48,7 @@ export default async function ReportsPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Reports" description="M26 — analytics & exports, filterable by date range + property" />
+      <PageHeader title={t("reports.page.title")} description={t("reports.page.description")} />
 
       <ReportPicker
         reports={reports.map((r) => ({ key: r.key, title: r.title, category: r.category, source: r.source, dateFiltered: r.dateFiltered }))}
@@ -68,7 +70,7 @@ export default async function ReportsPage({
             </CardHeader>
             <CardContent>
               {result.rows.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No rows for this scope/period.</p>
+                <p className="text-sm text-muted-foreground">{t("reports.noRows")}</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
