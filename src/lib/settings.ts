@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db";
 import { seal, open, maskSecret } from "@/lib/crypto/sealed";
 import { logAudit } from "@/lib/audit";
 import { env } from "@/lib/env";
+import { isLocale, LOCALES } from "@/lib/i18n";
 
 export interface ActorRef {
   id?: string | null;
@@ -290,6 +291,9 @@ export async function updateSettings(
     for (const k of Object.keys(next)) if (typeof next[k] !== "boolean") delete next[k];
     await writeGroup(def, next, actor, ip, `Feature flags updated (${Object.keys(patch).join(", ") || "none"})`);
     return;
+  }
+  if (group === "locale" && patch.locale !== undefined && !isLocale(patch.locale)) {
+    throw new Error(`Unsupported language — use one of: ${LOCALES.join(", ")}`);
   }
   const next = { ...current, ...patch };
   await writeGroup(def, next, actor, ip, `Settings group "${group}" updated (${Object.keys(patch).join(", ")})`);

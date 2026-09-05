@@ -63,4 +63,8 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Khmer script needs taller line boxes to avoid clipped stacking marks. */
+  html[lang="km"] body {
+    line-height: 1.75;
+  }
 }

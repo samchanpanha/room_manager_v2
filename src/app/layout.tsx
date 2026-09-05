@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { I18nProvider } from "@/components/i18n-provider";
+import { getT } from "@/lib/locale-server";
 
 export const metadata: Metadata = {
   title: "RentManager",
@@ -16,14 +18,20 @@ try {
 } catch (e) {}
 `;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Resolve the request locale once (rm-locale cookie → §M28 org default → en)
+  // and flow it down as props/context — SSR and hydration stay in sync.
+  const { locale } = await getT();
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body className="min-h-screen font-sans antialiased">
-        <Providers>{children}</Providers>
+        <Providers>
+          <I18nProvider locale={locale}>{children}</I18nProvider>
+        </Providers>
       </body>
     </html>
   );
