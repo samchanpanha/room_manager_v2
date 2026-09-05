@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { formatDate } from "@/lib/utils";
 import { NewUserButton, UserRowActions } from "./user-actions";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,7 @@ export default async function UsersPage() {
                 <TableRow key={u.id}>
                   <TableCell className="font-medium">
                     {u.name}
-                    {u.id === user.id ? <span className="ml-1 text-xs text-muted-foreground">(you)</span> : null}
+                    {u.id === user.id ? <span className="ml-1 text-xs text-muted-foreground"><Tx>(you)</Tx></span> : null}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{u.email}</TableCell>
                   <TableCell>

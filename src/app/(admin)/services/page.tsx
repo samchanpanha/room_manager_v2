@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, PageHeader, StatCard } from "@/components/ui/misc";
 import { ServiceActions } from "./service-actions";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +75,7 @@ export default async function ServicesPage() {
 
       <Card className="mb-6">
         <CardContent className="p-0">
-          <div className="border-b p-4 text-sm font-semibold">Assignments</div>
+          <div className="border-b p-4 text-sm font-semibold"><Tx>Assignments</Tx></div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -128,9 +129,9 @@ export default async function ServicesPage() {
               ))}
               {visibleAssignments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                     No assignments — assign a catalog service to an active lease (WiFi / parking bind real resources).
-                  </TableCell>
+                  </Tx></TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
@@ -141,7 +142,7 @@ export default async function ServicesPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardContent className="p-0">
-            <div className="border-b p-4 text-sm font-semibold">Catalog</div>
+            <div className="border-b p-4 text-sm font-semibold"><Tx>Catalog</Tx></div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -165,7 +166,7 @@ export default async function ServicesPage() {
                       {c.unitLabel ? (
                         <span className="text-xs text-muted-foreground">/{c.unitLabel}</span>
                       ) : c.pricingModel === "fixed_monthly" ? (
-                        <span className="text-xs text-muted-foreground">/mo</span>
+                        <span className="text-xs text-muted-foreground"><Tx>/mo</Tx></span>
                       ) : null}
                     </TableCell>
                   </TableRow>
@@ -177,7 +178,7 @@ export default async function ServicesPage() {
 
         <Card>
           <CardContent className="p-0">
-            <div className="border-b p-4 text-sm font-semibold">Per-use entries</div>
+            <div className="border-b p-4 text-sm font-semibold"><Tx>Per-use entries</Tx></div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -205,7 +206,7 @@ export default async function ServicesPage() {
                 {visibleUsages.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
-                      No per-use entries yet.
+                      <Tx>No per-use entries yet.</Tx>
                     </TableCell>
                   </TableRow>
                 ) : null}
@@ -218,7 +219,7 @@ export default async function ServicesPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>
           <CardContent className="p-0">
-            <div className="border-b p-4 text-sm font-semibold">Parking slots</div>
+            <div className="border-b p-4 text-sm font-semibold"><Tx>Parking slots</Tx></div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -242,7 +243,7 @@ export default async function ServicesPage() {
                 {slots.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
-                      No parking slots yet.
+                      <Tx>No parking slots yet.</Tx>
                     </TableCell>
                   </TableRow>
                 ) : null}
@@ -253,7 +254,7 @@ export default async function ServicesPage() {
 
         <Card>
           <CardContent className="p-0">
-            <div className="border-b p-4 text-sm font-semibold">WiFi accounts</div>
+            <div className="border-b p-4 text-sm font-semibold"><Tx>WiFi accounts</Tx></div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -277,7 +278,7 @@ export default async function ServicesPage() {
                 {wifi.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
-                      No WiFi accounts yet.
+                      <Tx>No WiFi accounts yet.</Tx>
                     </TableCell>
                   </TableRow>
                 ) : null}

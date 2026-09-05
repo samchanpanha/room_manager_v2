@@ -9,6 +9,7 @@ import { EmptyState, PageHeader, StatCard } from "@/components/ui/misc";
 import { formatMinor } from "@/lib/money";
 import { DepositActions } from "./deposit-actions";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +91,7 @@ export default async function DepositsPage({
 
       <form method="get" className="mb-4 flex items-end gap-3 text-sm">
         <div className="space-y-1">
-          <label htmlFor="df-status" className="text-xs text-muted-foreground">Status</label>
+          <label htmlFor="df-status" className="text-xs text-muted-foreground"><Tx>Status</Tx></label>
           <SearchableSelect
             id="df-status"
             name="status"
@@ -107,7 +108,7 @@ export default async function DepositsPage({
           />
         </div>
         <button type="submit" className="h-9 rounded-md bg-primary px-3 font-medium text-primary-foreground hover:bg-primary/90">
-          Filter
+          <Tx>Filter</Tx>
         </button>
       </form>
 
@@ -148,7 +149,7 @@ export default async function DepositsPage({
                         view
                       </a>
                     ) : (
-                      <span className="text-xs text-muted-foreground">not billed</span>
+                      <span className="text-xs text-muted-foreground"><Tx>not billed</Tx></span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -170,9 +171,9 @@ export default async function DepositsPage({
               ))}
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={10} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                     No deposits yet — deposits are billed automatically when a lease with deposit terms is activated.
-                  </TableCell>
+                  </Tx></TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
@@ -180,8 +181,8 @@ export default async function DepositsPage({
         </CardContent>
       </Card>
       <p className="mt-3 text-xs text-muted-foreground">
-        Installments bill through invoices (pay them via Payments — oldest-first picks the deposit first). Deductions require an
-        evidence document; refunds need Accountant approval. The 2100 liability nets to 0 once a closed lease is fully settled.
+        <Tx>Installments bill through invoices (pay them via Payments — oldest-first picks the deposit first). Deductions require an
+        evidence document; refunds need Accountant approval. The 2100 liability nets to 0 once a closed lease is fully settled.</Tx>
       </p>
     </div>
   );

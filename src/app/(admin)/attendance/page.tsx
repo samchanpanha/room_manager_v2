@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { AttendanceAdmin, KioskCard } from "./attendance-actions";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -148,9 +149,9 @@ export default async function AttendancePage() {
               ))}
               {records.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                     No punches this month yet — clock in via the kiosk above.
-                  </TableCell>
+                  </Tx></TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
@@ -160,7 +161,7 @@ export default async function AttendancePage() {
 
       <Card className="mt-6">
         <CardContent className="p-0">
-          <div className="border-b p-3 text-sm font-semibold">Exception report (open)</div>
+          <div className="border-b p-3 text-sm font-semibold"><Tx>Exception report (open)</Tx></div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -184,7 +185,7 @@ export default async function AttendancePage() {
               {openExceptions.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
-                    No open exceptions.
+                    <Tx>No open exceptions.</Tx>
                   </TableCell>
                 </TableRow>
               ) : null}
@@ -194,8 +195,8 @@ export default async function AttendancePage() {
       </Card>
 
       <p className="mt-3 text-xs text-muted-foreground">
-        Punches never bypass the record: corrections are separate audited edits with a mandatory reason (edited badge), the daily
-        sweep flags open punches older than 16h as missed_clock_out, and the CSV export mirrors the records one row per punch pair.
+        <Tx>Punches never bypass the record: corrections are separate audited edits with a mandatory reason (edited badge), the daily
+        sweep flags open punches older than 16h as missed_clock_out, and the CSV export mirrors the records one row per punch pair.</Tx>
       </p>
     </div>
   );

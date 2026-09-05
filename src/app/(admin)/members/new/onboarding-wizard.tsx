@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
 import { cn } from "@/lib/utils";
+import { Tx } from "@/components/i18n-text";
 
 interface DocTypeOpt {
   id: string;
@@ -223,7 +224,7 @@ export function OnboardingWizard({
                 </Select>
               </div>
               <div>
-                <p className="mb-2 text-sm font-medium">Emergency contacts *</p>
+                <p className="mb-2 text-sm font-medium"><Tx>Emergency contacts *</Tx></p>
                 <div className="space-y-3">
                   {contacts.map((c, i) => (
                     <div key={i} className="grid gap-2 rounded-lg border p-3 sm:grid-cols-4">
@@ -265,8 +266,8 @@ export function OnboardingWizard({
               </div>
               {!canUpload ? (
                 <p className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
-                  Your roles cannot upload documents for the selected property (M17:create). You can still create the member and
-                  attach files later from an account with document rights.
+                  <Tx>Your roles cannot upload documents for the selected property (M17:create). You can still create the member and
+                  attach files later from an account with document rights.</Tx>
                 </p>
               ) : null}
               {docTypes
@@ -277,7 +278,7 @@ export function OnboardingWizard({
                     <div key={t.id} className="grid items-end gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_170px_auto]">
                       <div className="space-y-1.5">
                         <Label htmlFor={`doc-${t.id}`}>
-                          {t.name} {t.kycRequired ? <span className="text-destructive">*</span> : <span className="text-muted-foreground">(optional)</span>}
+                          {t.name} {t.kycRequired ? <span className="text-destructive">*</span> : <span className="text-muted-foreground"><Tx>(optional)</Tx></span>}
                         </Label>
                         <Input
                           id={`doc-${t.id}`}
@@ -311,8 +312,8 @@ export function OnboardingWizard({
                   );
                 })}
               <p className="text-xs text-muted-foreground">
-                Files upload right after the member record is created (PDF/PNG/JPEG/WEBP, ≤10 MB). Expiring docs trigger 30/7-day
-                reminder events.
+                <Tx>Files upload right after the member record is created (PDF/PNG/JPEG/WEBP, ≤10 MB). Expiring docs trigger 30/7-day
+                reminder events.</Tx>
               </p>
             </div>
           ) : null}
@@ -330,11 +331,11 @@ export function OnboardingWizard({
                 </p>
               </div>
               <div className="rounded-lg border p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Property</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground"><Tx>Property</Tx></p>
                 <p>{properties.find((p) => p.id === homePropertyId)?.label ?? "Unassigned"}</p>
               </div>
               <div className="rounded-lg border p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Emergency contacts</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground"><Tx>Emergency contacts</Tx></p>
                 {contacts.map((c, i) => (
                   <p key={i}>
                     {c.name} · {c.relationship} · {c.phone}
@@ -342,9 +343,9 @@ export function OnboardingWizard({
                 ))}
               </div>
               <div className="rounded-lg border p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Documents</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground"><Tx>Documents</Tx></p>
                 {docs.length === 0 ? (
-                  <p className="text-muted-foreground">None staged</p>
+                  <p className="text-muted-foreground"><Tx>None staged</Tx></p>
                 ) : (
                   docs.map((d) => (
                     <p key={d.docTypeId}>

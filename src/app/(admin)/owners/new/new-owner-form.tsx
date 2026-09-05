@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
+import { Tx } from "@/components/i18n-text";
 
 interface BuildingOpt {
   id: string;
@@ -74,7 +75,7 @@ export function NewOwnerForm({ unownedBuildings }: { unownedBuildings: BuildingO
       <CardContent className="p-6">
         <form onSubmit={submit} className="space-y-6">
           <section className="space-y-3">
-            <p className="text-sm font-medium">Identity</p>
+            <p className="text-sm font-medium"><Tx>Identity</Tx></p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="o-name">Full name *</Label>
@@ -132,9 +133,9 @@ export function NewOwnerForm({ unownedBuildings }: { unownedBuildings: BuildingO
           </section>
 
           <section className="space-y-3">
-            <p className="text-sm font-medium">Buildings owned (optional)</p>
+            <p className="text-sm font-medium"><Tx>Buildings owned (optional)</Tx></p>
             {unownedBuildings.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No unassigned buildings — every building already has an owner.</p>
+              <p className="text-sm text-muted-foreground"><Tx>No unassigned buildings — every building already has an owner.</Tx></p>
             ) : (
               <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-md border p-2">
                 {unownedBuildings.map((b) => (
@@ -151,7 +152,7 @@ export function NewOwnerForm({ unownedBuildings }: { unownedBuildings: BuildingO
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              Every building links to exactly one owner; owner contracts (M05, Phase 5) formalize the terms.
+              <Tx>Every building links to exactly one owner; owner contracts (M05, Phase 5) formalize the terms.</Tx>
             </p>
           </section>
 

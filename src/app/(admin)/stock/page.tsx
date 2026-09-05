@@ -5,6 +5,7 @@ import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { getSettings } from "@/lib/settings";
 import { StockActions } from "./stock-actions";
 import { StockManager } from "./stock-manager";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -133,8 +134,8 @@ export default async function StockPage() {
       />
 
       <p className="mt-3 text-xs text-muted-foreground">
-        On-hand changes only through movements — never direct edits. Maintenance can consume parts straight onto a ticket
-        (material cost at moving average). Stocktake variance posts `adjustment` movements and reports the valuation delta.
+        <Tx>On-hand changes only through movements — never direct edits. Maintenance can consume parts straight onto a ticket
+        (material cost at moving average). Stocktake variance posts `adjustment` movements and reports the valuation delta.</Tx>
       </p>
     </div>
   );

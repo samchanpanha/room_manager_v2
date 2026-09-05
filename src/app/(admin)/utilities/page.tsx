@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, PageHeader, StatCard } from "@/components/ui/misc";
 import { MeterActions } from "./meter-actions";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -88,7 +89,7 @@ export default async function UtilitiesPage() {
                           <span className="block text-xs text-muted-foreground">{latest.readAt.toISOString().slice(0, 10)}</span>
                         </>
                       ) : (
-                        <span className="text-xs text-muted-foreground">no readings</span>
+                        <span className="text-xs text-muted-foreground"><Tx>no readings</Tx></span>
                       )}
                     </TableCell>
                     <TableCell className="tabular-nums">
@@ -115,9 +116,9 @@ export default async function UtilitiesPage() {
               })}
               {visible.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                     No meters yet — register a meter on a room to start recording readings.
-                  </TableCell>
+                  </Tx></TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
@@ -135,7 +136,7 @@ async function TariffSection({ isGlobal }: { isGlobal: boolean }) {
   return (
     <Card className="mt-6">
       <CardContent className="p-5">
-        <h2 className="mb-3 text-sm font-semibold">Tariffs</h2>
+        <h2 className="mb-3 text-sm font-semibold"><Tx>Tariffs</Tx></h2>
         <Table>
           <TableHeader>
             <TableRow>
@@ -161,7 +162,7 @@ async function TariffSection({ isGlobal }: { isGlobal: boolean }) {
             {tariffs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
-                  No tariffs configured — readings are stored but produce no charges until a tariff exists.
+                  <Tx>No tariffs configured — readings are stored but produce no charges until a tariff exists.</Tx>
                 </TableCell>
               </TableRow>
             ) : null}

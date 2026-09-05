@@ -9,6 +9,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
 import { cn } from "@/lib/utils";
+import { Tx } from "@/components/i18n-text";
 
 interface PayoutMethodView {
   id: string;
@@ -178,7 +179,7 @@ function ProfileTab({ ownerId, profile, canUpdate }: { ownerId: string; profile:
               </Button>
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground">Read-only (your OWNER role has view access to your own record).</p>
+            <p className="text-xs text-muted-foreground"><Tx>Read-only (your OWNER role has view access to your own record).</Tx></p>
           )}
         </form>
       </CardContent>
@@ -252,7 +253,7 @@ function PayoutTab({ ownerId, methods, canUpdate }: { ownerId: string; methods: 
     <Card>
       <CardContent className="p-5">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-sm font-medium">Payout methods</p>
+          <p className="text-sm font-medium"><Tx>Payout methods</Tx></p>
           {canUpdate ? <Button size="sm" onClick={() => setOpen(true)}>+ Add method</Button> : null}
         </div>
         <ul className="divide-y">
@@ -281,7 +282,7 @@ function PayoutTab({ ownerId, methods, canUpdate }: { ownerId: string; methods: 
               ) : null}
             </li>
           ))}
-          {methods.length === 0 ? <li className="py-3 text-sm text-muted-foreground">No payout methods on file.</li> : null}
+          {methods.length === 0 ? <li className="py-3 text-sm text-muted-foreground"><Tx>No payout methods on file.</Tx></li> : null}
         </ul>
       </CardContent>
       <Dialog open={open} onClose={() => setOpen(false)} title="Add payout method">
@@ -382,7 +383,7 @@ function BuildingsTab({
     <div className="space-y-4">
       <Card>
         <CardContent className="p-5">
-          <p className="mb-3 text-sm font-medium">Owned buildings</p>
+          <p className="mb-3 text-sm font-medium"><Tx>Owned buildings</Tx></p>
           <ul className="divide-y">
             {buildings.map((b) => (
               <li key={b.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
@@ -399,16 +400,16 @@ function BuildingsTab({
                 ) : null}
               </li>
             ))}
-            {buildings.length === 0 ? <li className="py-3 text-sm text-muted-foreground">No buildings yet.</li> : null}
+            {buildings.length === 0 ? <li className="py-3 text-sm text-muted-foreground"><Tx>No buildings yet.</Tx></li> : null}
           </ul>
         </CardContent>
       </Card>
       {canUpdate ? (
         <Card>
           <CardContent className="p-5">
-            <p className="mb-3 text-sm font-medium">Assign an unowned building</p>
+            <p className="mb-3 text-sm font-medium"><Tx>Assign an unowned building</Tx></p>
             {unownedBuildings.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Every building already has an owner.</p>
+              <p className="text-sm text-muted-foreground"><Tx>Every building already has an owner.</Tx></p>
             ) : (
               <div className="flex items-end gap-2">
                 <div className="min-w-64 flex-1 space-y-1.5">
@@ -461,7 +462,7 @@ function LoginTab({ ownerId, portalEmail, canUpdate }: { ownerId: string; portal
   return (
     <Card>
       <CardContent className="p-5">
-        <p className="mb-1 text-sm font-medium">Owner portal login</p>
+        <p className="mb-1 text-sm font-medium"><Tx>Owner portal login</Tx></p>
         <p className="mb-4 text-xs text-muted-foreground">
           {portalEmail
             ? `Active login: ${portalEmail}. Submitting a new form below resets the password.`
@@ -484,7 +485,7 @@ function LoginTab({ ownerId, portalEmail, canUpdate }: { ownerId: string; portal
             </div>
           </form>
         ) : (
-          <p className="text-xs text-muted-foreground">Read-only.</p>
+          <p className="text-xs text-muted-foreground"><Tx>Read-only.</Tx></p>
         )}
       </CardContent>
     </Card>
@@ -556,7 +557,7 @@ function DocumentsTab({
     <Card>
       <CardContent className="p-5">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-sm font-medium">Documents (contracts, statements, ID…)</p>
+          <p className="text-sm font-medium"><Tx>Documents (contracts, statements, ID…)</Tx></p>
           {flags.canUploadDocs ? (
             <Button size="sm" onClick={() => setOpen(true)}>
               + Upload
@@ -582,7 +583,7 @@ function DocumentsTab({
               ) : null}
             </li>
           ))}
-          {documents.length === 0 ? <li className="py-3 text-sm text-muted-foreground">No documents yet.</li> : null}
+          {documents.length === 0 ? <li className="py-3 text-sm text-muted-foreground"><Tx>No documents yet.</Tx></li> : null}
         </ul>
       </CardContent>
       <Dialog open={open} onClose={() => setOpen(false)} title="Upload owner document">

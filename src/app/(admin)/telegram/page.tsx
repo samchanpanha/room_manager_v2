@@ -7,6 +7,7 @@ import { hasModuleAccess } from "@/lib/rbac/can";
 import { redirect } from "next/navigation";
 import { parsePrefs } from "@/lib/telegram/service";
 import { TelegramActions } from "./telegram-actions";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -54,16 +55,16 @@ export default async function TelegramPage() {
         </CardHeader>
         <CardContent>
           {links.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No chats linked yet — members/owners link from their portals, staff chats are bound here.</p>
+            <p className="text-sm text-muted-foreground"><Tx>No chats linked yet — members/owners link from their portals, staff chats are bound here.</Tx></p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs text-muted-foreground">
-                    <th className="py-2 pr-3">Chat</th>
-                    <th className="py-2 pr-3">Principal</th>
-                    <th className="py-2 pr-3">Linked</th>
-                    <th className="py-2 pr-3">Toggles off</th>
+                    <th className="py-2 pr-3"><Tx>Chat</Tx></th>
+                    <th className="py-2 pr-3"><Tx>Principal</Tx></th>
+                    <th className="py-2 pr-3"><Tx>Linked</Tx></th>
+                    <th className="py-2 pr-3"><Tx>Toggles off</Tx></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -96,17 +97,17 @@ export default async function TelegramPage() {
         </CardHeader>
         <CardContent>
           {outbox.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nothing sent yet — the dispatcher and commands record every attempt here.</p>
+            <p className="text-sm text-muted-foreground"><Tx>Nothing sent yet — the dispatcher and commands record every attempt here.</Tx></p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs text-muted-foreground">
-                    <th className="py-2 pr-3">When</th>
-                    <th className="py-2 pr-3">Template</th>
-                    <th className="py-2 pr-3">Chat</th>
-                    <th className="py-2 pr-3">Status</th>
-                    <th className="py-2 pr-3">Body</th>
+                    <th className="py-2 pr-3"><Tx>When</Tx></th>
+                    <th className="py-2 pr-3"><Tx>Template</Tx></th>
+                    <th className="py-2 pr-3"><Tx>Chat</Tx></th>
+                    <th className="py-2 pr-3"><Tx>Status</Tx></th>
+                    <th className="py-2 pr-3"><Tx>Body</Tx></th>
                   </tr>
                 </thead>
                 <tbody>

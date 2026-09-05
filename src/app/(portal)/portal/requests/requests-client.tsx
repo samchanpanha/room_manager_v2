@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
+import { useT } from "@/components/i18n-provider";
 
 export interface TicketRow { id: string; code: string; title: string; status: string; slaDueAt: string | null }
 export interface ComplaintRow { id: string; code: string; subject: string; status: string }
@@ -24,6 +25,8 @@ async function post(url: string, body: unknown): Promise<{ ok: boolean; message?
 /// §M25 requests — maintenance ticket (M19), complaint (M22), room-move
 /// request (M16, requestedByRole "member") and move-out notice (via
 /// /api/portal/notices → the M05 give-notice logic). All own-scope.
+/// Resident-facing copy follows the active locale: raw text goes through tUi,
+/// labels/placeholders/options/buttons/badges/toasts through the primitives.
 export function RequestsClient({
   memberId,
   leaseId,
@@ -41,6 +44,7 @@ export function RequestsClient({
 }) {
   const router = useRouter();
   const { push } = useToast();
+  const { tUi } = useT();
   const [tab, setTab] = useState<Tab>("Maintenance");
   const [busy, setBusy] = useState(false);
 
@@ -133,13 +137,13 @@ export function RequestsClient({
                   <p className="font-medium">{t.title}</p>
                   <p className="text-xs text-muted-foreground">
                     {t.code}
-                    {t.slaDueAt ? ` · due ${t.slaDueAt.slice(0, 16).replace("T", " ")}` : ""}
+                    {t.slaDueAt ? ` · ${tUi("due")} ${t.slaDueAt.slice(0, 16).replace("T", " ")}` : ""}
                   </p>
                 </div>
                 <Badge variant={["open", "assigned", "in_progress"].includes(t.status) ? "warning" : "secondary"}>{t.status.replace("_", " ")}</Badge>
               </div>
             ))}
-            {tickets.length === 0 ? <p className="text-sm text-muted-foreground">No tickets yet.</p> : null}
+            {tickets.length === 0 ? <p className="text-sm text-muted-foreground">{tUi("No tickets yet.")}</p> : null}
           </div>
         </>
       ) : null}
@@ -214,7 +218,7 @@ export function RequestsClient({
                 <Badge variant={["new", "acknowledged", "in_progress"].includes(c.status) ? "warning" : "secondary"}>{c.status.replace("_", " ")}</Badge>
               </div>
             ))}
-            {complaints.length === 0 ? <p className="text-sm text-muted-foreground">No complaints filed.</p> : null}
+            {complaints.length === 0 ? <p className="text-sm text-muted-foreground">{tUi("No complaints filed.")}</p> : null}
           </div>
         </>
       ) : null}
@@ -250,7 +254,7 @@ export function RequestsClient({
                       </option>
                     ))}
                   </Select>
-                  {rooms.length === 0 ? <p className="text-xs text-muted-foreground">No vacant rooms right now.</p> : null}
+                  {rooms.length === 0 ? <p className="text-xs text-muted-foreground">{tUi("No vacant rooms right now.")}</p> : null}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="m-eff">Effective from</Label>
@@ -265,7 +269,7 @@ export function RequestsClient({
                 </Button>
               </form>
             ) : (
-              <p className="text-sm text-muted-foreground">Room moves need an active lease.</p>
+              <p className="text-sm text-muted-foreground">{tUi("Room moves need an active lease.")}</p>
             )}
           </CardContent>
         </Card>
@@ -288,7 +292,9 @@ export function RequestsClient({
                     );
                   }}
                 >
-                  <p className="text-sm text-muted-foreground">Giving notice sets your lease to &quot;notice&quot;. Settle open invoices and book a move-out inspection to finish.</p>
+                  <p className="text-sm text-muted-foreground">
+                    {tUi('Giving notice sets your lease to "notice". Settle open invoices and book a move-out inspection to finish.')}
+                  </p>
                   <div className="space-y-1.5">
                     <Label htmlFor="n-end">Intended end date</Label>
                     <Input id="n-end" name="endDate" type="date" />
@@ -298,10 +304,12 @@ export function RequestsClient({
                   </Button>
                 </form>
               ) : (
-                <p className="text-sm text-muted-foreground">Your lease is already in notice ({leaseStatus}).</p>
+                <p className="text-sm text-muted-foreground">
+                  {tUi("Your lease is already in notice ({status}).").replace("{status}", tUi(leaseStatus ?? ""))}
+                </p>
               )
             ) : (
-              <p className="text-sm text-muted-foreground">No lease on file.</p>
+              <p className="text-sm text-muted-foreground">{tUi("No lease on file.")}</p>
             )}
           </CardContent>
         </Card>

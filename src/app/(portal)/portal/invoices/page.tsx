@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/misc";
 import { requireMember, memberOpenInvoices } from "@/lib/portal";
+import { getT } from "@/lib/locale-server";
 
 const money = (minor: number) => `$${(minor / 100).toFixed(2)}`;
 
@@ -15,12 +16,12 @@ const STATUS_VARIANT: Record<string, "success" | "warning" | "destructive" | "se
 
 /// §M25 invoices — the member's open invoices only (OWN by construction).
 export default async function PortalInvoicesPage() {
-  const { member } = await requireMember();
+  const [{ member }, { tUi }] = await Promise.all([requireMember(), getT()]);
   const invoices = await memberOpenInvoices(member.id);
 
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-semibold tracking-tight">Rent & invoices</h1>
+      <h1 className="text-lg font-semibold tracking-tight">{tUi("Rent & invoices")}</h1>
       {invoices.length === 0 ? (
         <EmptyState title="Nothing due" hint="Open invoices appear here when they are issued." />
       ) : (
@@ -32,7 +33,7 @@ export default async function PortalInvoicesPage() {
                   <p className="text-sm font-medium">{inv.code}</p>
                   <p className="text-xs text-muted-foreground">
                     {inv.periodStart.toISOString().slice(0, 10)} – {inv.periodEnd.toISOString().slice(0, 10)}
-                    {inv.dueDate ? ` · due ${inv.dueDate.toISOString().slice(0, 10)}` : ""}
+                    {inv.dueDate ? ` · ${tUi("due")} ${inv.dueDate.toISOString().slice(0, 10)}` : ""}
                   </p>
                 </div>
                 <div className="text-right">

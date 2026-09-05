@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
+import { Tx } from "@/components/i18n-text";
 
 export function NewPropertyButton() {
   const router = useRouter();
@@ -52,7 +53,7 @@ export function NewPropertyButton() {
           <div className="space-y-1.5">
             <Label htmlFor="p-code">Code</Label>
             <Input id="p-code" name="code" placeholder="BLR" required pattern="[A-Za-z0-9]{2,16}" />
-            <p className="text-xs text-muted-foreground">Uppercase letters/digits. Used in invoice numbering.</p>
+            <p className="text-xs text-muted-foreground"><Tx>Uppercase letters/digits. Used in invoice numbering.</Tx></p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="p-address">Address</Label>

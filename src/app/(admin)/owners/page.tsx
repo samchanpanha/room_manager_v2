@@ -6,9 +6,10 @@ import { visibleOwnerIdsFilter } from "@/lib/owners";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { buttonClassName } from "@/components/ui/button";
+import { buttonClassName } from "@/components/ui/button-styles";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { formatDate } from "@/lib/utils";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,7 @@ export default async function OwnersPage() {
         actions={
           can(user, "create", "M03") ? (
             <Link href="/owners/new" className={buttonClassName()}>
-              + New owner
+              <Tx>+ New owner</Tx>
             </Link>
           ) : undefined
         }

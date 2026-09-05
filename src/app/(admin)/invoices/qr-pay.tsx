@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useToast } from "@/components/toast";
 import { formatMinor } from "@/lib/money";
+import { Tx } from "@/components/i18n-text";
 
 interface QrCharge {
   paymentId: string;
@@ -98,9 +99,9 @@ export function QrPayButton({ invoiceId }: { invoiceId: string }) {
               {busy ? "Generating…" : "—"}
             </div>
           )}
-          {status === "pending" ? <p className="text-sm text-muted-foreground">Waiting for confirmation… (checking every 3 s)</p> : null}
-          {status === "confirmed" ? <p className="text-sm font-medium text-success">Payment confirmed — thank you!</p> : null}
-          {status === "failed" ? <p className="text-sm font-medium text-destructive">The gateway reported a failure — generate a new QR.</p> : null}
+          {status === "pending" ? <p className="text-sm text-muted-foreground"><Tx>Waiting for confirmation… (checking every 3 s)</Tx></p> : null}
+          {status === "confirmed" ? <p className="text-sm font-medium text-success"><Tx>Payment confirmed — thank you!</Tx></p> : null}
+          {status === "failed" ? <p className="text-sm font-medium text-destructive"><Tx>The gateway reported a failure — generate a new QR.</Tx></p> : null}
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -133,8 +134,8 @@ export function QrPayButton({ invoiceId }: { invoiceId: string }) {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Confirmation arrives via the signed gateway webhook; this dialog polls as a fallback (§M13). Exactly-once is guaranteed by the
-            payment idempotency key — duplicate webhooks are ignored.
+            <Tx>Confirmation arrives via the signed gateway webhook; this dialog polls as a fallback (§M13). Exactly-once is guaranteed by the
+            payment idempotency key — duplicate webhooks are ignored.</Tx>
           </p>
         </div>
       </Dialog>

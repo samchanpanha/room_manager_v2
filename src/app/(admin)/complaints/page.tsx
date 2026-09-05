@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { ComplaintActions } from "./complaint-actions";
 import { COMPLAINT_SLA_HOURS } from "@/lib/operations/maintenance-machine";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -106,9 +107,9 @@ export default async function ComplaintsPage() {
               })}
               {visible.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                     No complaints yet — members file from the portal; staff can log one on their behalf.
-                  </TableCell>
+                  </Tx></TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
@@ -116,8 +117,8 @@ export default async function ComplaintsPage() {
         </CardContent>
       </Card>
       <p className="mt-3 text-xs text-muted-foreground">
-        Closing is the member&apos;s call: resolved complaints show a rating dialog for that member (1–5, required). Conversion to a ticket keeps
-        the cross-link visible on both surfaces (matrix row 13).
+        <Tx>Closing is the member&apos;s call: resolved complaints show a rating dialog for that member (1–5, required). Conversion to a ticket keeps
+        the cross-link visible on both surfaces (matrix row 13).</Tx>
       </p>
     </div>
   );

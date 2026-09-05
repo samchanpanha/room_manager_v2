@@ -5,11 +5,12 @@ import { can, hasModuleAccess } from "@/lib/rbac/can";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { buttonClassName } from "@/components/ui/button";
+import { buttonClassName } from "@/components/ui/button-styles";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { OwnerContractActions } from "./contract-actions";
 import { formatMinor } from "@/lib/money";
 import { formatDate, titleCase } from "@/lib/utils";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -48,10 +49,10 @@ export default async function LeasesPage({ searchParams }: { searchParams: Promi
           canCreate ? (
             <>
               <Link href="/owner-contracts/new" className={buttonClassName("outline")}>
-                + Owner contract
+                <Tx>+ Owner contract</Tx>
               </Link>
               <Link href="/leases/new" className={buttonClassName()}>
-                + New lease
+                <Tx>+ New lease</Tx>
               </Link>
             </>
           ) : undefined
@@ -124,9 +125,9 @@ export default async function LeasesPage({ searchParams }: { searchParams: Promi
                 ))}
                 {leases.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                       No leases yet — create the first one.
-                    </TableCell>
+                    </Tx></TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
@@ -182,7 +183,7 @@ export default async function LeasesPage({ searchParams }: { searchParams: Promi
                 {contracts.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
-                      No owner contracts yet.
+                      <Tx>No owner contracts yet.</Tx>
                     </TableCell>
                   </TableRow>
                 ) : null}

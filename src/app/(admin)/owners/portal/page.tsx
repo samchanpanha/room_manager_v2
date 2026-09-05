@@ -7,6 +7,7 @@ import { TelegramCard } from "@/components/telegram-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, PageHeader, StatCard } from "@/components/ui/misc";
 import { timeAgo } from "@/lib/utils";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -109,7 +110,7 @@ export default async function OwnerPortalPage() {
                 );
               })}
               {owner.buildings.length === 0 ? (
-                <li className="py-3 text-sm text-muted-foreground">No buildings assigned to you yet.</li>
+                <li className="py-3 text-sm text-muted-foreground"><Tx>No buildings assigned to you yet.</Tx></li>
               ) : null}
             </ul>
           </CardContent>
@@ -128,10 +129,10 @@ export default async function OwnerPortalPage() {
                   {primary.accountNumber.slice(-4)}
                 </p>
               ) : (
-                <p className="text-muted-foreground">No payout method on file.</p>
+                <p className="text-muted-foreground"><Tx>No payout method on file.</Tx></p>
               )}
               <p className="mt-1 text-xs text-muted-foreground">
-                Owner statements (M24) arrive in Phase 17 — payouts will land here.
+                <Tx>Owner statements (M24) arrive in Phase 17 — payouts will land here.</Tx>
               </p>
             </CardContent>
           </Card>
@@ -152,7 +153,7 @@ export default async function OwnerPortalPage() {
                   </li>
                 ))}
                 {documents.length === 0 ? (
-                  <li className="py-3 text-sm text-muted-foreground">No documents yet.</li>
+                  <li className="py-3 text-sm text-muted-foreground"><Tx>No documents yet.</Tx></li>
                 ) : null}
               </ul>
             </CardContent>
@@ -180,7 +181,7 @@ export default async function OwnerPortalPage() {
                     <Badge variant={st.status === "paid" ? "success" : st.status === "approved" ? "info" : "warning"}>{st.status}</Badge>
                     {st.status !== "draft" ? (
                       <Link href={`/api/statements/${st.id}/pdf`} target="_blank" className="text-xs underline underline-offset-4">
-                        PDF
+                        <Tx>PDF</Tx>
                       </Link>
                     ) : null}
                   </span>
@@ -194,7 +195,7 @@ export default async function OwnerPortalPage() {
       <p className="mt-6 text-xs text-muted-foreground">
         You are seeing only buildings owned by you — enforced server-side (OWN scope).{" "}
         <Link href="/properties" className="underline underline-offset-4">
-          Browse your properties →
+          <Tx>Browse your properties →</Tx>
         </Link>
       </p>
     </div>

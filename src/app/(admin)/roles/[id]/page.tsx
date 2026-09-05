@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { PermissionGrid } from "./permission-grid";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ export default async function RoleDetailPage({ params }: { params: Promise<{ id:
     <div>
       <div className="mb-4 text-sm text-muted-foreground">
         <Link href="/roles" className="underline underline-offset-4 hover:text-foreground">
-          Roles
+          <Tx>Roles</Tx>
         </Link>{" "}
         / <span className="text-foreground">{role.name}</span>
       </div>
@@ -56,12 +57,12 @@ export default async function RoleDetailPage({ params }: { params: Promise<{ id:
           <CardTitle className="text-base">Module × action × scope</CardTitle>
           {role.isProtected ? (
             <p className="text-sm text-destructive">
-              Super Admin is a protected role — it always holds full access and its grid cannot be edited.
+              <Tx>Super Admin is a protected role — it always holds full access and its grid cannot be edited.</Tx>
             </p>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Scope: GLOBAL = everywhere · PROPERTY = only assigned properties · OWN = own records only. Changes are audited and
-              effective immediately (union across all roles of a user).
+              <Tx>Scope: GLOBAL = everywhere · PROPERTY = only assigned properties · OWN = own records only. Changes are audited and
+              effective immediately (union across all roles of a user).</Tx>
             </p>
           )}
         </CardHeader>

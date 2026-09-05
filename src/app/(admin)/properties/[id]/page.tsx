@@ -10,6 +10,7 @@ import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { formatMinor } from "@/lib/money";
 import { AddBuildingForm, BuildingSection } from "./building-section";
 import type { RoomStatus } from "@/lib/rooms/status";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +66,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
     <div>
       <div className="mb-4 text-sm text-muted-foreground">
         <Link href="/properties" className="underline underline-offset-4 hover:text-foreground">
-          Properties
+          <Tx>Properties</Tx>
         </Link>{" "}
         / <span className="text-foreground">{property.code}</span>
       </div>

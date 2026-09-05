@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { formatMinor } from "@/lib/money";
 import { useToast } from "@/components/toast";
+import { Tx } from "@/components/i18n-text";
 
 export type ClientProduct = {
   id: string;
@@ -191,9 +192,9 @@ export function ProductsClient({ products, stockItems, categories, legacyCategor
               ))}
               {products.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                     No products yet — add one from the button above.
-                  </TableCell>
+                  </Tx></TableCell>
                 </TableRow>
               ) : null}
             </TableBody>

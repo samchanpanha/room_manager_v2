@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useToast } from "@/components/toast";
 import { cn } from "@/lib/utils";
+import { Tx } from "@/components/i18n-text";
 
 interface StockItemRow {
   id: string;
@@ -145,9 +146,9 @@ export function PoManager({ canWrite, defaultPropertyId, visibleProperties }: Po
 
       <Card>
         <CardContent className="pt-4">
-          {loadState === "loading" && <p className="text-sm text-muted-foreground">Loading…</p>}
-          {loadState === "error" && <p className="text-sm text-destructive">Could not load purchase orders.</p>}
-          {loadState === "ready" && orders.length === 0 && <p className="text-sm text-muted-foreground">No purchase orders yet.</p>}
+          {loadState === "loading" && <p className="text-sm text-muted-foreground"><Tx>Loading…</Tx></p>}
+          {loadState === "error" && <p className="text-sm text-destructive"><Tx>Could not load purchase orders.</Tx></p>}
+          {loadState === "ready" && orders.length === 0 && <p className="text-sm text-muted-foreground"><Tx>No purchase orders yet.</Tx></p>}
           {loadState === "ready" && orders.length > 0 && (
             <div className="space-y-2">
               {orders.map((o) => (
@@ -267,7 +268,7 @@ function NewPoDialog({ open, onClose, propertyId, stockItems, suppliers, busy, o
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-2">
           <label className="space-y-1 text-sm">
-            <span className="text-muted-foreground">Supplier (saved)</span>
+            <span className="text-muted-foreground"><Tx>Supplier (saved)</Tx></span>
             <SearchableSelect
               value={supplierId}
               onChange={setSupplierId}
@@ -280,7 +281,7 @@ function NewPoDialog({ open, onClose, propertyId, stockItems, suppliers, busy, o
             />
           </label>
           <label className="space-y-1 text-sm">
-            <span className="text-muted-foreground">Or supplier name (free text)</span>
+            <span className="text-muted-foreground"><Tx>Or supplier name (free text)</Tx></span>
             <Input value={freeSupplier} disabled={!!supplierId} placeholder="e.g. Sunrise Wholesale" onChange={(e) => setFreeSupplier(e.target.value)} />
           </label>
         </div>
@@ -315,7 +316,7 @@ function NewPoDialog({ open, onClose, propertyId, stockItems, suppliers, busy, o
         </div>
 
         <label className="space-y-1 text-sm">
-          <span className="text-muted-foreground">Note</span>
+          <span className="text-muted-foreground"><Tx>Note</Tx></span>
           <Input value={note} placeholder="Delivery date, terms…" onChange={(e) => setNote(e.target.value)} />
         </label>
 

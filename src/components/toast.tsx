@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/components/i18n-provider";
 
 type ToastVariant = "default" | "success" | "destructive";
 interface ToastItem {
@@ -21,9 +22,15 @@ export function useToast() {
   return ctx;
 }
 
+/// Toasts are pushed with authored English strings from ~70 call sites, so the
+/// provider translates them at render time (phrase table → active locale)
+/// instead of every caller having to. API messages with interpolated values
+/// simply don't match a phrase and are shown as-is. Translating on render (not
+/// on push) also means an open toast follows a language switch.
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
   const nextId = useRef(1);
+  const { tUi } = useT();
 
   const push = useCallback((t: { title: string; description?: string; variant?: ToastVariant }) => {
     const id = nextId.current++;
@@ -51,9 +58,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 i.variant === "destructive" && "text-destructive"
               )}
             >
-              {i.title}
+              {tUi(i.title)}
             </p>
-            {i.description ? <p className="mt-0.5 text-sm text-muted-foreground">{i.description}</p> : null}
+            {i.description ? <p className="mt-0.5 text-sm text-muted-foreground">{tUi(i.description)}</p> : null}
           </div>
         ))}
       </div>

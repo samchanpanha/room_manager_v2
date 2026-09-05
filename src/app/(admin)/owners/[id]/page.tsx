@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/misc";
 import { OwnerTabs } from "./owner-tabs";
 import { timeAgo } from "@/lib/utils";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +71,7 @@ export default async function OwnerDetailPage({ params }: { params: Promise<{ id
     <div>
       <div className="mb-4 text-sm text-muted-foreground">
         <Link href="/owners" className="underline underline-offset-4 hover:text-foreground">
-          Owners
+          <Tx>Owners</Tx>
         </Link>{" "}
         / <span className="text-foreground">{owner.party.name}</span>
       </div>
@@ -132,7 +133,7 @@ export default async function OwnerDetailPage({ params }: { params: Promise<{ id
         }}
         activity={
           <ul className="space-y-2.5">
-            {activity.length === 0 ? <li className="text-sm text-muted-foreground">No activity recorded yet.</li> : null}
+            {activity.length === 0 ? <li className="text-sm text-muted-foreground"><Tx>No activity recorded yet.</Tx></li> : null}
             {activity.map((a) => (
               <li key={a.id} className="flex items-start justify-between gap-3 text-sm">
                 <div>
@@ -149,10 +150,10 @@ export default async function OwnerDetailPage({ params }: { params: Promise<{ id
       />
 
       <Card className="mt-6">
-        <CardContent className="p-4 text-xs text-muted-foreground">
+        <CardContent className="p-4 text-xs text-muted-foreground"><Tx>
           Rules: a building links to exactly one owner (the contract terms arrive with M05 owner contracts in Phase 5). Account
           numbers are masked in lists; every payout-method change is audited.
-        </CardContent>
+        </Tx></CardContent>
       </Card>
     </div>
   );

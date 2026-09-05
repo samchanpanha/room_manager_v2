@@ -2,21 +2,27 @@ import { getAuthUser } from "@/lib/auth/session";
 import { hasModuleAccess } from "@/lib/rbac/can";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { PageHeader, StatCard } from "@/components/ui/misc";
+import { EmptyState, PageHeader, StatCard } from "@/components/ui/misc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { REPORT_BY_KEY } from "@/lib/reports/registry";
 import { canSeeReport, reportScope, visibleReportKeys } from "@/lib/reports/scope";
 import { runReport } from "@/lib/reports/service";
+import { applyReportDesign, designReport, resolveReportKeys, summaryLabel } from "@/lib/reports/config";
 import { formatMinor } from "@/lib/money";
 import { getSettings } from "@/lib/settings";
+import { getT } from "@/lib/locale-server";
 import { ReportPicker } from "./report-picker";
 
 export const dynamic = "force-dynamic";
 
 const money = (v: string | number | null | undefined) => (typeof v === "number" ? formatMinor(Math.round(v * 100)) : (v ?? "—"));
 
-/// M26 Reports console (§M26): registry-gated by the §5 qualifiers, filterable
-/// by date + property, CSV/PDF export via the API routes.
+/// M26 Reports console (§M26): registry-gated by the §5 qualifiers, narrowed by
+/// the OPTIONAL org configuration (Settings → Reports: develop/assign), styled
+/// by the optional design (title/description/columns), filterable by date +
+/// property, CSV/XLSX/PDF export via the API routes. Every label follows the
+/// active locale (en / km / zh) through the phrase table.
 export default async function ReportsPage({
   searchParams
 }: {
@@ -26,15 +32,24 @@ export default async function ReportsPage({
   if (!user) redirect("/login");
   if (!hasModuleAccess(user, "read", "M26")) redirect("/dashboard");
   const sp = await searchParams;
+  const { tUi } = await getT();
 
   const scope = await reportScope(user);
   if (!scope.allowed) redirect("/dashboard");
   const settings = await getSettings();
-  const assigned = Object.entries(settings.reports.assignments).filter(([, ids]) => ids.includes(user.id)).map(([key]) => key);
-  const enabled = settings.reports.enabledKeys.length === 0 ? null : new Set(settings.reports.enabledKeys);
-  const allowed = new Set(visibleReportKeys(user).filter((key) => (!enabled || enabled.has(key)) && (assigned.length === 0 || assigned.includes(key))));
-  const reports = [...REPORT_BY_KEY.values()].filter((r) => allowed.has(r.key));
-  if (reports.length === 0) return <PageHeader title="Reports" description="No reports are currently assigned or enabled for your account." />;
+
+  // §5 role scope first, then the optional develop/assign configuration.
+  const allowedKeys = resolveReportKeys(visibleReportKeys(user), settings.reports, user.id);
+  const reports = allowedKeys.map((key) => REPORT_BY_KEY.get(key)!).filter(Boolean);
+  if (reports.length === 0) {
+    return (
+      <div>
+        <PageHeader title="Reports" description="M26 — analytics & exports, filterable by date range + property" />
+        <EmptyState title="No reports available" hint="No reports are currently assigned or enabled for your account." />
+      </div>
+    );
+  }
+  const allowed = new Set(reports.map((r) => r.key));
   const currentKey = sp.key && allowed.has(sp.key) ? sp.key : reports[0]!.key;
 
   const [properties, result] = await Promise.all([
@@ -43,63 +58,74 @@ export default async function ReportsPage({
   ]);
 
   const def = REPORT_BY_KEY.get(currentKey)!;
+  const design = settings.reports.designs[currentKey];
+  const designed = designReport(def, design);
+  // Exports must match the screen: project rows/columns through the design.
+  const designedResult = result ? applyReportDesign(result, design) : null;
 
   return (
     <div className="space-y-6">
       <PageHeader title="Reports" description="M26 — analytics & exports, filterable by date range + property" />
 
       <ReportPicker
-        reports={reports.map((r) => ({ key: r.key, title: r.title, category: r.category, source: r.source, dateFiltered: r.dateFiltered }))}
+        reports={reports.map((r) => {
+          const d = designReport(r, settings.reports.designs[r.key]);
+          return { key: r.key, title: d.title, category: r.category, source: r.source, dateFiltered: r.dateFiltered, designed: d.designed };
+        })}
         properties={properties}
         current={{ key: currentKey, from: sp.from, to: sp.to, month: sp.month, propertyId: sp.propertyId }}
       />
 
-      {result ? (
+      {designedResult ? (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {Object.entries(result.summary).map(([k, v]) => (
-              <StatCard key={k} label={k} value={k.endsWith("Minor") ? money(v) : String(v ?? "—")} />
+            {Object.entries(designedResult.summary).map(([k, v]) => (
+              <StatCard
+                key={k}
+                label={tUi(summaryLabel(k))}
+                value={k.endsWith("Minor") ? money(v) : typeof v === "string" ? tUi(v) : String(v ?? "—")}
+              />
             ))}
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">{def.title}</CardTitle>
+              <CardTitle className="text-base">{tUi(designed.title)}</CardTitle>
+              {designed.description ? <p className="text-sm text-muted-foreground">{tUi(designed.description)}</p> : null}
+              <p className="text-[11px] text-muted-foreground">{tUi("Source")}: {tUi(designed.source)}</p>
             </CardHeader>
             <CardContent>
-              {result.rows.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No rows for this scope/period.</p>
+              {designedResult.rows.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{tUi("No rows for this scope/period.")}</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-xs text-muted-foreground">
-                        {result.columns.map((c) => (
-                          <th key={c.key} className={`py-2 pr-3 ${c.numeric ? "text-right" : ""}`}>
-                            {c.label}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.rows.map((r, i) => (
-                        <tr key={i} className="border-b last:border-0">
-                          {result.columns.map((c) => (
-                            <td key={c.key} className={`py-2 pr-3 ${c.numeric ? "text-right tabular-nums" : ""}`}>
-                              {c.key.endsWith("Minor") ? money(r[c.key] as number) : (r[c.key] ?? "—")}
-                            </td>
-                          ))}
-                        </tr>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {designedResult.columns.map((c) => (
+                        <TableHead key={c.key} className={c.numeric ? "text-right" : undefined}>
+                          {tUi(c.label)}
+                        </TableHead>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {designedResult.rows.map((r, i) => (
+                      <TableRow key={i}>
+                        {designedResult.columns.map((c) => (
+                          <TableCell key={c.key} className={c.numeric ? "text-right tabular-nums" : undefined}>
+                            {c.key.endsWith("Minor") ? money(r[c.key] as number) : ((r[c.key] as string | number | null) ?? "—")}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">Pick a report and run it.</p>
+        <p className="text-sm text-muted-foreground">{tUi("Pick a report and run it.")}</p>
       )}
     </div>
   );

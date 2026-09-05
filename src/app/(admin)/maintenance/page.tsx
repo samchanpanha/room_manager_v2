@@ -8,6 +8,7 @@ import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { formatMinor } from "@/lib/money";
 import { TicketActions } from "./ticket-actions";
 import { TICKET_SLA_HOURS } from "@/lib/operations/maintenance-machine";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -129,9 +130,9 @@ export default async function MaintenancePage() {
               })}
               {visible.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                     No tickets yet — members raise them from the portal, staff can log one on their behalf.
-                  </TableCell>
+                  </Tx></TableCell>
                 </TableRow>
               ) : null}
             </TableBody>

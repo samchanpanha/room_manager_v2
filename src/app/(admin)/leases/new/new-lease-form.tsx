@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input, Label, Select } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
+import { Tx } from "@/components/i18n-text";
 
 interface RoomView {
   id: string;
@@ -121,7 +122,7 @@ export function NewLeaseForm({
       <CardContent className="p-6">
         <form onSubmit={submit} className="space-y-6">
           <section className="space-y-3">
-            <p className="text-sm font-medium">Member</p>
+            <p className="text-sm font-medium"><Tx>Member</Tx></p>
             <div className="space-y-1.5">
               <Label htmlFor="l-member">Member (verified/active, not blacklisted)</Label>
               <Select id="l-member" value={memberProfileId} onChange={(e) => setMemberProfileId(e.target.value)} required>
@@ -132,12 +133,12 @@ export function NewLeaseForm({
                   </option>
                 ))}
               </Select>
-              <p className="text-xs text-muted-foreground">Prospects must complete KYC and be verified first (Members page).</p>
+              <p className="text-xs text-muted-foreground"><Tx>Prospects must complete KYC and be verified first (Members page).</Tx></p>
             </div>
           </section>
 
           <section className="space-y-3">
-            <p className="text-sm font-medium">Premises</p>
+            <p className="text-sm font-medium"><Tx>Premises</Tx></p>
             <div className="grid gap-3 sm:grid-cols-4">
               <div className="space-y-1.5">
                 <Label>Property</Label>
@@ -208,7 +209,7 @@ export function NewLeaseForm({
           </section>
 
           <section className="space-y-3">
-            <p className="text-sm font-medium">Term & rent</p>
+            <p className="text-sm font-medium"><Tx>Term & rent</Tx></p>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="space-y-1.5">
                 <Label htmlFor="l-start">Start date *</Label>
@@ -241,7 +242,7 @@ export function NewLeaseForm({
           </section>
 
           <section className="space-y-3">
-            <p className="text-sm font-medium">Deposit & notice</p>
+            <p className="text-sm font-medium"><Tx>Deposit & notice</Tx></p>
             <div className="grid gap-3 sm:grid-cols-4">
               <div className="space-y-1.5">
                 <Label htmlFor="l-dep">Deposit total</Label>
@@ -263,7 +264,7 @@ export function NewLeaseForm({
           </section>
 
           <section className="space-y-3">
-            <p className="text-sm font-medium">Included services (monthly add-ons)</p>
+            <p className="text-sm font-medium"><Tx>Included services (monthly add-ons)</Tx></p>
             {services.map((s, i) => (
               <div key={i} className="grid grid-cols-[1fr_140px_auto] gap-2">
                 <Input placeholder="Service (e.g. WiFi)" value={s.name} onChange={(e) => setService(i, { name: e.target.value })} />

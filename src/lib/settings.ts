@@ -11,6 +11,7 @@ import { seal, open, maskSecret } from "@/lib/crypto/sealed";
 import { logAudit } from "@/lib/audit";
 import { env } from "@/lib/env";
 import { isLocale, LOCALES } from "@/lib/i18n";
+import { normalizeReportSettings, type ReportDesign, type ReportDesignColumn, type ReportSettings } from "@/lib/reports/config";
 
 export interface ActorRef {
   id?: string | null;
@@ -107,14 +108,12 @@ export const TEMPLATE_EVENTS = [
 
 export type FeatureFlags = Record<string, boolean>;
 
-/** Optional M26 configuration. Empty enabledKeys means all registered reports.
- * assignments maps a report key to user ids; designs stores presentation metadata.
- * Report data remains registry/query backed and is never editable here. */
-export interface ReportSettings {
-  enabledKeys: string[];
-  assignments: Record<string, string[]>;
-  designs: Record<string, { title?: string; description?: string; columns?: string[] }>;
-}
+/// Optional M26 configuration (§M28 → Reports): develop (`enabledKeys`),
+/// assign (`assignments`) and design (`designs`). The shape and its
+/// normalization live in src/lib/reports/config.ts so the report console, the
+/// API routes and this store agree on one definition. Report DATA is never
+/// editable here — numbers stay registry/query backed.
+export type { ReportSettings, ReportDesign, ReportDesignColumn };
 
 /// Default page size for list tables (overridable per user session).
 export interface TableSettings {
@@ -227,6 +226,17 @@ async function writeGroup<T extends object>(def: GroupDefLike, value: T, actor: 
   });
 }
 
+/// Audit summary for the reports group — what an auditor needs to see without
+/// dumping the whole JSON blob (before/after carry the detail).
+function describeReportPatch(next: ReportSettings): string {
+  const parts = [
+    `develop: ${next.enabledKeys.length === 0 ? "all reports" : next.enabledKeys.join(", ")}`,
+    `assign: ${Object.keys(next.assignments).length} report(s)`,
+    `design: ${Object.keys(next.designs).length} report(s)`
+  ];
+  return parts.join(" · ");
+}
+
 export async function getSettings(): Promise<{
   org: OrgSettings;
   locale: LocaleSettings;
@@ -244,7 +254,7 @@ export async function getSettings(): Promise<{
   rentAlerts: RentAlertSettings;
   providers: { paymentCredentials: { configured: boolean; last4: string | null }; telegramBotToken: { configured: boolean; last4: string | null } };
 }> {
-  const [org, locale, billing, lateFee, retention, features, reports, templates, printer, telegram, menu, units, table, rentAlerts, providers] = await Promise.all([
+  const [org, locale, billing, lateFee, retention, features, reportsRaw, templates, printer, telegram, menu, units, table, rentAlerts, providers] = await Promise.all([
     readGroup<OrgSettings>(ORG),
     readGroup<LocaleSettings>(LOCALE),
     readGroup<BillingSettings>(BILLING),
@@ -261,6 +271,9 @@ export async function getSettings(): Promise<{
     readGroup<RentAlertSettings>(RENT_ALERTS),
     readGroup<Record<string, string>>(PROVIDERS)
   ]);
+  // Report config is coerced on every read: unknown report/column keys and
+  // malformed rows degrade to "no configuration" instead of breaking M26.
+  const reports = normalizeReportSettings(reportsRaw);
   return {
     org,
     locale,
@@ -310,6 +323,13 @@ export async function updateSettings(
   }
   if (group === "locale" && patch.locale !== undefined && !isLocale(patch.locale)) {
     throw new Error(`Unsupported language — use one of: ${LOCALES.join(", ")}`);
+  }
+  if (group === "reports") {
+    // Only registered report keys/columns survive; everything else is dropped
+    // (settings are forward-only and must never break the Reports console).
+    const next = normalizeReportSettings({ ...normalizeReportSettings(current), ...patch });
+    await writeGroup(def, next, actor, ip, `Reports configuration updated (${describeReportPatch(next)})`);
+    return;
   }
   const next = { ...current, ...patch };
   await writeGroup(def, next, actor, ip, `Settings group "${group}" updated (${Object.keys(patch).join(", ")})`);

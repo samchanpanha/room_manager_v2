@@ -27,6 +27,7 @@ Date format: YYYY-MM-DD. All dates 2026.
 | 19 | Telegram bot | M21 | ✅ done | 2026-09-04 | §15 v1.3: OWNER M21 – → O(link). Signed webhook (`X-Telegram-Bot-Api-Secret-Token`, timing-safe; spoofed → 401); one-time 8-char link codes issued from the member/owner portals bind the chat (replay/expiry-proof, superseded on re-issue); commands /status /dues /pay (QR via M13) /link /unlink /help — member chats return own data only; event→template dispatcher over the DomainEvent log with a persisted cursor (invoice issued, payment receipt, dunning reminder, ticket/complaint transitions, statement ready → owner, low stock + occupancy digest → staff chats) and per-user toggles; every send recorded in a TelegramOutbox; dev token = mock sender. Acceptance live: pay → receipt message, /dues own-only, spoof rejected |
 | 20 | Reports | M26 | ✅ done | 2026-09-04 | 12 reports (occupancy by property/floor/type, rent roll, collections & arrears 30/60/90+ aging, move pipeline, maintenance KPIs, complaint KPIs, P&L, expense vs budget, owner statement history, POS sales, stock valuation, attendance summary) + dashboard KPI strip (occupancy %, billed vs collected, arrears, open tickets, cash position); every report declares its ledger/query **source line** (shown in UI + PDF) so each number traces to its source; GLOBAL = M26:read → whole portfolio, OWNER sees own statement history only; RFC-4180 CSV + branded PDF export per report, all filterable by date range + property. Acceptance live: collections = confirmed allocations = Σ ledger credits to 1300 (100.00), Σ aging buckets = Σ open dues (310.33), P&L NET = issued invoices (410.33) |
 | 21 | Settings & hardening | M27, M28 | ✅ done | 2026-09-04 | §15 v1.4 (before code): better-auth swap rejected (hand-rolled kernel already scrypt+httpOnly cookie+revocable DB sessions+rate-limited login; TOTP landed directly — RFC-6238, sealed secret, mandatory for Admin+ with a full capability lock until enrolled, 5-min signed challenge at login); secret-typed M28 settings stored AES-256-GCM-sealed (masked reads, env fallback). Sessions & devices list + revoke; tamper-evident audit hash chain (mutation → brokenAtId, deletion → gaps) + PII masking; CSP/security headers; rate limits on auth+webhooks; S3 storage driver (aws4fetch presign, env-selected); nightly `VACUUM INTO` backup + runbook; M28 settings console (org/locale/billing/late-fee/dunning/providers/features/retention, audited, Admin-only writes, forward-only) + opening balances as balanced `opening` postings. Pentest pass: IDOR, escalation, webhook spoof, URL guessing |
+| i18n | Switch languages + report config | all, M26, M28 | ✅ done | 2026-09-05 | Phrase-table UI translation (1392 km/zh phrases) in primitives, portal, help, toasts + 187 `<Tx>` wraps; optional M26 develop/assign/design configuration |
 | 22 | Golden path & release | all | – | – | |
 
 ## Acceptance evidence — Phases 0–2
@@ -360,6 +361,121 @@ lint ✅ · typecheck ✅ · tests ✅ 122/122 (19 ledger) · seed ✅ (13 syste
 itself has no mutation endpoints) · ledger ✅ balanced by construction + trigger + CI · RBDC negatives ✅.
 
 ---
+
+## Cross-cutting — Switch languages (EN/KM/ZH) everywhere + optional M26 report configuration — 2026-09-05
+
+Two user asks, one session:
+1. the 🌐 switcher only translated nav/tabs — **table columns, field labels,
+   buttons, badges, placeholders and page copy stayed English**;
+2. Reports needed an **optional** configuration: *develop* (which reports exist
+   for the org), *assign* (who may open them) and *design* (title/description/
+   columns), without touching report data.
+
+**Shipped — i18n (phrase-table approach)**
+- `src/lib/locales/phrase-table.ts`: merge + normalization engine. Lookup is
+  exact → normalized → case-insensitive, where `normalizePhrase` folds HTML
+  entities, curly quotes/dashes, NBSP, underscores and whitespace — so a raw
+  enum (`partial_paid`, `moved_out`) and its humanised form (`Partial paid`)
+  share one entry, and JSX-written `&apos;`/`&quot;` match authored copy.
+- **12 dictionaries, 1477 phrases each for km and zh** (`ui-columns`,
+  `ui-common`, `ui-extra`, `ui-fields`, `ui-guide`, `ui-labels`, `ui-messages`,
+  `ui-pages`, `ui-portal`, `ui-prose`, `ui-reports`, `ui-status`) merged into `UI_PHRASES`
+  with cross-file conflict detection (`mergeConflicts`), exported as
+  `tUiIn(locale, englishText)`; server side `getT().tUi`, client side
+  `useT().tUi` / `<Tx>`.
+- **Primitives translate what pages hand them** — the reason a module screen
+  switches language with no locale import of its own: `TableHead`, `Button`
+  (children + `title` + `aria-label`), `Badge`, `Input`/`Textarea`
+  placeholders, `Select` option labels (cloned — `value` attributes untouched,
+  so forms still submit English enums), `Label`, `CardTitle`/`CardDescription`,
+  `PageHeader`/`EmptyState`/`StatCard`, `Dialog` title/description,
+  `Pagination`, `SearchableSelect` (translated display map; the filter matches
+  the English **or** translated label). `ToastProvider` translates every toast
+  at render time (~70 call sites, and an open toast follows a language switch).
+- **297 raw-text spots wrapped in `<Tx>`** across 67 files (static labels,
+  filter rows, totals ladders, empty-state sentences, module notes) — applied
+  mechanically, then verified by typecheck + lint.
+  `node scripts/check-locales.mjs --audit` re-runs the coverage scan: **75
+  static JSX text nodes remain, 36 covered, 39 uncovered — all 39 intentional**
+  (PDF documents, demo credential lines, `POST /api/…` hints, bot command
+  syntax, the RentManager brand).
+- Resident portal (§M25) fully localized: bottom tab bar (Home/Rent/Requests/
+  Docs/Me), OTP sign-in, invoice detail + QR pay panel, requests hub
+  (maintenance/complaint/room-move/move-out copy and category options),
+  documents/KYC — plus a compact 🌐 switcher in the portal header.
+- Help center (§ guide): module names/purposes/tips, the Driver.js note and all
+  six tour steps (Driver.js injects popovers outside React, so they are
+  translated before the tour is built).
+
+**Shipped — Settings → Language (§M28)**
+- New `LanguageCard`: pick the **org default** (`m28.locale.locale`, audited via
+  PATCH `/api/settings`) or **apply to my browser** (`rm-locale` cookie), with
+  the effective language and its source shown. Resolution order stays
+  cookie → org default → English (`src/lib/locale-server.ts`).
+- **Fixed**: the settings PATCH schema rejected the `table` and `alerts` groups
+  (400 on a valid request) — enum now covers every `SettingsGroupName`.
+
+**Shipped — optional M26 report configuration**
+- `src/lib/reports/config.ts` (pure, DB-free): `normalizeReportSettings`
+  (drops unknown report/column keys, accepts the legacy `string[]` column
+  shape, de-dupes), `resolveReportKeys` (develop ∩ assign ∩ §5 role scope),
+  `designReport` / `applyReportDesign` (title, optional description, ordered
+  column subset + label overrides; rows projected so screen/CSV/XLSX agree),
+  `summaryLabel` (camelCase builder keys → human labels, e.g. `arrearsMinor` →
+  "Arrears"; `open` → "Open tickets" to avoid the "Open" status collision).
+- Semantics: **develop** empty = every registered report; **assign** empty =
+  unrestricted, and a user named in *any* assignment sees exactly those
+  reports; **design** absent = registry presentation. The `source`
+  traceability line is never overridable and numbers always come from the
+  registry queries — configuration cannot alter data (§M26 acceptance).
+- API: `/api/reports` (list narrowed + designed), `/api/reports/[key]` and
+  `/api/reports/[key]/export` gate on `resolveReportKeys` before running, and
+  export through `applyReportDesign`. CSV/XLSX headers + summary labels follow
+  the caller's locale; money summary keys export as major-unit numbers.
+  **PDF stays English** — `@react-pdf/renderer` ships Helvetica, which has no
+  Khmer/Chinese glyphs; a localized PDF would render as boxes (same reason the
+  lease-contract clauses are excluded).
+- UI: `ReportsConfig` card with Develop / Assign / Design tabs (report ticks
+  grouped OPS/FIN, per-report user chips + picker, design editor with column
+  hide/reorder/label-override and per-report reset), audited like any M28
+  group; `getSettings()` normalizes the stored row on every read.
+
+**Design decisions worth remembering**
+- `TableCell` deliberately does **not** translate: cells carry record data
+  (names, codes, amounts). Statuses reach the dictionary through `Badge`.
+- Client modules cannot export callables to server components, so the button
+  class helpers moved to `src/components/ui/button-styles.ts`
+  (`buttonClassName`), re-imported by the leases/members/owners pages.
+- Untranslated phrases degrade to the original English — never to a key — so a
+  missing entry is a cosmetic gap, not a broken screen.
+
+### Acceptance (evidence)
+- **Typecheck**: `npx tsc --noEmit` → 754 errors, **byte-identical set to the
+  pre-session baseline** (all from the Prisma client, which cannot be generated
+  in this sandbox: `binaries.prisma.sh` is TLS-blocked, so no dev server / DB
+  smoke test was possible).
+- **Lint**: `npx next lint --dir src` → ✔ no warnings or errors.
+- **Tests**: `tests/reports-config.test.ts` (+20: normalization, develop/assign
+  AND-semantics, role-scope narrowing, design column order/labels, row
+  projection, summary labels) and `tests/i18n-ui.test.ts` (+18: km/zh parity,
+  no merge conflicts, English pass-through, unknown-phrase fallback,
+  snake_case folding, and **coverage assertions** that every report title /
+  column label / source line / summary label, every module-guide name, purpose
+  and tip, every nav label and the portal vocabulary resolves in both locales).
+  99/99 passing across the pure suites.
+- **Locales**: `node scripts/check-locales.mjs` → ALL CLEAN, km=zh=1477
+  (intra-file duplicates, cross-file same-key-different-value conflicts and
+  parity all checked; the checker now understands Prettier-wrapped entries).
+
+### Known gaps / follow-ups
+- Interpolated copy (`{member.name}` inside a sentence) is translated only where
+  a template phrase exists (`tUi("{n}d late").replace(...)`); other dynamic
+  sentences stay English by design.
+- The two lease-contract PDF clauses and PDF report labels remain English
+  (font support). A CJK/Khmer TTF registered with `@react-pdf/renderer` would
+  unlock them.
+- Live smoke (language switch in the browser, report design → CSV parity) is
+  pending a working `prisma generate`.
 
 ## Phase 21 — Settings & Hardening (M27, M28) — 2026-09-04
 

@@ -10,6 +10,7 @@ import { formatMinor } from "@/lib/money";
 import { timeAgo } from "@/lib/utils";
 import { PaymentActions, RecordPaymentButton } from "./payment-jobs";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +75,7 @@ export default async function PaymentsPage({
 
       <form method="get" className="mb-4 flex flex-wrap items-end gap-3 text-sm">
         <div className="space-y-1">
-          <label htmlFor="pf-status" className="text-xs text-muted-foreground">Status</label>
+          <label htmlFor="pf-status" className="text-xs text-muted-foreground"><Tx>Status</Tx></label>
           <SearchableSelect
             id="pf-status"
             name="status"
@@ -91,7 +92,7 @@ export default async function PaymentsPage({
           />
         </div>
         <div className="space-y-1">
-          <label htmlFor="pf-method" className="text-xs text-muted-foreground">Method</label>
+          <label htmlFor="pf-method" className="text-xs text-muted-foreground"><Tx>Method</Tx></label>
           <SearchableSelect
             id="pf-method"
             name="method"
@@ -109,7 +110,7 @@ export default async function PaymentsPage({
           />
         </div>
         <button type="submit" className="h-9 rounded-md bg-primary px-3 font-medium text-primary-foreground hover:bg-primary/90">
-          Filter
+          <Tx>Filter</Tx>
         </button>
       </form>
 
@@ -168,9 +169,9 @@ export default async function PaymentsPage({
               ))}
               {payments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                     No payments yet — record one (top right) or wait for portal/QR payments.
-                  </TableCell>
+                  </Tx></TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
@@ -178,7 +179,7 @@ export default async function PaymentsPage({
         </CardContent>
       </Card>
       <p className="mt-3 text-xs text-muted-foreground">
-        Partial payments set invoices to <span className="font-mono">partial_paid</span>; allocations are immutable; refunds of
+        Partial payments set invoices to <span className="font-mono"><Tx>partial_paid</Tx></span>; allocations are immutable; refunds of
         member credit need Accountant approval and reverse via the ledger; gateway webhooks are idempotent (duplicates ignored).
       </p>
     </div>

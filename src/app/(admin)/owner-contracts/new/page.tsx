@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/auth/session";
 import { can } from "@/lib/rbac/can";
 import { PageHeader } from "@/components/ui/misc";
 import { OwnerContractForm } from "./owner-contract-form";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export default async function NewOwnerContractPage() {
     return (
       <div>
         <PageHeader title="New owner contract" />
-        <p className="text-sm text-destructive">Your roles do not include create on Leases (M05).</p>
+        <p className="text-sm text-destructive"><Tx>Your roles do not include create on Leases (M05).</Tx></p>
       </div>
     );
   }

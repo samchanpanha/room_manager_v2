@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
+import { Tx } from "@/components/i18n-text";
 
 interface ServiceView {
   id: string;
@@ -75,7 +76,7 @@ export function ServicesCard({
     <Card>
       <CardContent className="p-5">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-sm font-medium">Included services</p>
+          <p className="text-sm font-medium"><Tx>Included services</Tx></p>
           {canUpdate && !ended ? (
             <Button size="sm" variant="outline" onClick={() => setAdding((v) => !v)}>
               {adding ? "Cancel" : "+ Add service"}
@@ -97,7 +98,7 @@ export function ServicesCard({
           </form>
         ) : null}
         {services.length === 0 ? (
-          <p className="text-sm text-muted-foreground">None — add-ons (WiFi, parking…) appear on invoices from Phase 10.</p>
+          <p className="text-sm text-muted-foreground"><Tx>None — add-ons (WiFi, parking…) appear on invoices from Phase 10.</Tx></p>
         ) : (
           <ul className="divide-y text-sm">
             {services.map((s) => (
@@ -118,7 +119,7 @@ export function ServicesCard({
           </ul>
         )}
         {status === "draft" && canUpdate ? (
-          <p className="mt-2 text-xs text-muted-foreground">Editable while drafting — immutable after activation.</p>
+          <p className="mt-2 text-xs text-muted-foreground"><Tx>Editable while drafting — immutable after activation.</Tx></p>
         ) : null}
       </CardContent>
     </Card>

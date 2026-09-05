@@ -11,6 +11,7 @@ import { useToast } from "@/components/toast";
 import { formatMinor } from "@/lib/money";
 import { ROOM_TRANSITIONS, type RoomStatus } from "@/lib/rooms/status";
 import { cn } from "@/lib/utils";
+import { Tx } from "@/components/i18n-text";
 
 interface RoomView {
   id: string;
@@ -93,7 +94,7 @@ export function BuildingSection({
       </CardHeader>
       <CardContent className="space-y-5">
         {building.floors.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No floors yet — add a floor, then use the bulk room wizard.</p>
+          <p className="text-sm text-muted-foreground"><Tx>No floors yet — add a floor, then use the bulk room wizard.</Tx></p>
         ) : (
           building.floors.map((floor) => <FloorBlock key={floor.id} floor={floor} canCreate={canCreate} canUpdate={canUpdate} />)
         )}
@@ -118,7 +119,7 @@ function FloorBlock({ floor, canCreate, canUpdate }: { floor: FloorView; canCrea
         ) : null}
       </div>
       {floor.rooms.length === 0 ? (
-        <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">No rooms on this floor yet.</p>
+        <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground"><Tx>No rooms on this floor yet.</Tx></p>
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           {floor.rooms.map((room) => <RoomCard key={room.id} room={room} canUpdate={canUpdate} />)}
@@ -212,7 +213,7 @@ function RoomDialog({ room, open, onClose, canUpdate }: { room: RoomView; open: 
 
         {canUpdate && nexts.length > 0 ? (
           <div>
-            <p className="mb-1.5 text-sm font-medium">Status transitions</p>
+            <p className="mb-1.5 text-sm font-medium"><Tx>Status transitions</Tx></p>
             <div className="flex flex-wrap gap-2">
               {nexts.map((to) => (
                 <Button key={to} size="sm" variant="outline" disabled={busy} onClick={() => transition(to)}>
@@ -228,7 +229,7 @@ function RoomDialog({ room, open, onClose, canUpdate }: { room: RoomView; open: 
 
         {canUpdate ? (
           <form onSubmit={saveDetails} className="space-y-3 border-t pt-4">
-            <p className="text-sm font-medium">Edit details</p>
+            <p className="text-sm font-medium"><Tx>Edit details</Tx></p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor={`r-num-${room.id}`}>Number</Label>

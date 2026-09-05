@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatCard } from "@/components/ui/misc";
 import { formatMinor } from "@/lib/money";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -48,14 +49,14 @@ export default async function MemberStatementPage({ params }: { params: Promise<
         <Link href={`/members/${id}`} className="underline underline-offset-4 hover:text-foreground">
           {member.party.name}
         </Link>{" "}
-        / <span className="text-foreground">Ledger statement</span>
+        / <span className="text-foreground"><Tx>Ledger statement</Tx></span>
       </div>
 
-      <h1 className="mb-1 text-2xl font-semibold tracking-tight">Account statement</h1>
-      <p className="mb-6 text-sm text-muted-foreground">
+      <h1 className="mb-1 text-2xl font-semibold tracking-tight"><Tx>Account statement</Tx></h1>
+      <p className="mb-6 text-sm text-muted-foreground"><Tx>
         Every ledger posting on this member&apos;s account, oldest first · receivable balance runs on 1300 Rent
         Receivable · corrections appear as reversals
-      </p>
+      </Tx></p>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <StatCard label="Current receivable" value={formatMinor(statement.receivableMinor)} sub="Σ DR − Σ CR on 1300" />
@@ -66,7 +67,7 @@ export default async function MemberStatementPage({ params }: { params: Promise<
       {openInvoices.length > 0 ? (
         <Card className="mb-6">
           <CardContent className="p-5">
-            <p className="mb-3 text-sm font-medium">Open invoices</p>
+            <p className="mb-3 text-sm font-medium"><Tx>Open invoices</Tx></p>
             <ul className="space-y-1.5 text-sm">
               {openInvoices.map((i) => (
                 <li key={i.id} className="flex items-center justify-between gap-3">
@@ -120,9 +121,9 @@ export default async function MemberStatementPage({ params }: { params: Promise<
               ))}
               {statement.rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                     No ledger activity for this member yet.
-                  </TableCell>
+                  </Tx></TableCell>
                 </TableRow>
               ) : null}
             </TableBody>

@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState, PageHeader, StatCard } from "@/components/ui/misc";
 import { formatMinor } from "@/lib/money";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -79,7 +80,7 @@ export default async function LedgerPage({
       <div className="grid gap-4 xl:grid-cols-5">
         <Card className="xl:col-span-2">
           <CardContent className="p-5">
-            <p className="mb-3 text-sm font-medium">Trial balance</p>
+            <p className="mb-3 text-sm font-medium"><Tx>Trial balance</Tx></p>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -105,15 +106,15 @@ export default async function LedgerPage({
                 ))}
                 {tb.rows.every((r) => r.debit === 0 && r.credit === 0) ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground"><Tx>
                       No postings yet — issue an invoice to see the books move.
-                    </TableCell>
+                    </Tx></TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
             </Table>
             <div className="mt-3 flex items-center justify-between border-t pt-3 text-sm font-semibold">
-              <span>Totals</span>
+              <span><Tx>Totals</Tx></span>
               <span className="flex items-center gap-4">
                 <span className="tabular-nums">DR {formatMinor(tb.totalDebit)}</span>
                 <span className="tabular-nums">CR {formatMinor(tb.totalCredit)}</span>
@@ -125,10 +126,10 @@ export default async function LedgerPage({
 
         <Card className="xl:col-span-3">
           <CardContent className="p-5">
-            <p className="mb-3 text-sm font-medium">Journal</p>
+            <p className="mb-3 text-sm font-medium"><Tx>Journal</Tx></p>
             <form method="get" className="mb-4 flex flex-wrap items-end gap-2 text-sm">
               <div className="space-y-1">
-                <label htmlFor="jf-account" className="text-xs text-muted-foreground">Account</label>
+                <label htmlFor="jf-account" className="text-xs text-muted-foreground"><Tx>Account</Tx></label>
                 <SearchableSelect
                   id="jf-account"
                   name="account"
@@ -142,7 +143,7 @@ export default async function LedgerPage({
                 />
               </div>
               <div className="space-y-1">
-                <label htmlFor="jf-ref" className="text-xs text-muted-foreground">Ref type</label>
+                <label htmlFor="jf-ref" className="text-xs text-muted-foreground"><Tx>Ref type</Tx></label>
                 <SearchableSelect
                   id="jf-ref"
                   name="refType"
@@ -164,7 +165,7 @@ export default async function LedgerPage({
                 />
               </div>
               <div className="space-y-1">
-                <label htmlFor="jf-from" className="text-xs text-muted-foreground">From</label>
+                <label htmlFor="jf-from" className="text-xs text-muted-foreground"><Tx>From</Tx></label>
                 <input id="jf-from" name="from" type="date" defaultValue={sp.from ?? ""} className="h-9 rounded-md border bg-background px-2" />
               </div>
               <div className="space-y-1">
@@ -173,19 +174,19 @@ export default async function LedgerPage({
               </div>
               {memberFilter ? <input type="hidden" name="memberId" value={memberFilter.id} /> : null}
               <button type="submit" className="h-9 rounded-md bg-primary px-3 font-medium text-primary-foreground hover:bg-primary/90">
-                Filter
+                <Tx>Filter</Tx>
               </button>
               {memberFilter ? (
                 <span className="pb-2 text-xs text-muted-foreground">
                   member: <span className="text-foreground">{memberFilter.party.name}</span>{" "}
-                  <a href="/ledger" className="underline underline-offset-4">clear</a>
+                  <a href="/ledger" className="underline underline-offset-4"><Tx>clear</Tx></a>
                 </span>
               ) : null}
             </form>
 
             <div className="space-y-3">
               {transactions.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">No postings match the filters.</p>
+                <p className="py-6 text-center text-sm text-muted-foreground"><Tx>No postings match the filters.</Tx></p>
               ) : null}
               {transactions.map((t) => (
                 <div key={t.id} className="rounded-lg border p-3">

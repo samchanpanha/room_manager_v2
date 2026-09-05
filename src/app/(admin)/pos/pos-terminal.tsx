@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { formatMinor } from "@/lib/money";
 import { useToast } from "@/components/toast";
+import { Tx } from "@/components/i18n-text";
 
 export type PosProduct = {
   id: string;
@@ -295,9 +296,9 @@ export function PosTerminal({ property, openSession, sales, products, members, c
             </div>
 
             {!openSession ? (
-              <p className="mt-8 py-10 text-center text-sm text-muted-foreground">Open a session to start ringing up sales.</p>
+              <p className="mt-8 py-10 text-center text-sm text-muted-foreground"><Tx>Open a session to start ringing up sales.</Tx></p>
             ) : visible.length === 0 ? (
-              <p className="mt-8 py-10 text-center text-sm text-muted-foreground">No products match — add them under POS Catalog.</p>
+              <p className="mt-8 py-10 text-center text-sm text-muted-foreground"><Tx>No products match — add them under POS Catalog.</Tx></p>
             ) : (
               <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
                 {visible.map((p) => {
@@ -337,7 +338,7 @@ export function PosTerminal({ property, openSession, sales, products, members, c
         <Card>
           <CardContent className="p-4">
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Current order</h2>
+              <h2 className="text-sm font-semibold"><Tx>Current order</Tx></h2>
               {cartLines.length > 0 ? (
                 <button className="text-xs text-muted-foreground underline underline-offset-4" onClick={() => setCart({})}>
                   clear
@@ -346,7 +347,7 @@ export function PosTerminal({ property, openSession, sales, products, members, c
             </div>
 
             {cartLines.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">Tap products to add them.</p>
+              <p className="py-8 text-center text-sm text-muted-foreground"><Tx>Tap products to add them.</Tx></p>
             ) : (
               <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
                 {cartLines.map((l) => (
@@ -422,14 +423,14 @@ export function PosTerminal({ property, openSession, sales, products, members, c
               )}
 
               <div className="flex items-center justify-between border-t border-border pt-3">
-                <span className="text-sm text-muted-foreground">Total</span>
+                <span className="text-sm text-muted-foreground"><Tx>Total</Tx></span>
                 <span className="text-2xl font-bold tabular-nums">{formatMinor(totalMinor)}</span>
               </div>
 
               {cartLines.length > 0 ? (
                 <div className="rounded-md border border-input p-2">
                   <div className="mb-1 flex items-center gap-1">
-                    <span className="text-xs font-medium text-muted-foreground">Discount</span>
+                    <span className="text-xs font-medium text-muted-foreground"><Tx>Discount</Tx></span>
                     <div className="ml-auto flex overflow-hidden rounded-md border border-input text-xs">
                       <button
                         className={`px-2 py-0.5 ${discountMode === "percent" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground"}`}
@@ -461,7 +462,7 @@ export function PosTerminal({ property, openSession, sales, products, members, c
                     </div>
                   ) : null}
                   <div className="flex items-center justify-between border-t border-border/60 pt-1 text-sm font-semibold">
-                    <span className="text-muted-foreground">Due</span>
+                    <span className="text-muted-foreground"><Tx>Due</Tx></span>
                     <span className="tabular-nums">{formatMinor(netMinor)}</span>
                   </div>
                 </div>
@@ -474,7 +475,7 @@ export function PosTerminal({ property, openSession, sales, products, members, c
                     <Input className="h-8 w-32 text-right" type="number" min="0" step="0.01" placeholder="Tendered amount" value={tendered} onChange={(e) => setTendered(e.target.value)} />
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Change due</span>
+                    <span className="text-muted-foreground"><Tx>Change due</Tx></span>
                     <span className={`font-semibold tabular-nums ${changeMinor > 0 ? "text-success" : "text-muted-foreground"}`}>{changeMinor > 0 ? formatMinor(changeMinor) : "—"}</span>
                   </div>
                 </div>
@@ -531,7 +532,7 @@ export function PosTerminal({ property, openSession, sales, products, members, c
                   <TableCell>
                     {s.invoiceId ? (
                       <a href={`/invoices/${s.invoiceId}`} className="text-xs underline underline-offset-4">
-                        invoice →
+                        <Tx>invoice →</Tx>
                       </a>
                     ) : (
                       <a href={`/api/pos/sales/${s.id}/receipt`} className="text-xs underline underline-offset-4" target="_blank" rel="noopener">
@@ -543,9 +544,9 @@ export function PosTerminal({ property, openSession, sales, products, members, c
               ))}
               {sales.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                     No sales yet — open a session and ring one up.
-                  </TableCell>
+                  </Tx></TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
@@ -554,8 +555,8 @@ export function PosTerminal({ property, openSession, sales, products, members, c
       </Card>
 
       <p className="mt-3 text-xs text-muted-foreground">
-        Cash sales raise the expected drawer count; room charges post as one-time lines on the member&apos;s invoice (visible under Invoices).
-        Receipts auto-print per Settings → Printers.
+        <Tx>Cash sales raise the expected drawer count; room charges post as one-time lines on the member&apos;s invoice (visible under Invoices).
+        Receipts auto-print per Settings → Printers.</Tx>
       </p>
 
       {/* ── Open / close dialogs ───────────────────────────────────────── */}

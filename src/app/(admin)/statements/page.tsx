@@ -9,6 +9,7 @@ import { formatMinor } from "@/lib/money";
 import { getOwnerLinkForUser } from "@/lib/owners";
 import { canManageStatements, statementsScope } from "@/lib/operations/statements-scope";
 import { StatementsActions } from "./statements-actions";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,7 @@ export default async function StatementsPage({ searchParams }: { searchParams: P
         <form className="ml-auto flex items-center gap-2" action="/statements" method="get">
           <input type="month" name="month" defaultValue={month} className="h-8 rounded-md border bg-transparent px-2 text-xs" />
           <button type="submit" className="h-8 rounded-md border px-2 text-xs hover:bg-accent">
-            Filter month
+            <Tx>Filter month</Tx>
           </button>
         </form>
       </div>
@@ -120,10 +121,10 @@ export default async function StatementsPage({ searchParams }: { searchParams: P
                   </TableCell>
                   <TableCell>
                     {s.status === "draft" ? (
-                      <span className="text-xs text-muted-foreground">on approval</span>
+                      <span className="text-xs text-muted-foreground"><Tx>on approval</Tx></span>
                     ) : (
                       <a href={`/api/statements/${s.id}/pdf`} target="_blank" rel="noreferrer" className="text-xs underline">
-                        PDF
+                        <Tx>PDF</Tx>
                       </a>
                     )}
                   </TableCell>
@@ -131,9 +132,9 @@ export default async function StatementsPage({ searchParams }: { searchParams: P
               ))}
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={11} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                     No statements yet — run the generation job for a month.
-                  </TableCell>
+                  </Tx></TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
@@ -142,10 +143,10 @@ export default async function StatementsPage({ searchParams }: { searchParams: P
       </Card>
 
       <p className="mt-3 text-xs text-muted-foreground">
-        Formula (per contract model): collected revenue for the owner&apos;s units × revenue share — or fixed master rent — minus
+        <Tx>Formula (per contract model): collected revenue for the owner&apos;s units × revenue share — or fixed master rent — minus
         management fee, pass-through expenses and owner-borne maintenance, ± audited adjustments. Approval accrues Owner
         Payable (DR 3900 Owner Distributions / CR 2200); the payout settles it (DR 2200 / CR cash|bank, refType `payout`) so
-        Owner Payable returns to 0 and the §M20 P&L payout term equals the cash distributed.
+        Owner Payable returns to 0 and the §M20 P&L payout term equals the cash distributed.</Tx>
       </p>
     </div>
   );

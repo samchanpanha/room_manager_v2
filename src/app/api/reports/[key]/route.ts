@@ -4,6 +4,8 @@ import { getAuthUser } from "@/lib/auth/session";
 import { hasModuleAccess } from "@/lib/rbac/can";
 import { runReport } from "@/lib/reports/service";
 import { canSeeReport, reportScope } from "@/lib/reports/scope";
+import { applyReportDesign, resolveReportKeys } from "@/lib/reports/config";
+import { getSettings } from "@/lib/settings";
 
 const querySchema = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -27,7 +29,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ key: string }> 
   const scope = await reportScope(user);
   if (!scope.allowed) return fail(403, "FORBIDDEN", "No reporting scope");
 
+  // Optional org configuration: a report that is switched off (develop) or not
+  // assigned to this caller (assign) is not reachable through the API either.
+  const { reports: reportSettings } = await getSettings();
+  if (!resolveReportKeys([key], reportSettings, user.id).includes(key)) {
+    return fail(403, "FORBIDDEN", "This report is not enabled or assigned for your account");
+  }
+
   const result = await runReport(key, parsed.data, scope);
   if (!result) return fail(404, "NOT_FOUND", "Unknown report");
-  return ok({ report: result });
+  return ok({ report: applyReportDesign(result, reportSettings.designs[key]) });
 }

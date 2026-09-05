@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
+import { Tx } from "@/components/i18n-text";
 
 interface Props {
   mode: "create" | "row";
@@ -167,7 +168,7 @@ function CreateDialog({
             <Label htmlFor="tk-desc">Description</Label>
             <Textarea id="tk-desc" name="description" rows={3} maxLength={2000} required />
           </div>
-          {priority === "urgent" ? <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">Urgent: 4-hour SLA — the daily sweep escalates breaches.</p> : null}
+          {priority === "urgent" ? <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive"><Tx>Urgent: 4-hour SLA — the daily sweep escalates breaches.</Tx></p> : null}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel

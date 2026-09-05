@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { NewRoleButton, DeleteRoleButton } from "./role-actions";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +67,7 @@ export default async function RolesPage() {
                         href={`/roles/${r.id}`}
                         className="rounded-md border border-input px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-accent"
                       >
-                        Edit grid
+                        <Tx>Edit grid</Tx>
                       </Link>
                       {canDelete && !r.isProtected ? <DeleteRoleButton id={r.id} name={r.name} inUse={r._count.users > 0} /> : null}
                     </div>
@@ -78,7 +79,7 @@ export default async function RolesPage() {
         </CardContent>
       </Card>
       <p className="mt-3 text-xs text-muted-foreground">
-        Rules: a role in use cannot be deleted; Super Admin is protected; every grid change is audited and snapshot-tested in CI.
+        <Tx>Rules: a role in use cannot be deleted; Super Admin is protected; every grid change is audited and snapshot-tested in CI.</Tx>
       </p>
     </div>
   );

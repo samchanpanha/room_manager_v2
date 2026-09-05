@@ -9,13 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, PageHeader, StatCard } from "@/components/ui/misc";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
 /// Consumption history bar chart (pure SVG, no external chart lib).
 function ConsumptionChart({ points, unitLabel }: { points: { label: string; milli: number; estimated: boolean; anomaly: boolean }[]; unitLabel: string }) {
   if (points.length < 2) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">Need at least 2 readings for a consumption chart.</p>;
+    return <p className="py-8 text-center text-sm text-muted-foreground"><Tx>Need at least 2 readings for a consumption chart.</Tx></p>;
   }
   const W = 720;
   const H = 200;
@@ -93,7 +94,7 @@ export default async function MeterDetailPage({ params }: { params: Promise<{ id
 
       <Card className="mb-6">
         <CardContent className="pt-5">
-          <h2 className="mb-2 text-sm font-semibold">Consumption history</h2>
+          <h2 className="mb-2 text-sm font-semibold"><Tx>Consumption history</Tx></h2>
           <ConsumptionChart
             unitLabel={meter.unitLabel}
             points={readings.slice(1).map((r) => ({
@@ -104,7 +105,7 @@ export default async function MeterDetailPage({ params }: { params: Promise<{ id
             }))}
           />
           <p className="mt-2 text-xs text-muted-foreground">
-            Red = spike anomaly (&gt; 2× recent average) · amber = estimated reading (avg of last 3, §M11).
+            <Tx>Red = spike anomaly (&gt; 2× recent average) · amber = estimated reading (avg of last 3, §M11).</Tx>
           </p>
         </CardContent>
       </Card>
@@ -139,7 +140,7 @@ export default async function MeterDetailPage({ params }: { params: Promise<{ id
 
       <Card className="mt-6">
         <CardContent className="p-0">
-          <div className="border-b p-4 text-sm font-semibold">Charges from this meter</div>
+          <div className="border-b p-4 text-sm font-semibold"><Tx>Charges from this meter</Tx></div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -171,9 +172,9 @@ export default async function MeterDetailPage({ params }: { params: Promise<{ id
               ))}
               {meter.charges.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground"><Tx>
                     No charges yet — charges appear from the second reading on (baseline first).
-                  </TableCell>
+                  </Tx></TableCell>
                 </TableRow>
               ) : null}
             </TableBody>

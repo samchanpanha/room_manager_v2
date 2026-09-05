@@ -1,10 +1,12 @@
 import { prisma } from "@/lib/db";
 import { requireMember } from "@/lib/portal";
+import { getT } from "@/lib/locale-server";
 import { RequestsClient, type ComplaintRow, type RoomOption, type TicketRow } from "./requests-client";
 
 /// §M25 requests hub — server-scoped rows for the client tabs.
 export default async function PortalRequestsPage() {
   const { member } = await requireMember();
+  const { tUi } = await getT();
 
   const [lease, tickets, complaints, vacantRooms] = await Promise.all([
     prisma.lease.findFirst({ where: { memberProfileId: member.id, status: { in: ["active", "notice"] } }, orderBy: { createdAt: "desc" }, select: { id: true, status: true } }),
@@ -36,7 +38,7 @@ export default async function PortalRequestsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-semibold tracking-tight">Requests</h1>
+      <h1 className="text-lg font-semibold tracking-tight">{tUi("Requests")}</h1>
       <RequestsClient
         memberId={member.id}
         leaseId={lease?.id ?? null}

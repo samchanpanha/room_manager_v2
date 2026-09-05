@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
 import { cn } from "@/lib/utils";
+import { Tx } from "@/components/i18n-text";
 
 interface GridRow {
   module: string;
@@ -85,13 +86,13 @@ export function PermissionGrid({
         <table className="w-full min-w-[760px] text-sm">
           <thead>
             <tr className="border-b bg-muted/40">
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground">Module</th>
+              <th className="px-3 py-2 text-left font-medium text-muted-foreground"><Tx>Module</Tx></th>
               {actions.map((a) => (
                 <th key={a} className="px-2 py-2 text-center font-medium capitalize text-muted-foreground">
                   {a}
                 </th>
               ))}
-              <th className="px-2 py-2 text-center font-medium text-muted-foreground">Scope</th>
+              <th className="px-2 py-2 text-center font-medium text-muted-foreground"><Tx>Scope</Tx></th>
             </tr>
           </thead>
           <tbody>

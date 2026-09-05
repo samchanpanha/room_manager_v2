@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { useToast } from "@/components/toast";
+import { Tx } from "@/components/i18n-text";
 
 interface Dues {
   member: { id: string; name: string };
@@ -98,27 +99,27 @@ export function PayClient() {
 
   return (
     <main className="mx-auto max-w-xl px-4 py-10">
-      <h1 className="text-2xl font-semibold tracking-tight">Pay your bill</h1>
+      <h1 className="text-2xl font-semibold tracking-tight"><Tx>Pay your bill</Tx></h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Scanned QR payment — no login needed. Confirmation is handled by the payment gateway (exactly once).
+        <Tx>Scanned QR payment — no login needed. Confirmation is handled by the payment gateway (exactly once).</Tx>
       </p>
 
       {error ? (
         <Card className="mt-6">
           <CardContent className="p-6">
             <p className="text-sm font-medium text-destructive">{error}</p>
-            <p className="mt-2 text-xs text-muted-foreground">Ask reception for a fresh QR, or sign in to the resident portal.</p>
+            <p className="mt-2 text-xs text-muted-foreground"><Tx>Ask reception for a fresh QR, or sign in to the resident portal.</Tx></p>
           </CardContent>
         </Card>
       ) : !dues ? (
         <Card className="mt-6">
-          <CardContent className="p-6 text-sm text-muted-foreground">Loading…</CardContent>
+          <CardContent className="p-6 text-sm text-muted-foreground"><Tx>Loading…</Tx></CardContent>
         </Card>
       ) : (
         <>
           <Card className="mt-6">
             <CardContent className="p-6">
-              <p className="text-sm text-muted-foreground">Paying as</p>
+              <p className="text-sm text-muted-foreground"><Tx>Paying as</Tx></p>
               <p className="text-lg font-semibold">{dues.member.name}</p>
               <p className="mt-3 text-3xl font-bold tabular-nums">{usd(dues.totalDueMinor)}</p>
               <p className="text-xs text-muted-foreground">total outstanding across {dues.invoices.length} invoice(s)</p>
@@ -147,7 +148,7 @@ export function PayClient() {
             ))}
             {dues.invoices.length === 0 ? (
               <Card>
-                <CardContent className="p-6 text-sm text-muted-foreground">Nothing outstanding — you are all settled up. 🎉</CardContent>
+                <CardContent className="p-6 text-sm text-muted-foreground"><Tx>Nothing outstanding — you are all settled up. 🎉</Tx></CardContent>
               </Card>
             ) : null}
           </div>
@@ -166,9 +167,9 @@ export function PayClient() {
         <div className="flex flex-col items-center gap-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={charge?.imageDataUrl} alt="Payment QR" className="h-64 w-64 rounded-lg border bg-white p-2" />
-          {payStatus === "pending" ? <p className="text-sm text-muted-foreground">Waiting for confirmation…</p> : null}
-          {payStatus === "confirmed" ? <p className="text-sm font-medium text-success">Payment confirmed!</p> : null}
-          {payStatus === "failed" ? <p className="text-sm font-medium text-destructive">Payment failed — please try again.</p> : null}
+          {payStatus === "pending" ? <p className="text-sm text-muted-foreground"><Tx>Waiting for confirmation…</Tx></p> : null}
+          {payStatus === "confirmed" ? <p className="text-sm font-medium text-success"><Tx>Payment confirmed!</Tx></p> : null}
+          {payStatus === "failed" ? <p className="text-sm font-medium text-destructive"><Tx>Payment failed — please try again.</Tx></p> : null}
         </div>
       </Dialog>
     </main>

@@ -11,6 +11,7 @@ import { EmptyState, PageHeader, StatCard } from "@/components/ui/misc";
 import { JobsButtons } from "./jobs-buttons";
 import { QrPayButton } from "./qr-pay";
 import { formatMinor } from "@/lib/money";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -91,7 +92,7 @@ export default async function InvoicesPage({
       <form method="get" className="mb-4 flex flex-wrap items-end gap-3">
         <div className="w-40 space-y-1.5">
           <label htmlFor="f-status" className="text-sm font-medium">
-            Status
+            <Tx>Status</Tx>
           </label>
           <Select id="f-status" name="status" defaultValue={sp.status ?? ""}>
             <option value="">All statuses</option>
@@ -104,7 +105,7 @@ export default async function InvoicesPage({
         </div>
         <div className="w-48 space-y-1.5">
           <label htmlFor="f-prop" className="text-sm font-medium">
-            Property
+            <Tx>Property</Tx>
           </label>
           <Select id="f-prop" name="propertyId" defaultValue={sp.propertyId ?? ""}>
             <option value="">All properties</option>
@@ -119,10 +120,10 @@ export default async function InvoicesPage({
           type="submit"
           className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
         >
-          Filter
+          <Tx>Filter</Tx>
         </button>
         <Link href="/invoices" className="pb-2 text-sm text-muted-foreground underline underline-offset-4">
-          Reset
+          <Tx>Reset</Tx>
         </Link>
       </form>
 
@@ -181,9 +182,9 @@ export default async function InvoicesPage({
               ))}
               {invoices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                     No invoices yet — run the generation job (top right) to bill all active leases.
-                  </TableCell>
+                  </Tx></TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
@@ -196,7 +197,7 @@ export default async function InvoicesPage({
       </p>
       <div className="mt-2 text-xs text-muted-foreground">
         <Link href="/rent-engine" className="underline underline-offset-4">
-          Rent engine rules →
+          <Tx>Rent engine rules →</Tx>
         </Link>
       </div>
     </div>

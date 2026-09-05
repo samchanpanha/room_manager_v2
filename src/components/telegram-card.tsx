@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/toast";
+import { Tx } from "@/components/i18n-text";
 
 interface LinkState {
   linked: boolean;
@@ -86,7 +87,7 @@ export function TelegramCard() {
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         {!state ? (
-          <p className="text-muted-foreground">Loading…</p>
+          <p className="text-muted-foreground"><Tx>Loading…</Tx></p>
         ) : !state.linked ? (
           <>
             <p className="text-muted-foreground">Get rent receipts and updates in Telegram. Generate a code, then send <span className="font-mono">/link &lt;code&gt;</span> to the bot.</p>
@@ -95,7 +96,7 @@ export function TelegramCard() {
                 <p className="text-xs text-muted-foreground">One-time code (expires {new Date(code.expiresAt).toLocaleTimeString()}):</p>
                 <p className="font-mono text-lg font-semibold tracking-widest">{code.code}</p>
                 <a href={code.deepLink} target="_blank" rel="noreferrer" className="text-xs underline underline-offset-4">
-                  Open the bot →
+                  <Tx>Open the bot →</Tx>
                 </a>
               </div>
             ) : (

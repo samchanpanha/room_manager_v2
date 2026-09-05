@@ -12,6 +12,7 @@ import { MemberTabs } from "./member-tabs";
 import { kycChecklist } from "@/lib/members/kyc";
 import { formatDate, timeAgo } from "@/lib/utils";
 import { formatMinor } from "@/lib/money";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +67,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     <div>
       <div className="mb-4 text-sm text-muted-foreground">
         <Link href="/members" className="underline underline-offset-4 hover:text-foreground">
-          Members
+          <Tx>Members</Tx>
         </Link>{" "}
         / <span className="text-foreground">{member.party.name}</span>
       </div>
@@ -97,7 +98,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
               href={`/members/${member.id}/statement`}
               className="text-xs underline underline-offset-4 hover:text-foreground"
             >
-              Ledger statement →
+              <Tx>Ledger statement →</Tx>
             </Link>
           </div>
         </div>
@@ -136,7 +137,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         }}
         activity={
           <ul className="space-y-2.5">
-            {activity.length === 0 ? <li className="text-sm text-muted-foreground">No activity recorded yet.</li> : null}
+            {activity.length === 0 ? <li className="text-sm text-muted-foreground"><Tx>No activity recorded yet.</Tx></li> : null}
             {activity.map((a) => (
               <li key={a.id} className="flex items-start justify-between gap-3 text-sm">
                 <div>
@@ -196,10 +197,10 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       {invoiceCandidate ? <MemberPayQrCard memberId={member.id} /> : null}
 
       <Card className="mt-6">
-        <CardContent className="p-4 text-xs text-muted-foreground">
+        <CardContent className="p-4 text-xs text-muted-foreground"><Tx>
           Lifecycle: prospect → verified needs a complete KYC checklist; verified → active requires an active lease (Phase 5);
           blacklist blocks every transition. Room capacity is enforced at lease time.
-        </CardContent>
+        </Tx></CardContent>
       </Card>
     </div>
   );

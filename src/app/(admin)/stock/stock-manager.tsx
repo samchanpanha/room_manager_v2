@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/components/toast";
 import { formatMinor } from "@/lib/money";
 import { flattenCategoryTree, type CategoryNode } from "@/lib/stock/categories";
+import { Tx } from "@/components/i18n-text";
 
 export interface StockItemRow {
   id: string;
@@ -276,7 +277,7 @@ export function StockManager({ items, categories, suppliers, properties, units, 
                   {filtered.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={canWrite ? 9 : 8} className="py-8 text-center text-sm text-muted-foreground">
-                        No stock items match.
+                        <Tx>No stock items match.</Tx>
                       </TableCell>
                     </TableRow>
                   ) : null}
@@ -296,7 +297,7 @@ export function StockManager({ items, categories, suppliers, properties, units, 
               </Button>
             ) : null}
             <p className="text-xs text-muted-foreground">
-              Two levels (parent/child · shared or per property). Deleting a category in use is refused — archive it instead.
+              <Tx>Two levels (parent/child · shared or per property). Deleting a category in use is refused — archive it instead.</Tx>
             </p>
           </div>
           <Card>
@@ -352,9 +353,9 @@ export function StockManager({ items, categories, suppliers, properties, units, 
                   ))}
                   {flatCats.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={canWrite ? 5 : 4} className="py-8 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={canWrite ? 5 : 4} className="py-8 text-center text-sm text-muted-foreground"><Tx>
                         No categories yet — create one to organise items & till products.
-                      </TableCell>
+                      </Tx></TableCell>
                     </TableRow>
                   ) : null}
                 </TableBody>
@@ -398,7 +399,7 @@ export function StockManager({ items, categories, suppliers, properties, units, 
                 {movements.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
-                      No movements yet.
+                      <Tx>No movements yet.</Tx>
                     </TableCell>
                   </TableRow>
                 ) : null}
@@ -442,7 +443,7 @@ export function StockManager({ items, categories, suppliers, properties, units, 
                 {stocktakes.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
-                      No stocktakes yet.
+                      <Tx>No stocktakes yet.</Tx>
                     </TableCell>
                   </TableRow>
                 ) : null}
