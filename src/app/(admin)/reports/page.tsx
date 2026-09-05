@@ -16,7 +16,10 @@ import { ReportPicker } from "./report-picker";
 
 export const dynamic = "force-dynamic";
 
-const money = (v: string | number | null | undefined) => (typeof v === "number" ? formatMinor(Math.round(v * 100)) : (v ?? "—"));
+/// Summary values arrive as `unknown` (the builder types them loosely), so the
+/// formatter narrows: numbers on *Minor keys are minor units → currency text.
+const money = (v: unknown): string =>
+  typeof v === "number" ? formatMinor(Math.round(v * 100)) : v == null ? "—" : String(v);
 
 /// M26 Reports console (§M26): registry-gated by the §5 qualifiers, narrowed by
 /// the OPTIONAL org configuration (Settings → Reports: develop/assign), styled
@@ -32,7 +35,7 @@ export default async function ReportsPage({
   if (!user) redirect("/login");
   if (!hasModuleAccess(user, "read", "M26")) redirect("/dashboard");
   const sp = await searchParams;
-  const { tUi } = await getT();
+  const { t, tUi } = await getT();
 
   const scope = await reportScope(user);
   if (!scope.allowed) redirect("/dashboard");
@@ -44,8 +47,8 @@ export default async function ReportsPage({
   if (reports.length === 0) {
     return (
       <div>
-        <PageHeader title="Reports" description="M26 — analytics & exports, filterable by date range + property" />
-        <EmptyState title="No reports available" hint="No reports are currently assigned or enabled for your account." />
+        <PageHeader title={t("reports.page.title")} description={t("reports.page.description")} />
+        <EmptyState title={tUi("No reports available")} hint={t("reports.page.noAccess")} />
       </div>
     );
   }
@@ -65,7 +68,7 @@ export default async function ReportsPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Reports" description="M26 — analytics & exports, filterable by date range + property" />
+      <PageHeader title={t("reports.page.title")} description={t("reports.page.description")} />
 
       <ReportPicker
         reports={reports.map((r) => {
@@ -96,7 +99,7 @@ export default async function ReportsPage({
             </CardHeader>
             <CardContent>
               {designedResult.rows.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{tUi("No rows for this scope/period.")}</p>
+                <p className="text-sm text-muted-foreground">{t("reports.noRows")}</p>
               ) : (
                 <Table>
                   <TableHeader>
