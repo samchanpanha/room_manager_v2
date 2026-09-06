@@ -2,14 +2,18 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, Label, Select } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatMinor } from "@/lib/money";
 import { useToast } from "@/components/toast";
+import { useT } from "@/components/i18n-provider";
 import { Tx } from "@/components/i18n-text";
 
 export type PosProduct = {
@@ -36,8 +40,11 @@ export type PosSaleRow = {
 
 export type PosMember = { id: string; label: string };
 
+export type PosProperty = { id: string; code: string; name: string };
+
 interface Props {
-  property: { id: string } | null;
+  properties: PosProperty[];
+  selectedProperty: PosProperty | null;
   openSession: { id: string; openingFloatMinor: number; sales: number; cashSalesMinor: number } | null;
   sales: PosSaleRow[];
   products: PosProduct[];
@@ -60,9 +67,10 @@ function digitsOnly(s: string): string {
   return s.replace(/\D/g, "");
 }
 
-export function PosTerminal({ property, openSession, sales, products, members, categories, canWrite }: Props) {
+export function PosTerminal({ properties, selectedProperty, openSession, sales, products, members, categories, canWrite }: Props) {
   const router = useRouter();
   const { push } = useToast();
+  const { tUi } = useT();
   const [busy, setBusy] = useState(false);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [method, setMethod] = useState("cash");
@@ -174,9 +182,9 @@ export function PosTerminal({ property, openSession, sales, products, members, c
   }
 
   async function doOpenSession() {
-    if (!property) return;
+    if (!selectedProperty) return;
     setSessionBusy(true);
-    await post("/api/pos/sessions", { propertyId: property.id, float: Number(float) || 0 }, "Session opened");
+    await post("/api/pos/sessions", { propertyId: selectedProperty.id, float: Number(float) || 0 }, "Session opened");
     setSessionBusy(false);
     setOpenDialog(false);
   }
@@ -229,10 +237,107 @@ export function PosTerminal({ property, openSession, sales, products, members, c
     />
   ) : null;
 
+  /// M14 guided tour (Driver.js). Popovers are injected straight into the DOM,
+  /// so titles/descriptions are translated here before the tour is built —
+  /// same pattern as the shell chrome tour in src/components/help.tsx.
+  function startTour() {
+    if (selectedProperty === null) {
+      driver({
+        showProgress: true,
+        nextBtnText: tUi("Next"),
+        prevBtnText: tUi("Back"),
+        doneBtnText: tUi("Done"),
+        steps: [
+          {
+            element: '[data-tour="pos-session"]',
+            popover: {
+              title: tUi("No property in scope"),
+              description: tUi("Your role has no property assigned and no global POS scope. Ask an admin to assign you to a property (Properties → Users), then reload this page.")
+            }
+          }
+        ]
+      }).drive();
+      return;
+    }
+    const picker =
+      properties.length > 1
+        ? [
+            {
+              element: '[data-tour="pos-property"]',
+              popover: {
+                title: tUi("Property"),
+                description: tUi("The till operates on one property at a time. Switch between the properties in your scope — each has its own session, drawer, catalog and sales.")
+              }
+            }
+          ]
+        : [];
+    const steps = [
+      {
+        element: '[data-tour="pos-session"]',
+        popover: {
+          title: tUi("Session"),
+          description: openSession
+            ? tUi("The till session is open. The badge shows the float and running cash sales; each cash sale raises the expected drawer count. Close it at the end of the shift.")
+            : tUi("The till session is closed — start ringing up with the “Open session…” button and set the opening float.")
+        }
+      },
+      ...picker,
+      {
+        element: '[data-tour="pos-scan"]',
+        popover: {
+          title: tUi("Scan or search"),
+          description: tUi("Type or scan an EAN-13 barcode, or search by product name. Category chips filter the grid.")
+        }
+      },
+      {
+        element: '[data-tour="pos-products"]',
+        popover: {
+          title: tUi("Products"),
+          description: tUi("Tap a product to add it to the order. On-hand stock is shown; service products never run out. Out-of-stock items grey out.")
+        }
+      },
+      {
+        element: '[data-tour="pos-order"]',
+        popover: {
+          title: tUi("Current order"),
+          description: tUi("Adjust quantities here and clear the cart. Room charges post a one-time line on the member’s invoice instead of taking money now.")
+        }
+      },
+      {
+        element: '[data-tour="pos-payment"]',
+        popover: {
+          title: tUi("Payment"),
+          description: tUi("Cash, QR Pay, card, or charge to the member’s room. For cash, entering the tendered amount shows the change due.")
+        }
+      },
+      {
+        element: '[data-tour="pos-charge"]',
+        popover: {
+          title: tUi("Take payment"),
+          description: tUi("Every sale decrements stock, files a receipt PDF, and honours the printer settings (Settings → Printers): 58/80 mm width, receipt copies, auto-print.")
+        }
+      },
+      {
+        element: '[data-tour="pos-recent"]',
+        popover: {
+          title: tUi("Recent sales"),
+          description: tUi("The day’s receipts with their payment method. Room charges link straight to the member’s invoice; other sales expose the PDF receipt.")
+        }
+      }
+    ];
+    driver({
+      showProgress: true,
+      nextBtnText: tUi("Next"),
+      prevBtnText: tUi("Back"),
+      doneBtnText: tUi("Done"),
+      steps
+    }).drive();
+  }
+
   return (
     <div>
       {/* ── Session bar ─────────────────────────────────────────────────── */}
-      <Card className="mb-4">
+      <Card className="mb-4" data-tour="pos-session">
         <CardContent className="p-4">
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant={openSession ? "success" : "secondary"}>{openSession ? "session open" : "session closed"}</Badge>
@@ -249,14 +354,29 @@ export function PosTerminal({ property, openSession, sales, products, members, c
               </>
             ) : (
               <span className="text-sm text-muted-foreground">
-                {property ? `No open session for this property — open one to start ringing up sales.` : "No property in scope."}
+                {selectedProperty ? `No open session for ${selectedProperty.code} — open one to start ringing up sales.` : "No property in scope."}
               </span>
             )}
-            {!openSession && canWrite && property ? (
+            {!openSession && canWrite && selectedProperty ? (
               <Button size="sm" className="ml-auto" onClick={() => setOpenDialog(true)}>
                 Open session…
               </Button>
             ) : null}
+            {properties.length > 1 ? (
+              <div className="ml-auto w-64" data-tour="pos-property">
+                <SearchableSelect
+                  aria-label="Property"
+                  value={selectedProperty?.id ?? ""}
+                  onChange={(v) => router.push(v ? `/pos?propertyId=${encodeURIComponent(v)}` : "/pos")}
+                  options={properties.map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` }))}
+                />
+              </div>
+            ) : (
+              <span className="ml-auto text-xs font-mono text-muted-foreground">{selectedProperty?.code}</span>
+            )}
+            <Button variant="ghost" size="sm" title="Play a guided tour of the POS till (Driver.js)" onClick={startTour}>
+              ? Tour
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -265,7 +385,7 @@ export function PosTerminal({ property, openSession, sales, products, members, c
         {/* ── Product picker ─────────────────────────────────────────────── */}
         <Card>
           <CardContent className="p-4">
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2" data-tour="pos-scan">
               <Input
                 ref={scanRef}
                 className="h-9 max-w-64 font-mono"
@@ -300,7 +420,7 @@ export function PosTerminal({ property, openSession, sales, products, members, c
             ) : visible.length === 0 ? (
               <p className="mt-8 py-10 text-center text-sm text-muted-foreground"><Tx>No products match — add them under POS Catalog.</Tx></p>
             ) : (
-              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4" data-tour="pos-products">
                 {visible.map((p) => {
                   const step = p.stock && p.stock.unit !== "pcs" ? 0.5 : 1;
                   const onHand = p.stock ? p.stock.qtyMilli / 1000 : Number.POSITIVE_INFINITY;
@@ -335,7 +455,7 @@ export function PosTerminal({ property, openSession, sales, products, members, c
         </Card>
 
         {/* ── Current order ─────────────────────────────────────────────── */}
-        <Card>
+        <Card data-tour="pos-order">
           <CardContent className="p-4">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold"><Tx>Current order</Tx></h2>
@@ -393,7 +513,7 @@ export function PosTerminal({ property, openSession, sales, products, members, c
             )}
 
             <div className="mt-4 space-y-3">
-              <div className="space-y-1.5">
+              <div className="space-y-1.5" data-tour="pos-payment">
                 <Label htmlFor="pos-method">Payment</Label>
                 <Select id="pos-method" value={method} disabled={!canWrite || !openSession} onChange={(e) => setMethod(e.target.value)}>
                   {Object.entries(METHOD_LABELS).map(([k, v]) => (
@@ -484,6 +604,7 @@ export function PosTerminal({ property, openSession, sales, products, members, c
               <Button
                 size="lg"
                 className="w-full"
+                data-tour="pos-charge"
                 disabled={!canWrite || !openSession || busy || cartLines.length === 0 || (method === "room_charge" && !memberId) || (method === "cash" && Number(tendered) > 0 && changeMinor < 0)}
                 onClick={charge}
               >
@@ -495,7 +616,7 @@ export function PosTerminal({ property, openSession, sales, products, members, c
       </div>
 
       {/* ── Recent sales ────────────────────────────────────────────────── */}
-      <Card className="mt-4">
+      <Card className="mt-4" data-tour="pos-recent">
         <CardContent className="p-0">
           <Table>
             <TableHeader>

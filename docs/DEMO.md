@@ -106,8 +106,7 @@ Services → laundry per-use entry pending on Sokha; parking P-A01/P-A02 and WiF
 accounts assigned.
 
 ### Facilities & operations (M14/M15/M18/M19/M22/M29/M30)
-- **POS**: a closed till session with 3 sales (cash $2.50, QR $6.60, room-charge
-  $3.60 on Sokha) and a **$0.10 cash variance** logged.
+- **POS**: click **? Tour** in the till's session bar for a Driver.js guided walkthrough of the register. GLOBAL roles (root/admin/accountant) land on the **first property in scope**; the **Property** picker in the session bar switches the till between Bassac Lane Residence and Riverside Villa (each keeps its own session/drawer/catalog/sales). The till ends **session closed** with 3 sales (cash $2.50, QR $6.60, room-charge $3.60 on Sokha) and a **$0.10 cash variance** logged — open a session live with "Open session…" + float, ring one up, close it with the counted drawer.
 - **Stock**: 13 movements; PO-2026-0001 received (5 lines), PO-2026-0002 draft;
   a completed **stocktake** with counted variance (–1 cola, –2 noodles) and the
   valuation delta.

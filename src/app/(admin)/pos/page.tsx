@@ -6,20 +6,32 @@ import { PosTerminal } from "./pos-terminal";
 
 export const dynamic = "force-dynamic";
 
-export default async function PosPage() {
+export default async function PosPage({ searchParams }: { searchParams: Promise<{ propertyId?: string }> }) {
   const user = await getAuthUser();
   if (!user || !hasModuleAccess(user, "read", "M14")) {
     return <EmptyState title="No access" hint="Your roles do not include read on POS (M14)." />;
   }
+  const sp = await searchParams;
   const scopes = [...new Set(user.propertyIds)];
-  const property = scopes.length > 0 ? await prisma.property.findUnique({ where: { id: scopes[0] } }) : null;
 
   const posGrants = user.permissions.filter((p) => p.module === "M14" && p.action === "read");
   const global = posGrants.some((g) => g.scope === "GLOBAL");
   const visibleProps = global ? (await prisma.property.findMany({ select: { id: true } })).map((p) => p.id) : scopes;
 
+  // The till operates on ONE property at a time: default to the first property
+  // in scope (GLOBAL roles have no assignments, so fall back to any visible
+  // property instead of showing "No property in scope"), switchable via
+  // ?propertyId= in the URL.
+  const properties = (await prisma.property.findMany({
+    where: visibleProps.length > 0 ? { id: { in: visibleProps } } : { id: { in: [] } },
+    select: { id: true, code: true, name: true },
+    orderBy: { code: "asc" }
+  })) as Array<{ id: string; code: string; name: string }>;
+  const selectedProperty = properties.find((p) => p.id === sp.propertyId) ?? properties[0] ?? null;
+  const propertyScope = selectedProperty ? { propertyId: selectedProperty.id } : visibleProps.length > 0 ? { propertyId: { in: visibleProps } } : {};
+
   const sessions = await prisma.posSession.findMany({
-    where: visibleProps.length > 0 ? { propertyId: { in: visibleProps } } : {},
+    where: propertyScope,
     include: { sales: true },
     orderBy: { openedAt: "desc" },
     take: 10
@@ -27,7 +39,7 @@ export default async function PosPage() {
   const openSession = sessions.find((s) => s.status === "open") ?? null;
 
   const sales = await prisma.posSale.findMany({
-    where: visibleProps.length > 0 ? { propertyId: { in: visibleProps } } : {},
+    where: propertyScope,
     include: { items: true, member: { include: { party: true } } },
     orderBy: { createdAt: "desc" },
     take: 25
@@ -56,7 +68,8 @@ export default async function PosPage() {
       />
 
       <PosTerminal
-        property={property ? { id: property.id } : null}
+        properties={properties}
+        selectedProperty={selectedProperty}
         openSession={
           openSession
             ? {
