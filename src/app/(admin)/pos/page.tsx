@@ -60,6 +60,16 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
 
   const canWrite = can(user, "create", "M14");
 
+  // Open stay tabs for the current property — "charge to room" routes POS
+  // lines onto the booking's settlement invoice (posMode=tab only).
+  const stayTabs = selectedProperty
+    ? await prisma.stayBooking.findMany({
+        where: { propertyId: selectedProperty.id, status: { in: ["confirmed", "checked_in"] }, posMode: "tab" },
+        select: { id: true, code: true, guestName: true, room: { select: { number: true } }, checkOut: true },
+        orderBy: { checkIn: "desc" }
+      })
+    : [];
+
   return (
     <div>
       <PageHeader
@@ -103,6 +113,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
             : null
         }))}
         members={visibleMembers.map((m) => ({ id: m.id, label: m.party.name }))}
+        stayTabs={stayTabs.map((t) => ({ id: t.id, code: t.code, guestName: t.guestName, roomNumber: t.room.number, checkOut: t.checkOut.toISOString() }))}
         categories={categories}
         canWrite={canWrite}
       />

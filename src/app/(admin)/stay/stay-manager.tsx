@@ -1,7 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -10,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState } from "@/components/ui/misc";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useToast } from "@/components/toast";
+import { useT } from "@/components/i18n-provider";
 import { formatMinor } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Tx } from "@/components/i18n-text";
@@ -119,8 +122,11 @@ interface PriceBucket {
 interface StayQuote {
   minutes: number;
   buckets: PriceBucket[];
+  strategy: "progressive" | "blended";
+  strategyLabel: string;
   totalMinor: number;
   dayPriceMinor: number;
+  breakdown: { hitToMinutes: number; dayCount: number; remainderMinutes: number };
 }
 
 function fmt(d?: string | null): string {
@@ -154,27 +160,40 @@ interface Props {
 export function StayManager({ modules, rates, bookings, rooms, properties, canWrite }: Props) {
   const router = useRouter();
   const { push } = useToast();
+  const { tUi } = useT();
   const [tab, setTab] = useState<Tab>("bookings");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [propertyFilter, setPropertyFilter] = useState("all");
   const [showNew, setShowNew] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [moduleDialog, setModuleDialog] = useState<{ module?: ModuleRow } | null>(null);
   const [rateDialog, setRateDialog] = useState<{ rate?: RateRow; moduleId?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [rateModuleFilter, setRateModuleFilter] = useState("all");
+  const [printUrl, setPrintUrl] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return bookings.filter((b) => {
+      if (propertyFilter !== "all" && b.propertyId !== propertyFilter) return false;
       if (statusFilter !== "all" && b.status !== statusFilter) return false;
       if (q && !`${b.code} ${b.guestName} ${b.room?.number} ${b.module?.name}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [bookings, search, statusFilter]);
+  }, [bookings, search, statusFilter, propertyFilter]);
 
   const activeBookings = bookings.filter((b) => ["requested", "confirmed", "checked_in"].includes(b.status));
   const grossMinor = bookings.filter((b) => b.status === "checked_out").reduce((s, b) => s + b.priceSnapshotMinor, 0);
+
+  const ACTION_LABEL: Record<string, string> = {
+    confirm: "Confirmed",
+    checkin: "Checked in",
+    checkout: "Checked out",
+    cancel: "Cancelled",
+    no_show: "Marked no-show",
+    void: "Voided"
+  };
 
   async function runAction(id: string, action: string, opts: Record<string, unknown> = {}) {
     setBusy(true);
@@ -182,16 +201,85 @@ export function StayManager({ modules, rates, bookings, rooms, properties, canWr
     setBusy(false);
     push(
       r.ok
-        ? { title: `${action} done`, variant: "success" }
+        ? { title: `${ACTION_LABEL[action] ?? action}`, variant: "success" }
         : { title: "Action failed", description: r.message, variant: "destructive" }
     );
-    if (r.ok) router.refresh();
+    if (r.ok) {
+      const d = (r.data ?? {}) as { print?: { autoPrintReceipt?: boolean; receiptCopies?: number; receiptUrl?: string } };
+      if (d.print?.autoPrintReceipt && d.print.receiptUrl) setPrintUrl(`${d.print.receiptUrl}?copies=${d.print.receiptCopies ?? 1}`);
+      router.refresh();
+    }
+  }
+
+  const printFrame = printUrl ? (
+    <iframe
+      src={printUrl}
+      title="Receipt print"
+      style={{ position: "fixed", top: -10000, left: 0, width: 800, height: 800, border: 0 }}
+      onLoad={(e) => {
+        try {
+          (e.currentTarget.contentWindow as Window | null)?.print();
+        } catch {
+          /* PDF viewer may not expose print(); the print link covers manual printing */
+        }
+        setPrintUrl(null);
+      }}
+    />
+  ) : null;
+
+  /// M32 guided tour (Driver.js). Popovers are injected straight into the DOM,
+  /// so titles/descriptions are translated here — same pattern as the POS tour.
+  function startTour() {
+    const steps = [
+      {
+        element: '[data-tour="stays-tabs"]',
+        popover: {
+          title: tUi("Stays workbench"),
+          description: tUi("Three views: Bookings (the calendar of stays), Modules (hourly, overnight, day-use rent products) and Rates (the price ladder each module charges).")
+        }
+      },
+      {
+        element: '[data-tour="stays-new"]',
+        popover: {
+          title: tUi("New booking"),
+          description: tUi("A three-step wizard: guest & room details, live price quote with the bucket breakdown, then review. Walk-ins are resolved automatically.")
+        }
+      },
+      {
+        element: '[data-tour="stays-filter"]',
+        popover: {
+          title: tUi("Find a stay"),
+          description: tUi("Search by code, guest or room, and filter by status or property. Open a row to drive it through the workflow.")
+        }
+      },
+      {
+        element: '[data-tour="stays-table"]',
+        popover: {
+          title: tUi("Bookings"),
+          description: tUi("Each stay shows code, guest, room, interval and total. Requested stays can be confirmed inline; every other transition happens in the detail view.")
+        }
+      },
+      {
+        element: '[data-tour="stays-open"]',
+        popover: {
+          title: tUi("Workflow"),
+          description: tUi("Open a stay to walk it: Requested → Confirmed → Checked in → Checked out. The detail view shows the next action and lets you settle, extend or void.")
+        }
+      }
+    ].filter((s) => Boolean(document.querySelector(s.element))) as Array<{ element: string; popover: { title: string; description: string } }>;
+    driver({
+      showProgress: true,
+      nextBtnText: tUi("Next"),
+      prevBtnText: tUi("Back"),
+      doneBtnText: tUi("Done"),
+      steps
+    }).drive();
   }
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-lg border bg-card p-1 text-sm">
+        <div className="inline-flex rounded-lg border bg-card p-1 text-sm" data-tour="stays-tabs">
           {(
             [
               ["bookings", `Bookings (${activeBookings.length} active)`],
@@ -208,11 +296,16 @@ export function StayManager({ modules, rates, bookings, rooms, properties, canWr
             </button>
           ))}
         </div>
-        {canWrite ? (
-          <Button onClick={() => setShowNew(true)} disabled={modules.length === 0}>
-            New booking
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" title="Play a guided tour of Short Stays (Driver.js)" onClick={startTour}>
+            ? Tour
           </Button>
-        ) : null}
+          {canWrite ? (
+            <Button data-tour="stays-new" onClick={() => setShowNew(true)} disabled={modules.length === 0 || rooms.length === 0}>
+              New booking
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {tab === "bookings" ? (
@@ -222,6 +315,9 @@ export function StayManager({ modules, rates, bookings, rooms, properties, canWr
           setSearch={setSearch}
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
+          propertyFilter={propertyFilter}
+          setPropertyFilter={setPropertyFilter}
+          properties={properties}
           onDetail={setDetailId}
           canWrite={canWrite}
           busy={busy}
@@ -253,6 +349,7 @@ export function StayManager({ modules, rates, bookings, rooms, properties, canWr
         <NewBookingDialog
           modules={modules}
           rooms={rooms}
+          properties={properties}
           onClose={() => setShowNew(false)}
           onDone={() => {
             setShowNew(false);
@@ -274,6 +371,8 @@ export function StayManager({ modules, rates, bookings, rooms, properties, canWr
           onClose={() => setRateDialog(null)}
         />
       ) : null}
+
+      {printFrame}
     </div>
   );
 }
@@ -286,6 +385,9 @@ function BookingsTable({
   setSearch,
   statusFilter,
   setStatusFilter,
+  propertyFilter,
+  setPropertyFilter,
+  properties,
   onDetail,
   canWrite,
   busy,
@@ -297,6 +399,9 @@ function BookingsTable({
   setSearch: (v: string) => void;
   statusFilter: string;
   setStatusFilter: (v: string) => void;
+  propertyFilter: string;
+  setPropertyFilter: (v: string) => void;
+  properties: PropertyRow[];
   onDetail: (id: string) => void;
   canWrite: boolean;
   busy: boolean;
@@ -305,7 +410,7 @@ function BookingsTable({
 }) {
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2" data-tour="stays-filter">
         <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search code / guest / room…" className="max-w-xs" />
         <SearchableSelect
           value={statusFilter}
@@ -317,75 +422,89 @@ function BookingsTable({
           className="rounded-md border bg-card px-2 py-2 text-sm"
           placeholder="All statuses"
         />
+        {properties.length > 1 ? (
+          <SearchableSelect
+            value={propertyFilter}
+            onChange={setPropertyFilter}
+            options={[{ value: "all", label: "All properties" }, ...properties.map((p) => ({ value: p.id, label: p.code }))]}
+            className="rounded-md border bg-card px-2 py-2 text-sm"
+            placeholder="All properties"
+          />
+        ) : null}
         <span className="ml-auto text-sm text-muted-foreground">
           <Tx>Completed revenue: </Tx><span className="font-medium">{formatMinor(grossMinor)}</span>
         </span>
       </div>
 
       {bookings.length === 0 ? (
-        <EmptyState title="No bookings yet" hint="Create one — pick a room, an interval, and the module sets the price." />
+        <EmptyState
+          title="No bookings yet"
+          hint="Create one with New booking: pick a module and room, set the interval, and the rate ladder prices it live. Walk-in guests are auto-resolved to a member profile on save."
+        />
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Code</TableHead>
-              <TableHead>Guest</TableHead>
-              <TableHead>Room</TableHead>
-              <TableHead>Interval</TableHead>
-              <TableHead>Module</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {bookings.map((b) => (
-              <TableRow key={b.id}>
-                <TableCell className="font-medium">{b.code}</TableCell>
-                <TableCell>
-                  {b.guestName}
-                  {b.guestPhone ? <div className="text-xs text-muted-foreground">{b.guestPhone}</div> : null}
-                </TableCell>
-                <TableCell>
-                  {b.room?.number}
-                  {b.module ? <div className="text-xs text-muted-foreground">{b.module.name}</div> : null}
-                </TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {fmt(b.checkIn)} → {fmt(b.checkOut)}
-                  {b.posMode === "tab" ? <div className="text-xs text-muted-foreground"><Tx>POS tab</Tx></div> : null}
-                </TableCell>
-                <TableCell>{duration((new Date(b.checkOut).getTime() - new Date(b.checkIn).getTime()) / 60000)}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatMinor(b.priceSnapshotMinor)}
-                  {b.depositMinor > 0 ? <div className="text-xs text-muted-foreground">+{formatMinor(b.depositMinor)} <Tx>deposit</Tx></div> : null}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={STATUS_VARIANT[b.status] ?? "outline"}>{STATUS_LABEL[b.status] ?? b.status}</Badge>
-                  {b.tabInvoice && b.tabInvoice.amountDueMinor > 0 ? (
-                    <div className="mt-1 text-xs text-destructive"><Tx>due </Tx>{formatMinor(b.tabInvoice.amountDueMinor)}</div>
-                  ) : null}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-1">
-                    <Button variant="outline" size="sm" onClick={() => onDetail(b.id)}>
-                      Open
-                    </Button>
-                    {canWrite && b.status === "requested" ? (
-                      <Button size="sm" disabled={busy} onClick={() => runAction(b.id, "confirm")}>
-                        Confirm
-                      </Button>
-                    ) : null}
-                    {canWrite && b.status === "confirmed" ? (
-                      <Button size="sm" disabled={busy} onClick={() => runAction(b.id, "checkin")}>
-                        Check in
-                      </Button>
-                    ) : null}
-                  </div>
-                </TableCell>
+        <div data-tour="stays-table">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Code</TableHead>
+                <TableHead>Guest</TableHead>
+                <TableHead>Room</TableHead>
+                <TableHead>Interval</TableHead>
+                <TableHead>Module</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {bookings.map((b, ix) => (
+                <TableRow key={b.id}>
+                  <TableCell className="font-medium">{b.code}</TableCell>
+                  <TableCell>
+                    {b.guestName}
+                    {b.guestPhone ? <div className="text-xs text-muted-foreground">{b.guestPhone}</div> : null}
+                  </TableCell>
+                  <TableCell>
+                    {b.room?.number}
+                    {b.module ? <div className="text-xs text-muted-foreground">{b.module.name}</div> : null}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {fmt(b.checkIn)} → {fmt(b.checkOut)}
+                    {b.posMode === "tab" ? <div className="text-xs text-muted-foreground"><Tx>POS tab</Tx></div> : null}
+                  </TableCell>
+                  <TableCell>{duration((new Date(b.checkOut).getTime() - new Date(b.checkIn).getTime()) / 60000)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatMinor(b.priceSnapshotMinor)}
+                    {b.depositMinor > 0 ? <div className="text-xs text-muted-foreground">+{formatMinor(b.depositMinor)} <Tx>deposit</Tx></div> : null}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={STATUS_VARIANT[b.status] ?? "outline"}>{STATUS_LABEL[b.status] ?? b.status}</Badge>
+                    {b.tabInvoice && b.tabInvoice.amountDueMinor > 0 ? (
+                      <div className="mt-1 text-xs text-destructive"><Tx>due </Tx>{formatMinor(b.tabInvoice.amountDueMinor)}</div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="outline" size="sm" data-tour={ix === 0 ? "stays-open" : undefined} onClick={() => onDetail(b.id)}>
+                        Open
+                      </Button>
+                      {canWrite && b.status === "requested" ? (
+                        <Button size="sm" disabled={busy} onClick={() => runAction(b.id, "confirm")}>
+                          Confirm
+                        </Button>
+                      ) : null}
+                      {canWrite && b.status === "confirmed" ? (
+                        <Button size="sm" disabled={busy} onClick={() => runAction(b.id, "checkin")}>
+                          Check in
+                        </Button>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </div>
   );
@@ -420,6 +539,17 @@ function DetailDialog({
   if (!data) return <Dialog open onClose={onClose} title="Booking"> <EmptyState title="Loading…" /></Dialog>;
 
   const active = ["requested", "confirmed", "checked_in"].includes(data.status);
+  const FLOW = ["requested", "confirmed", "checked_in", "checked_out"] as const;
+  const flowIdx = FLOW.indexOf(data.status as (typeof FLOW)[number]);
+  const NEXT_ACTION: Record<string, string> = {
+    requested: "Next: Confirm — reserves the room and locks the price.",
+    confirmed: "Next: Check in — the room becomes occupied and any deposit is due.",
+    checked_in: "Next: Check out — issues the settlement invoice and takes payment (extend first if the guest stays longer).",
+    checked_out: "Stay complete — the settlement invoice is issued and settled; the receipt prints per printer settings.",
+    no_show: "Stay closed as a no-show — the room is vacant again.",
+    cancelled: "Stay cancelled — nothing was charged.",
+    void: "Stay voided — this booking is invalid."
+  };
 
   return (
     <Dialog open onClose={onClose} title={`Booking ${data.code}`} description={data.room ? `Room ${data.room.number} · ${data.module?.name ?? ""}` : undefined} wide>
@@ -434,13 +564,48 @@ function DetailDialog({
         <Field label="Deposit">{formatMinor(data.depositMinor)}</Field>
       </div>
 
+      {flowIdx >= 0 ? (
+        <div className="mt-4 rounded-lg border p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Workflow</span>
+            <span className="text-xs text-muted-foreground">{STATUS_LABEL[data.status] ?? data.status}</span>
+          </div>
+          <div className="flex items-center">
+            {FLOW.map((s, i) => {
+              const done = i < flowIdx;
+              const current = i === flowIdx;
+              return (
+                <Fragment key={s}>
+                  <div className="flex min-w-16 flex-col items-center gap-1">
+                    <div
+                      className={cn(
+                        "flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold",
+                        done ? "bg-success text-success-foreground" : current ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {done ? "✓" : i + 1}
+                    </div>
+                    <span className={cn("text-[10px]", current ? "font-medium" : "text-muted-foreground")}>{STATUS_LABEL[s]}</span>
+                  </div>
+                  {i < FLOW.length - 1 ? <div className={cn("h-px flex-1 self-start mt-3", i < flowIdx ? "bg-success" : "bg-border")} /> : null}
+                </Fragment>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-2 rounded-lg bg-muted/60 p-3 text-sm text-muted-foreground">
+        <span className="font-medium text-foreground">{NEXT_ACTION[data.status]}</span>
+      </div>
+
       {data.tabInvoice ? (
         <div className="mt-4 rounded-lg border p-3 text-sm">
           <div className="mb-2 flex items-center justify-between">
             <span className="font-medium"><Tx>Settlement invoice </Tx>{data.tabInvoice.code}</span>
             <Badge variant="outline">{data.tabInvoice.status}</Badge>
           </div>
-{data.tabInvoice.items?.length ? (
+          {data.tabInvoice.items?.length ? (
             <ul className="space-y-1 text-muted-foreground">
               {data.tabInvoice.items.map((i) => (
                 <li key={i.id} className="flex justify-between">
@@ -456,6 +621,13 @@ function DetailDialog({
             <span><Tx>Total</Tx></span>
             <span>{formatMinor(data.tabInvoice.totalMinor)}</span>
           </div>
+          {data.status === "checked_out" ? (
+            <div className="mt-2 flex justify-end">
+              <a href={`/api/stay/bookings/${data.id}/receipt?copies=1`} target="_blank" rel="noopener" className="text-xs underline underline-offset-4">
+                <Tx>Print stay receipt (PDF) →</Tx>
+              </a>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -555,16 +727,21 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function NewBookingDialog({
   modules,
   rooms,
+  properties,
   onClose,
   onDone
 }: {
   modules: ModuleRow[];
   rooms: RoomRow[];
+  properties: PropertyRow[];
   onClose: () => void;
   onDone: () => void;
 }) {
   const { push } = useToast();
+  const { tUi } = useT();
   const now = new Date();
+  const [step, setStep] = useState(0);
+  const [propertyId, setPropertyId] = useState(properties[0]?.id ?? "");
   const [moduleId, setModuleId] = useState(modules[0]?.id ?? "");
   const [roomId, setRoomId] = useState("");
   const [checkIn, setCheckIn] = useState(now.toISOString().slice(0, 16));
@@ -578,13 +755,18 @@ function NewBookingDialog({
   const [notes, setNotes] = useState("");
   const [quote, setQuote] = useState<StayQuote | null>(null);
   const [quoteErr, setQuoteErr] = useState<string | null>(null);
+  const [stepErr, setStepErr] = useState<string | null>(null);
+  const [quoting, setQuoting] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const roomList = useMemo(() => rooms.filter((r) => r.status !== "maintenance"), [rooms]);
+  const roomList = useMemo(() => rooms.filter((r) => r.status !== "maintenance" && (!propertyId || r.propertyId === propertyId)), [rooms, propertyId]);
+  const detailsReady = Boolean(moduleId && roomId && guestName.trim().length >= 2 && checkIn && checkOut);
 
   async function refreshQuote() {
     if (!moduleId || !roomId || !checkIn || !checkOut) return;
+    setQuoting(true);
     const r = await send("/api/stay/quote", "POST", { moduleId, roomId, checkIn, checkOut, guests });
+    setQuoting(false);
     if (r.ok) {
       setQuote(r.data as StayQuote);
       setQuoteErr(null);
@@ -593,6 +775,11 @@ function NewBookingDialog({
       setQuoteErr(r.message ?? "No quote");
     }
   }
+
+  useEffect(() => {
+    if (step === 1 && moduleId && roomId && checkIn && checkOut) void refreshQuote();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, moduleId, roomId, checkIn, checkOut, guests]);
 
   async function save() {
     setBusy(true);
@@ -614,104 +801,265 @@ function NewBookingDialog({
     if (r.ok) onDone();
   }
 
+  const sortedBuckets = quote ? [...quote.buckets].sort((a, b) => a.toMinutes - b.toMinutes) : [];
+  const hitIdx = quote && quote.breakdown.hitToMinutes > 0 ? sortedBuckets.findIndex((b) => b.toMinutes === quote.breakdown.hitToMinutes) : -1;
+  const remBucket =
+    quote && quote.breakdown.remainderMinutes > 0 ? sortedBuckets.find((b) => quote.breakdown.remainderMinutes! <= b.toMinutes) : null;
+
+  const banner = (() => {
+    if (!quote) return "";
+    if (quote.breakdown.hitToMinutes > 0) {
+      return quote.strategyLabel === "Progressive" || hitIdx < sortedBuckets.length - 1
+        ? tUi("First bucket that covers your duration sets the price — extra time inside the same band costs nothing.")
+        : tUi("Flat promotional rate: stays beyond the top bucket stay at the top-bucket price.");
+    }
+    if (quote.breakdown.dayCount > 0) {
+      return tUi("Whole days at the day price, plus the cheapest remainder bucket — capped at the next whole day.");
+    }
+    return "";
+  })();
+
   return (
-    <Dialog open onClose={onClose} title="New short stay" description="Pick a module, a room and an interval — the price is quoted live." wide>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="text-xs font-medium text-muted-foreground">
-          <Tx>Module
-          </Tx><SearchableSelect
-            value={moduleId}
-            onChange={(v) => { setModuleId(v); setQuote(null); }}
-            options={modules.filter((m) => m.isActive).map((m) => ({
-              value: m.id,
-              label: `${m.name} (${m.minDurationMinutes >= 1440 ? `${m.maxDurationMinutes / 1440}d` : `${m.maxDurationMinutes / 60}h`} max)`
-            }))}
-            className="mt-1 w-full rounded-md border bg-card px-2 py-2 text-sm"
-            placeholder="Select module"
-          />
-        </label>
-        <label className="text-xs font-medium text-muted-foreground">
-          <Tx>Room
-          </Tx><SearchableSelect
-            value={roomId}
-            onChange={(v) => { setRoomId(v); setQuote(null); }}
-            options={[
-              { value: "", label: "— select a room —" },
-              ...roomList.map((r) => ({ value: r.id, label: `${r.number} (${r.type} · cap ${r.capacity})` }))
-            ]}
-            className="mt-1 w-full rounded-md border bg-card px-2 py-2 text-sm"
-            placeholder="Select room"
-          />
-        </label>
-        <label className="text-xs font-medium text-muted-foreground">
-          <Tx>Check-in
-          </Tx><Input type="datetime-local" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); setQuote(null); }} className="mt-1" />
-        </label>
-        <label className="text-xs font-medium text-muted-foreground">
-          <Tx>Check-out
-          </Tx><Input type="datetime-local" value={checkOut} onChange={(e) => { setCheckOut(e.target.value); setQuote(null); }} className="mt-1" />
-        </label>
-        <label className="text-xs font-medium text-muted-foreground">
-          <Tx>Guests
-          </Tx><Input type="number" min={1} max={10} value={guests} onChange={(e) => { setGuests(parseInt(e.target.value) || 1); setQuote(null); }} className="mt-1" />
-        </label>
-        <label className="text-xs font-medium text-muted-foreground">
-          <Tx>POS mode
-          </Tx><SearchableSelect
-            value={posMode}
-            onChange={(v) => setPosMode(v as "direct" | "tab")}
-            options={[
-              { value: "direct", label: "Direct — settle at checkout" },
-              { value: "tab", label: "Tab — share one invoice with POS room-charge" }
-            ]}
-            className="mt-1 w-full rounded-md border bg-card px-2 py-2 text-sm"
-            placeholder="Select POS mode"
-          />
-        </label>
-        <label className="text-xs font-medium text-muted-foreground">
-          <Tx>Guest name *
-          </Tx><Input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Walk-in: name" className="mt-1" />
-        </label>
-        <label className="text-xs font-medium text-muted-foreground">
-          <Tx>Guest phone
-          </Tx><Input value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="For repeat guests" className="mt-1" />
-        </label>
-        <label className="text-xs font-medium text-muted-foreground">
-          <Tx>ID / passport
-          </Tx><Input value={guestIdNumber} onChange={(e) => setGuestIdNumber(e.target.value)} className="mt-1" />
-        </label>
-        <label className="text-xs font-medium text-muted-foreground">
-          <Tx>Deposit to collect (major)
-          </Tx><Input type="number" min={0} step="0.01" value={deposit} onChange={(e) => setDeposit(e.target.value)} className="mt-1" />
-        </label>
-        <label className="text-xs font-medium text-muted-foreground sm:col-span-2">
-          <Tx>Notes
-          </Tx><Input value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1" />
-        </label>
+    <Dialog open onClose={onClose} title="New short stay" description="A three-step wizard: details, live price, then review & request." wide>
+      {/* Stepper header */}
+      <div className="mb-4 flex items-center">
+        {[
+          ["Details", "guest, room, interval"],
+          ["Price", "quote + settlement"],
+          ["Review", "confirm & request"]
+        ].map(([label, sub], i) => {
+          const done = i < step;
+          const current = i === step;
+          return (
+            <Fragment key={label}>
+              <div className="flex min-w-28 flex-col items-center gap-1">
+                <div
+                  className={cn(
+                    "flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold",
+                    done ? "bg-success text-success-foreground" : current ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {done ? "✓" : i + 1}
+                </div>
+                <span className={cn("text-xs", current ? "font-medium" : "text-muted-foreground")}><Tx>{label}</Tx></span>
+                <span className="text-[10px] text-muted-foreground"><Tx>{sub}</Tx></span>
+              </div>
+              {i < 2 ? <div className={cn("h-px flex-1", i < step ? "bg-success" : "bg-border")} /> : null}
+            </Fragment>
+          );
+        })}
       </div>
 
-      <div className="mt-4 flex items-center justify-between rounded-lg border p-3">
-        <button type="button" onClick={refreshQuote} className="text-sm font-medium text-primary underline-offset-2 hover:underline">
-          {quote ? "Re-quote" : "Quote price"}
-        </button>
-        {quoteErr ? <span className="text-sm text-destructive">{quoteErr}</span> : null}
-        {quote ? (
-          <div className="text-right">
-            <p className="text-sm text-muted-foreground">
-              {duration(quote.minutes)} · {quote.buckets.length} <Tx>bucket(s)
-            </Tx></p>
-            <p className="text-lg font-semibold tabular-nums">{formatMinor(quote.totalMinor)}</p>
+      {step === 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {properties.length > 1 ? (
+            <label className="text-xs font-medium text-muted-foreground">
+              <Tx>Property
+              </Tx><SearchableSelect
+                value={propertyId}
+                onChange={(v) => { setPropertyId(v); setRoomId(""); setQuote(null); }}
+                options={properties.map((p) => ({ value: p.id, label: p.code }))}
+                className="mt-1 w-full rounded-md border bg-card px-2 py-2 text-sm"
+                placeholder="Select property"
+              />
+            </label>
+          ) : null}
+          <label className="text-xs font-medium text-muted-foreground">
+            <Tx>Module
+            </Tx><SearchableSelect
+              value={moduleId}
+              onChange={(v) => { setModuleId(v); setQuote(null); }}
+              options={modules.filter((m) => m.isActive).map((m) => ({
+                value: m.id,
+                label: `${m.name} (${m.minDurationMinutes >= 1440 ? `${m.maxDurationMinutes / 1440}d` : `${m.maxDurationMinutes / 60}h`} max)`
+              }))}
+              className="mt-1 w-full rounded-md border bg-card px-2 py-2 text-sm"
+              placeholder="Select module"
+            />
+          </label>
+          <label className="text-xs font-medium text-muted-foreground">
+            <Tx>Room
+            </Tx><SearchableSelect
+              value={roomId}
+              onChange={(v) => { setRoomId(v); setQuote(null); }}
+              options={[
+                { value: "", label: "— select a room —" },
+                ...roomList.map((r) => ({ value: r.id, label: `${r.number} (${r.type} · cap ${r.capacity})` }))
+              ]}
+              className="mt-1 w-full rounded-md border bg-card px-2 py-2 text-sm"
+              placeholder="Select room"
+            />
+          </label>
+          <label className="text-xs font-medium text-muted-foreground">
+            <Tx>Check-in
+            </Tx><Input type="datetime-local" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); setQuote(null); }} className="mt-1" />
+          </label>
+          <label className="text-xs font-medium text-muted-foreground">
+            <Tx>Check-out
+            </Tx><Input type="datetime-local" value={checkOut} onChange={(e) => { setCheckOut(e.target.value); setQuote(null); }} className="mt-1" />
+          </label>
+          <label className="text-xs font-medium text-muted-foreground">
+            <Tx>Guests
+            </Tx><Input type="number" min={1} max={10} value={guests} onChange={(e) => { setGuests(parseInt(e.target.value) || 1); setQuote(null); }} className="mt-1" />
+          </label>
+          <label className="text-xs font-medium text-muted-foreground">
+            <Tx>Guest name *
+            </Tx><Input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Walk-in: name" className="mt-1" />
+          </label>
+          <label className="text-xs font-medium text-muted-foreground">
+            <Tx>Guest phone
+            </Tx><Input value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="For repeat guests" className="mt-1" />
+          </label>
+          <label className="text-xs font-medium text-muted-foreground">
+            <Tx>ID / passport
+            </Tx><Input value={guestIdNumber} onChange={(e) => setGuestIdNumber(e.target.value)} className="mt-1" />
+          </label>
+          <label className="text-xs font-medium text-muted-foreground sm:col-span-2">
+            <Tx>Notes
+            </Tx><Input value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1" />
+          </label>
+        </div>
+      ) : null}
+
+      {step === 1 ? (
+        <div className="space-y-3">
+          <div className="rounded-lg border p-3" data-tour="stays-quote">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm font-medium"><Tx>Live price quote</Tx></span>
+              <button
+                type="button"
+                onClick={refreshQuote}
+                disabled={quoting}
+                className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+              >
+                {quoting ? "…" : tUi("Re-quote")}
+              </button>
+            </div>
+            {quoteErr ? <p className="text-sm text-destructive">{quoteErr}</p> : null}
+            {quote ? (
+              <>
+                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    {duration(quote.minutes)} · {quote.strategyLabel}
+                  </span>
+                  <span className="text-xl font-semibold tabular-nums">{formatMinor(quote.totalMinor)}</span>
+                </div>
+                <div className="space-y-0.5">
+                  {sortedBuckets.map((b, i) => {
+                    const isHit = i === hitIdx;
+                    return (
+                      <div
+                        key={b.toMinutes}
+                        className={cn(
+                          "flex items-center justify-between rounded px-2 py-0.5 text-xs",
+                          isHit ? "bg-primary/10 font-medium" : "text-muted-foreground"
+                        )}
+                      >
+                        <span>≤ {duration(b.toMinutes)}</span>
+                        <span className="tabular-nums">{formatMinor(b.priceMinor)}</span>
+                        {isHit ? <span className="text-primary">{tUi("← prices this stay")}</span> : null}
+                      </div>
+                    );
+                  })}
+                </div>
+                {quote.breakdown.dayCount > 0 ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {quote.breakdown.dayCount} <Tx>day(s) @ </Tx>{formatMinor(quote.dayPriceMinor)}
+                    {remBucket ? <Tx> + ≤{duration(quote.breakdown.remainderMinutes)} bucket </Tx> : null}
+                  </p>
+                ) : null}
+                <p className="mt-2 text-xs text-muted-foreground">{banner} {quote.buckets.length} <Tx>bucket(s) in the ladder.</Tx></p>
+              </>
+            ) : quoting ? (
+              <p className="text-sm text-muted-foreground">Pricing…</p>
+            ) : (
+              <p className="text-sm text-muted-foreground"><Tx>Quote the price on this step.</Tx></p>
+            )}
           </div>
-        ) : null}
-      </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-xs font-medium text-muted-foreground">
+              <Tx>Deposit to collect (major)
+              </Tx><Input type="number" min={0} step="0.01" value={deposit} onChange={(e) => setDeposit(e.target.value)} className="mt-1" placeholder="0 = none" />
+            </label>
+            <label className="text-xs font-medium text-muted-foreground">
+              <Tx>Billing mode
+              </Tx><SearchableSelect
+                value={posMode}
+                onChange={(v) => setPosMode(v as "direct" | "tab")}
+                options={[
+                  { value: "direct", label: "Direct — settle at checkout" },
+                  { value: "tab", label: "Tab — share one invoice with POS room-charge" }
+                ]}
+                className="mt-1 w-full rounded-md border bg-card px-2 py-2 text-sm"
+                placeholder="Select billing mode"
+              />
+            </label>
+          </div>
+        </div>
+      ) : null}
+
+      {step === 2 ? (
+        <div className="space-y-2 rounded-lg border p-3 text-sm">
+          <div className="flex justify-between"><span className="text-muted-foreground">Guest</span><span className="font-medium">{guestName}{guestPhone ? ` · ${guestPhone}` : ""}</span></div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Room</span>
+            <span className="font-medium">{(rooms.find((r) => r.id === roomId)?.number) ?? roomId.slice(-6)} · {modules.find((m) => m.id === moduleId)?.name}</span>
+          </div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Interval</span><span className="font-medium">{fmt(checkIn)} → {fmt(checkOut)}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Guests</span><span className="font-medium">{guests}</span></div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Price</span>
+            <span className="font-semibold tabular-nums text-primary">
+              {quote ? `${formatMinor(quote.totalMinor)} (${duration(quote.minutes)} · ${quote.strategyLabel})` : "—"}
+            </span>
+          </div>
+          {parseFloat(deposit) > 0 ? (
+            <div className="flex justify-between"><span className="text-muted-foreground">Deposit</span><span className="font-medium tabular-nums">{formatMinor(Math.round(parseFloat(deposit) * 100))}</span></div>
+          ) : null}
+          <div className="flex justify-between"><span className="text-muted-foreground">Billing</span><span className="font-medium">{posMode === "tab" ? "Tab (POS room-charge)" : "Direct settlement"}</span></div>
+          {notes ? <p className="text-muted-foreground">Notes: {notes}</p> : null}
+        </div>
+      ) : null}
+
+      {stepErr ? <p className="mt-2 text-sm text-destructive">{stepErr}</p> : null}
 
       <div className="mt-4 flex justify-end gap-2">
         <Button variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button disabled={busy || !guestName.trim() || !roomId} onClick={save}>
-          {busy ? "Creating…" : "Request booking"}
-        </Button>
+        {step > 0 ? (
+          <Button variant="outline" onClick={() => { setStep(step - 1); setStepErr(null); }}>
+            Back
+          </Button>
+        ) : null}
+        {step < 2 ? (
+          <Button
+            onClick={() => {
+              if (step === 0) {
+                if (!detailsReady) {
+                  setStepErr("Fill in the guest name and pick a room, module and interval to continue.");
+                  return;
+                }
+                setStep(1);
+                setStepErr(null);
+              } else {
+                if (!quote) {
+                  setStepErr("The price could not be quoted — re-quote or fix the interval.");
+                  return;
+                }
+                setStep(2);
+                setStepErr(null);
+              }
+            }}
+          >
+            Next
+          </Button>
+        ) : (
+          <Button disabled={busy || !guestName.trim() || !roomId || !quote} onClick={save}>
+            {busy ? "Creating…" : "Request booking"}
+          </Button>
+        )}
       </div>
     </Dialog>
   );

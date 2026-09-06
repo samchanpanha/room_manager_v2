@@ -35,21 +35,62 @@ export interface RateBucket {
   priceMinor: number;
 }
 
-/// Progressive bucket price: the FIRST bucket whose coverage upper bound is ≥
-/// the stay minutes wins (a 6h stay priced by the ≤12h bucket, cheaper than
-/// 4h×2). Beyond the last bucket, bill whole days at the day price (the bucket
-/// covering exactly 1440 min) plus the cheapest remainder bucket, or the next
-/// whole day — whichever is cheaper (blended days).
-export function progressiveBucketPrice(buckets: RateBucket[], minutes: number): number {
+export type StayStrategy = "progressive" | "blended";
+
+/// Normalize a module's stored billingStrategy string to a real strategy;
+/// anything unrecognized falls back to progressive (the staging default).
+export function normalizeStrategy(strategy?: string | null): StayStrategy {
+  return strategy === "blended" ? "blended" : "progressive";
+}
+
+export interface PriceBreakdown {
+  /// The bucket upper bound that priced the stay (0 when priced over several
+  /// whole days). UI shows this as "≤{duration} bucket".
+  hitToMinutes: number;
+  /// Whole 24h units billed at day price (blended beyond the ladder only).
+  dayCount: number;
+  /// Remaining minutes billed at the cheapest bucket (blended, remainder 0 for
+  /// progressive plateaus).
+  remainderMinutes: number;
+}
+
+/// Short-stay price engine. Inside the ladder both strategies agree: the FIRST
+/// bucket whose coverage upper bound is ≥ the stay minutes wins (a 6h stay
+/// priced by the ≤12h bucket, cheaper than 4h×2). Beyond the last bucket they
+/// diverge:
+///   progressive — plateau: the stay is billable at the top bucket rate, so an
+///     all-day span caps at the most expensive single bucket (promo-friendly).
+///   blended     — full-day carry: whole days at the day price (the bucket
+///     covering exactly 1440 min) plus the cheapest remainder bucket, or the
+///     next whole day — whichever is cheaper.
+export function priceStay(buckets: RateBucket[], minutes: number, strategy: StayStrategy = "progressive"): number {
   if (buckets.length === 0) return 0;
   const hit = buckets.find((b) => minutes <= b.toMinutes);
   if (hit) return hit.priceMinor;
+  if (strategy === "progressive") return buckets[buckets.length - 1].priceMinor;
   const day = buckets.find((b) => b.toMinutes === DAY_MINUTES);
   if (!day) return buckets[buckets.length - 1].priceMinor;
   const n = Math.floor(minutes / DAY_MINUTES);
   const r = minutes - n * DAY_MINUTES;
   const remainder = r > 0 ? buckets.find((b) => r <= b.toMinutes)?.priceMinor ?? day.priceMinor : 0;
   return Math.min(n * day.priceMinor + remainder, (n + 1) * day.priceMinor);
+}
+
+/// How `priceStay` attributed the stay — a pure mirror used to explain quotes.
+export function priceBreakdown(buckets: RateBucket[], minutes: number, strategy: StayStrategy): PriceBreakdown {
+  if (buckets.length === 0) return { hitToMinutes: 0, dayCount: 0, remainderMinutes: minutes };
+  const hit = buckets.find((b) => minutes <= b.toMinutes);
+  if (hit) return { hitToMinutes: hit.toMinutes, dayCount: 0, remainderMinutes: 0 };
+  if (strategy === "progressive") return { hitToMinutes: buckets[buckets.length - 1].toMinutes, dayCount: 0, remainderMinutes: 0 };
+  const n = Math.floor(minutes / DAY_MINUTES);
+  const r = minutes - n * DAY_MINUTES;
+  return { hitToMinutes: 0, dayCount: n, remainderMinutes: r };
+}
+
+/// Backwards-compatible alias: progressive strategy (within-ladder hit, plateau
+/// beyond the ladder).
+export function progressiveBucketPrice(buckets: RateBucket[], minutes: number): number {
+  return priceStay(buckets, minutes, "progressive");
 }
 
 /// Pick the rate ladder for (property, roomType) at a point in time. Most
@@ -93,10 +134,17 @@ export interface StayQuote {
   guests: number;
   minutes: number;
   buckets: RateBucket[];
-  strategy: string;
+  strategy: StayStrategy;
+  strategyLabel: string;
   totalMinor: number;
   dayPriceMinor: number;
+  breakdown: PriceBreakdown;
 }
+
+export const STRATEGY_LABELS: Record<StayStrategy, string> = {
+  progressive: "Progressive",
+  blended: "Blended (day carry)"
+};
 
 /// Pure price probe — no writes. Validates the interval envelope and guest
 /// count, resolves the ladder and computes the total.
@@ -121,7 +169,8 @@ export async function quoteStay(
   const buckets = await resolveRateLadder(mod.id, room.floor.building.property.id, room.type, at);
   if (buckets.length === 0) return { ok: false, code: "NO_RATES", message: "No active rate rules cover this room/module yet" };
 
-  const totalMinor = progressiveBucketPrice(buckets, minutes);
+  const strategy = normalizeStrategy(mod.billingStrategy);
+  const totalMinor = priceStay(buckets, minutes, strategy);
   const day = buckets.find((b) => b.toMinutes === DAY_MINUTES);
   return {
     ok: true,
@@ -135,9 +184,11 @@ export async function quoteStay(
       guests: input.guests,
       minutes,
       buckets,
-      strategy: mod.billingStrategy,
+      strategy,
+      strategyLabel: STRATEGY_LABELS[strategy],
       totalMinor,
-      dayPriceMinor: day?.priceMinor ?? 0
+      dayPriceMinor: day?.priceMinor ?? 0,
+      breakdown: priceBreakdown(buckets, minutes, strategy)
     }
   };
 }
@@ -372,7 +423,8 @@ export async function confirmBooking(id: string, actor: ActorCtx): Promise<StayR
   }
   const minutes = Math.round((booking.checkOut.getTime() - booking.checkIn.getTime()) / STAY_MINUTES);
   const buckets = await resolveRateLadder(booking.moduleId, booking.propertyId, booking.room.type, new Date());
-  const totalMinor = progressiveBucketPrice(buckets, minutes);
+  const strategy = normalizeStrategy(booking.module.billingStrategy);
+  const totalMinor = priceStay(buckets, minutes, strategy);
   const conflicts = await checkAvailability({ roomId: booking.roomId, checkIn: booking.checkIn, checkOut: booking.checkOut, excludeBookingId: id });
   if (conflicts.length > 0) {
     return { ok: false, code: "UNAVAILABLE", message: "The room became unavailable — refresh and pick another interval", conflicts };
@@ -464,7 +516,8 @@ export async function checkOutBooking(id: string, input: CheckoutInput, actor: A
 
   const minutes = Math.round((checkOut.getTime() - booking.checkIn.getTime()) / STAY_MINUTES);
   const buckets = await resolveRateLadder(booking.moduleId, booking.propertyId, booking.room.type, new Date());
-  const totalMinor = progressiveBucketPrice(buckets, minutes);
+  const strategy = normalizeStrategy(booking.module.billingStrategy);
+  const totalMinor = priceStay(buckets, minutes, strategy);
 
   await prisma.$transaction(async (tx) => {
     const invoiceId = await ensureTabInvoiceTx(tx, id, { propertyId: booking.propertyId, memberProfileId: booking.memberProfileId, checkIn: booking.checkIn, checkOut, createdById: booking.createdById });
@@ -661,7 +714,8 @@ export async function extendBooking(id: string, newCheckOut: Date, actor: ActorC
   if (tail.length > 0) return { ok: false, code: "UNAVAILABLE", message: "The extension window is already booked", conflicts: tail };
 
   const buckets = await resolveRateLadder(booking.moduleId, booking.propertyId, booking.room.type, new Date());
-  const totalMinor = progressiveBucketPrice(buckets, minutes);
+  const strategy = normalizeStrategy(booking.module.billingStrategy);
+  const totalMinor = priceStay(buckets, minutes, strategy);
   await prisma.$transaction(async (tx) => {
     await tx.stayBooking.update({ where: { id }, data: { checkOut: newCheckOut, priceSnapshotMinor: totalMinor } });
     const inv = await tx.invoice.findUnique({ where: { stayBookingId: id } });

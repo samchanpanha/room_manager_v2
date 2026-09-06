@@ -34,7 +34,8 @@ export const MODULE_GUIDE: ModuleGuideEntry[] = [
   { key: "M26", name: "Reports", purpose: "Aggregate dashboards and exportable views.", tips: ["Run the export if you want a file to send."] },
   { key: "M27", name: "Security", purpose: "2FA (TOTP), session and audit hardening.", tips: ["Admin+ must enroll a second factor before using other modules."] },
   { key: "M28", name: "Settings", purpose: "Org profile, branding, locale, printers, flags and secrets.", tips: ["Every change is audited, forward-only.", "Read-only for PM/Accountant."] },
-  { key: "M29", name: "Purchase Orders", purpose: "Plan stock purchases and receive them as stock movements.", tips: ["Placement is bookkeeping; only Receiving changes on-hand stock.", "Partial receipts leave the PO placed until everything arrives."] }
+  { key: "M29", name: "Purchase Orders", purpose: "Plan stock purchases and receive them as stock movements.", tips: ["Placement is bookkeeping; only Receiving changes on-hand stock.", "Partial receipts leave the PO placed until everything arrives."] },
+  { key: "M32", name: "Short Stays", purpose: "Hourly / overnight / day-use rentals with duration-bucket pricing and a booking lifecycle (request → confirm → check-in → check-out).", tips: ["Price = first bucket covering the stay duration; Progressive plateaus at the top bucket, Blended bills whole days + remainder.", "POS room charges stream onto the booking's settlement invoice when the stay is in 'tab' mode — settle them all at check-out.", "Walk-in guests are auto-matched to a member profile by phone; repeats keep history.", "New bookings walk through a 3-step wizard with a live price quote — use the ? Tour button on this page."] }
 ];
 
 /// Driver.js usage note shown in the Help dialog — tells staff how tours work

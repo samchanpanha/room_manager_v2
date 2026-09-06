@@ -42,6 +42,8 @@ export type PosMember = { id: string; label: string };
 
 export type PosProperty = { id: string; code: string; name: string };
 
+export type PosStayTab = { id: string; code: string; guestName: string; roomNumber: string; checkOut: string };
+
 interface Props {
   properties: PosProperty[];
   selectedProperty: PosProperty | null;
@@ -49,6 +51,7 @@ interface Props {
   sales: PosSaleRow[];
   products: PosProduct[];
   members: PosMember[];
+  stayTabs: PosStayTab[];
   categories: string[];
   canWrite: boolean;
 }
@@ -67,7 +70,7 @@ function digitsOnly(s: string): string {
   return s.replace(/\D/g, "");
 }
 
-export function PosTerminal({ properties, selectedProperty, openSession, sales, products, members, categories, canWrite }: Props) {
+export function PosTerminal({ properties, selectedProperty, openSession, sales, products, members, stayTabs, categories, canWrite }: Props) {
   const router = useRouter();
   const { push } = useToast();
   const { tUi } = useT();
@@ -75,6 +78,7 @@ export function PosTerminal({ properties, selectedProperty, openSession, sales, 
   const [cart, setCart] = useState<Record<string, number>>({});
   const [method, setMethod] = useState("cash");
   const [memberId, setMemberId] = useState("");
+  const [stayBookingId, setStayBookingId] = useState("");
   const [ref, setRef] = useState("");
   const [filterCat, setFilterCat] = useState("");
   const [query, setQuery] = useState("");
@@ -205,6 +209,7 @@ export function PosTerminal({ properties, selectedProperty, openSession, sales, 
       method,
       lines,
       memberProfileId: method === "room_charge" ? memberId || undefined : undefined,
+      stayBookingId: method === "room_charge" ? stayBookingId || undefined : undefined,
       ref: ref || undefined
     };
     if (discountMinor > 0) {
@@ -218,6 +223,7 @@ export function PosTerminal({ properties, selectedProperty, openSession, sales, 
       setDiscountValue("");
       setTendered("");
       setDiscountMode("percent");
+      setStayBookingId("");
     });
   }
 
@@ -300,14 +306,14 @@ export function PosTerminal({ properties, selectedProperty, openSession, sales, 
         element: '[data-tour="pos-order"]',
         popover: {
           title: tUi("Current order"),
-          description: tUi("Adjust quantities here and clear the cart. Room charges post a one-time line on the member’s invoice instead of taking money now.")
+          description: tUi("Adjust quantities here and clear the cart. Room charges post a one-time line on the member’s invoice — or stream onto an open stay tab — instead of taking money now.")
         }
       },
       {
         element: '[data-tour="pos-payment"]',
         popover: {
           title: tUi("Payment"),
-          description: tUi("Cash, QR Pay, card, or charge to the member’s room. For cash, entering the tendered amount shows the change due.")
+          description: tUi("Cash, QR Pay, card, or charge to the member’s room. For cash, entering the tendered amount shows the change due. When stay tabs are open you can charge F&B straight onto the booking to settle at check-out.")
         }
       },
       {
@@ -534,6 +540,24 @@ export function PosTerminal({ properties, selectedProperty, openSession, sales, 
                       </option>
                     ))}
                   </Select>
+                  {stayTabs.length > 0 ? (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pos-stay-tab">Stay tab (M32)</Label>
+                      <Select id="pos-stay-tab" value={stayBookingId} onChange={(e) => setStayBookingId(e.target.value)}>
+                        <option value=""><Tx>No stay tab — issue a member invoice</Tx></option>
+                        {stayTabs.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.code} · {t.guestName} · {t.roomNumber} {t.checkOut ? `(out ${new Date(t.checkOut).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })})` : ""}
+                          </option>
+                        ))}
+                      </Select>
+                      {stayBookingId ? (
+                        <p className="text-xs text-muted-foreground">
+                          <Tx>Lines land on this booking’s settlement invoice and settle together at check-out.</Tx>
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className="space-y-1.5">
@@ -608,7 +632,7 @@ export function PosTerminal({ properties, selectedProperty, openSession, sales, 
                 disabled={!canWrite || !openSession || busy || cartLines.length === 0 || (method === "room_charge" && !memberId) || (method === "cash" && Number(tendered) > 0 && changeMinor < 0)}
                 onClick={charge}
               >
-                {method === "room_charge" ? "Charge to room" : method === "cash" && Number(tendered) > 0 ? `Take ${formatMinor(netMinor)} (change ${formatMinor(Math.max(0, changeMinor))})` : `Take ${METHOD_LABELS[method] ?? method}`}
+                {method === "room_charge" ? (stayBookingId ? "Charge to stay tab" : "Charge to room") : method === "cash" && Number(tendered) > 0 ? `Take ${formatMinor(netMinor)} (change ${formatMinor(Math.max(0, changeMinor))})` : `Take ${METHOD_LABELS[method] ?? method}`}
               </Button>
             </div>
           </CardContent>

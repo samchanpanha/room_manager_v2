@@ -12,6 +12,8 @@ import {
   noShowBooking,
   voidBooking
 } from "@/lib/operations/stay-service";
+import { fileStayReceipt } from "@/lib/operations/stay-receipt";
+import { getSettings } from "@/lib/settings";
 
 const actionSchema = z.object({
   action: z.enum(["confirm", "checkin", "checkout", "cancel", "void", "no_show"]),
@@ -46,7 +48,18 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     case "checkout": {
       if (!parsed.data.payMethod) return fail(400, "PAY_METHOD_REQUIRED", "checkout needs payMethod");
       const r = await checkOutBooking(id, { payMethod: parsed.data.payMethod, depositMethod: parsed.data.depositMethod, extendTo: parsed.data.extendTo ? new Date(parsed.data.extendTo) : undefined }, actor, ip);
-      return r.ok ? ok(r.data) : fail(400, r.code, r.message);
+      if (!r.ok) return fail(400, r.code, r.message);
+      // §M28 printer flow: tell the UI how to print the checkout receipt.
+      const { printer } = await getSettings();
+      fileStayReceipt(id).catch(() => undefined);
+      return ok({
+        ...r.data,
+        print: {
+          autoPrintReceipt: printer.autoPrintReceipt ?? false,
+          receiptCopies: Math.max(1, Math.min(12, printer.receiptCopies ?? 1)),
+          receiptUrl: `/api/stay/bookings/${id}/receipt`
+        }
+      });
     }
     case "cancel": {
       const r = await cancelBooking(id, actor);

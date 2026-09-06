@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
+const THEME_COOKIE = "; path=/; max-age=31536000; samesite=lax";
+
+/// Persists to the rm-theme cookie (not localStorage) because the root layout
+/// renders the <html> class from that cookie server-side — so a reload paints
+/// the chosen theme immediately instead of flashing dark→light on hydration.
 export function ThemeToggle() {
   const [dark, setDark] = useState(false);
 
@@ -14,11 +19,7 @@ export function ThemeToggle() {
     const next = !dark;
     setDark(next);
     document.documentElement.classList.toggle("dark", next);
-    try {
-      localStorage.setItem("rm-theme", next ? "dark" : "light");
-    } catch {
-      /* storage unavailable */
-    }
+    document.cookie = `rm-theme=${next ? "dark" : "light"}${THEME_COOKIE}`;
   };
 
   return (
