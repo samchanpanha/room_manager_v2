@@ -63,6 +63,8 @@ export const uiStatus: PhraseTable = {
     "acknowledged": "បានទទួលស្គាល់",
     "proposed": "បានស្នើ",
     "dismissed": "បានបដិសេធ",
+    // user auth (M01 / M34)
+    "must change password": "ត្រូវផ្លាស់ប្តូរពាក្យសម្ងាត់",
     // priorities & severity
     "urgent": "បន្ទាន់",
     "critical": "ធ្ងន់ធ្ងរ",
@@ -225,6 +227,7 @@ export const uiStatus: PhraseTable = {
     "acknowledged": "已受理",
     "proposed": "已提议",
     "dismissed": "已驳回",
+    "must change password": "须更改密码",
     "urgent": "紧急",
     "critical": "严重",
     "high": "高",

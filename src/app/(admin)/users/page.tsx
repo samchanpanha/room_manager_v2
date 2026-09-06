@@ -71,6 +71,11 @@ export default async function UsersPage() {
                   </TableCell>
                   <TableCell>
                     <Badge variant={u.status === "active" ? "success" : "destructive"}>{u.status}</Badge>
+                    {u.mustChangePassword && u.status === "active" ? (
+                      <span className="block">
+                        <Badge variant="warning"><Tx>must change password</Tx></Badge>
+                      </span>
+                    ) : null}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">{formatDate(u.createdAt)}</TableCell>
                   {canUpdate ? (

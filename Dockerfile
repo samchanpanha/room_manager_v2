@@ -52,6 +52,7 @@ RUN chmod +x /docker-entrypoint.sh
 
 # Storage directory for dev-disk driver
 RUN mkdir -p /app/storage/objects && chown -R nextjs:nodejs /app/storage
+ENV STORAGE_DIR=/app/storage
 
 # Data directory for SQLite database
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data

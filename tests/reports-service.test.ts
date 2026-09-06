@@ -32,6 +32,7 @@ function asUser(roles: string[], propertyIds: string[] = [], isSuperAdmin = fals
     sessionId: "s",
     isSuperAdmin,
     totpEnrollmentRequired: false,
+    mustChangePassword: false,
     propertyIds,
     permissions: [
       { module: "M26", action: "read", scope: isSuperAdmin ? ("GLOBAL" as const) : ("PROPERTY" as const) }

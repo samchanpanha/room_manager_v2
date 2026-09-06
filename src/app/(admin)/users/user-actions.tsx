@@ -271,7 +271,7 @@ export function UserRowActions({
             <Input id={`r-pass-${target.id}`} type="password" value={resetPwd} onChange={(e) => setResetPwd(e.target.value)} minLength={8} required />
           </div>
           <p className="text-xs text-muted-foreground">
-            <Tx>Sets a temporary password and makes it mandatory to change at the user's next sign-in.</Tx>
+            <Tx>Sets a temporary password and makes it mandatory to change at the user&apos;s next sign-in.</Tx>
           </p>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setResetOpen(false)}>

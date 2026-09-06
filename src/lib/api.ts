@@ -15,10 +15,20 @@ export async function parseBody<S extends z.ZodTypeAny>(
   schema: S
 ): Promise<{ data: z.infer<S>; response?: undefined } | { data?: undefined; response: NextResponse }> {
   let raw: unknown;
+  let text: string;
   try {
-    raw = await req.json();
+    text = await req.text();
   } catch {
     return { response: fail(400, "INVALID_JSON", "Request body must be valid JSON") };
+  }
+  if (text.trim().length === 0) {
+    raw = {};
+  } else {
+    try {
+      raw = JSON.parse(text);
+    } catch {
+      return { response: fail(400, "INVALID_JSON", "Request body must be valid JSON") };
+    }
   }
   const parsed = schema.safeParse(raw);
   if (!parsed.success) {

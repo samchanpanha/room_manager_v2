@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,6 +67,7 @@ export function PoManager({ canWrite, defaultPropertyId, visibleProperties }: Po
   const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string }>>([]);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const [newOpen, setNewOpen] = useState(false);
   const [receiveFor, setReceiveFor] = useState<PurchaseOrder | null>(null);
 
@@ -93,9 +94,15 @@ export function PoManager({ canWrite, defaultPropertyId, visibleProperties }: Po
   }, [propertyId, status, load]);
 
   async function act(method: string, url: string, body?: unknown): Promise<boolean> {
+    if (busyRef.current) return false;
+    busyRef.current = true;
     setBusy(true);
     try {
-      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+      const res = await fetch(url, {
+        method,
+        headers: body ? { "Content-Type": "application/json" } : undefined,
+        body: body ? JSON.stringify(body) : undefined
+      });
       const data = (await res.json().catch(() => ({}))) as { message?: string };
       if (res.ok) {
         push({ title: "Done", variant: "success" });
@@ -103,9 +110,13 @@ export function PoManager({ canWrite, defaultPropertyId, visibleProperties }: Po
         await load(propertyId, status);
         return true;
       }
-      push({ title: "Failed", description: data.message, variant: "destructive" });
+      push({ title: "Failed", description: data.message ?? "Request failed", variant: "destructive" });
+      return false;
+    } catch {
+      push({ title: "Failed", description: "Request failed — please try again", variant: "destructive" });
       return false;
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }
@@ -238,6 +249,7 @@ function NewPoDialog({ open, onClose, propertyId, stockItems, suppliers, busy, o
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<Array<{ stockItemId: string; qtyMilli: number; unitCostMinor: number }>>([{ stockItemId: "", qtyMilli: 1000, unitCostMinor: 100 }]);
   const [error, setError] = useState<string | null>(null);
+  const busyLocalRef = useRef(false);
 
   function setLine(i: number, patch: Partial<(typeof lines)[number]>) {
     setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -245,22 +257,30 @@ function NewPoDialog({ open, onClose, propertyId, stockItems, suppliers, busy, o
 
   async function submit() {
     setError(null);
+    if (busyLocalRef.current) return;
     if (!propertyId) return setError("No property selected.");
     if (!lines.length || lines.some((l) => !l.stockItemId || l.qtyMilli <= 0)) return setError("Every line needs a stock item and a positive quantity.");
-    const res = await fetch("/api/po", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        propertyId,
-        supplierId: supplierId || undefined,
-        supplierName: freeSupplier || undefined,
-        note: note || undefined,
-        lines
-      })
-    });
-    const data = (await res.json().catch(() => ({}))) as { code?: string; message?: string };
-    if (!res.ok) return setError(data.message ?? "Could not create the purchase order");
-    await onCreated(`Purchase order ${(data as { code?: string }).code ?? ""} created`);
+    busyLocalRef.current = true;
+    try {
+      const res = await fetch("/api/po", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          propertyId,
+          supplierId: supplierId || undefined,
+          supplierName: freeSupplier || undefined,
+          note: note || undefined,
+          lines
+        })
+      });
+      const data = (await res.json().catch(() => ({}))) as { code?: string; message?: string };
+      if (!res.ok) return setError(data.message ?? "Could not create the purchase order");
+      await onCreated(`Purchase order ${(data as { code?: string }).code ?? ""} created`);
+    } catch {
+      setError("Could not create the purchase order — please try again");
+    } finally {
+      busyLocalRef.current = false;
+    }
   }
 
   return (
@@ -339,6 +359,7 @@ function ReceiveDialog({ po, remaining, busy, onClose, onDone }: {
 }) {
   const [qtyInput, setQtyInput] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
+  const busyLocalRef = useRef(false);
 
   useEffect(() => {
     if (po) setQtyInput(Object.fromEntries(Object.entries(remaining).map(([id, r]) => [id, Math.max(0, r)])));
@@ -347,19 +368,26 @@ function ReceiveDialog({ po, remaining, busy, onClose, onDone }: {
 
   async function submit() {
     setError(null);
-    if (!po) return;
+    if (!po || busyLocalRef.current) return;
     const received = Object.entries(qtyInput)
       .filter(([, v]) => v > 0)
       .map(([lineId, qtyMilli]) => ({ lineId, qtyMilli }));
     if (received.length === 0) return setError("Enter at least one received quantity.");
-    const res = await fetch(`/api/po/${po.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ received })
-    });
-    const data = (await res.json().catch(() => ({}))) as { message?: string };
-    if (!res.ok) return setError(data.message ?? "Could not receive stock");
-    await onDone();
+    busyLocalRef.current = true;
+    try {
+      const res = await fetch(`/api/po/${po.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ received })
+      });
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      if (!res.ok) return setError(data.message ?? "Could not receive stock");
+      await onDone();
+    } catch {
+      setError("Could not receive stock — please try again");
+    } finally {
+      busyLocalRef.current = false;
+    }
   }
 
   return (

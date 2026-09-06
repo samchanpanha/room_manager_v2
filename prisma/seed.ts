@@ -262,7 +262,9 @@ async function seedDocTypes(): Promise<void> {
     { id: "receipt", name: "Receipt", kycRequired: false, requiresExpiry: false, sortOrder: 22 },
     { id: "inspection_report", name: "Inspection report", kycRequired: false, requiresExpiry: false, sortOrder: 23 },
     { id: "statement", name: "Owner statement", kycRequired: false, requiresExpiry: false, sortOrder: 24 },
-    { id: "stock_photo", name: "Stock item photo", kycRequired: false, requiresExpiry: false, sortOrder: 30 }
+    { id: "stock_photo", name: "Stock item photo", kycRequired: false, requiresExpiry: false, sortOrder: 30 },
+    { id: "product_photo", name: "POS product photo", kycRequired: false, requiresExpiry: false, sortOrder: 31 },
+    { id: "service_photo", name: "Service catalog photo", kycRequired: false, requiresExpiry: false, sortOrder: 32 }
   ];
   for (const dt of docTypes) {
     await db.docType.upsert({ where: { id: dt.id }, create: dt, update: dt });

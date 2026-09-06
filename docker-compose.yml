@@ -19,6 +19,7 @@ services:
     environment:
       - DATABASE_URL=file:/app/data/rentmanager.db
       - NODE_ENV=production
+      - STORAGE_DIR=/app/storage
       - SESSION_TTL_DAYS=30
       - FILE_SIGNING_SECRET=docker-file-signing-secret-change-me-in-prod
       - PAYMENT_WEBHOOK_SECRET=docker-webhook-secret-change-me-in-prod
