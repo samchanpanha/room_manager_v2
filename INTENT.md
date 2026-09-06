@@ -392,6 +392,20 @@ localStorage (file:// fallback) → `en`; the in-guide switcher writes both. Mis
 structurally drifted translated parts fall back to English with a build warning (h2/TOC counts
 checked against the English part). — affected §13, docs/manual.
 
+v1.6 — 2026-09-06 — Database provider switched from SQLite to PostgreSQL across
+Dev, tests, and Docker (supersedes the v1.1 SQLite-for-portability note). The
+schema was already provider-portable (string enums, integer minor-unit money,
+cuid ids, no raw SQL outside the backup job), so the swap is: `datasource`
+provider → postgresql, a single fresh baseline migration generated from the
+schema (old per-phase SQLite migrations archived under `prisma/migrations-sqlite/`),
+and a `postgres` service in docker-compose (named volume, creates
+`rentmanager_test` on init for `npm test`). The M27 backup job switches from
+SQLite `VACUUM INTO` to `pg_dump` custom-format (postgresql-client installed in
+the runner image). User-facing `contains` filters gained `mode: "insensitive"`
+to preserve the case-insensitive search SQLite's LIKE gave for free. Dev/test
+DATABASE_URL = `postgresql://rentmanager:rentmanager@{localhost|postgres}:5432/rentmanager[_test]`.
+— affected §3, §6, §15 v1.1, M00+, M27, docs/BACKUP.md.
+
 v1.5 — 2026-09-05 — i18n graduates from the single-locale dictionary to switchable UI languages:
 English (`en`), Khmer (`km`), Chinese simplified (`zh`). Resolution order is `rm-locale` cookie
 (LanguageSwitcher in the admin header + standalone on /login) → §M28 `m28.locale.locale` org

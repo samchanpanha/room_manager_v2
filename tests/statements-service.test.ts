@@ -53,15 +53,15 @@ const payableBalance = async () => {
 };
 
 const dropPaymentTriggers = () => {
-  return prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS payment_no_delete`)
-    .then(() => prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS payment_allocation_no_delete`))
-    .then(() => prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS payment_allocation_no_update`));
+  return prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "payment_no_delete" ON "Payment"`)
+    .then(() => prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "payment_allocation_no_delete" ON "PaymentAllocation"`))
+    .then(() => prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "payment_allocation_no_update" ON "PaymentAllocation"`));
 };
 
 const recreatePaymentTriggers = () => {
-  return prisma.$executeRawUnsafe(`CREATE TRIGGER payment_no_delete BEFORE DELETE ON "Payment" BEGIN SELECT RAISE(ABORT, 'Payments are append-only: refund or fail instead'); END;`)
-    .then(() => prisma.$executeRawUnsafe(`CREATE TRIGGER payment_allocation_no_delete BEFORE DELETE ON "PaymentAllocation" BEGIN SELECT RAISE(ABORT, 'Payment allocations are append-only'); END;`))
-    .then(() => prisma.$executeRawUnsafe(`CREATE TRIGGER payment_allocation_no_update BEFORE UPDATE ON "PaymentAllocation" BEGIN SELECT RAISE(ABORT, 'Payment allocations are immutable'); END;`));
+  return prisma.$executeRawUnsafe(`CREATE TRIGGER "payment_no_delete" BEFORE DELETE ON "Payment" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Payments are append-only: refund or fail instead')`)
+    .then(() => prisma.$executeRawUnsafe(`CREATE TRIGGER "payment_allocation_no_delete" BEFORE DELETE ON "PaymentAllocation" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Payment allocations are append-only')`))
+    .then(() => prisma.$executeRawUnsafe(`CREATE TRIGGER "payment_allocation_no_update" BEFORE UPDATE ON "PaymentAllocation" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Payment allocations are immutable')`));
 };
 
 /// Purge payments + allocations on this DISPOSABLE copy (append-only rows:

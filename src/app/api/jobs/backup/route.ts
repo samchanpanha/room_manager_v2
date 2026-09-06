@@ -5,8 +5,8 @@ import { logAudit } from "@/lib/audit";
 import { hasModuleAccess } from "@/lib/rbac/can";
 
 /// §M27 nightly backup job (cron shape: POST after backup window). Snapshot =
-/// SQLite `VACUUM INTO` (consistent on a live DB), newest 7 kept; runbook:
-/// docs/BACKUP.md. M27:update (Admin+/Super Admin, §15 v1.4c).
+/// Postgres `pg_dump` custom-format (consistent on a live DB), newest 7 kept;
+/// runbook: docs/BACKUP.md. M27:update (Admin+/Super Admin, §15 v1.4c).
 export async function POST(req: Request) {
   const user = await getAuthUser();
   if (!user) return fail(401, "UNAUTHENTICATED", "Sign in required");

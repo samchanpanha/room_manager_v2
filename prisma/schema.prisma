@@ -1,7 +1,7 @@
-// RentManager — Prisma schema v1 (Phases 0–2: M00 kernel, M01 RBDC, M04 physical inventory)
+// RentManager — Prisma schema v2 (PostgreSQL everywhere — Dev, CI, Docker)
 // Notes:
-//  - Dev datasource is SQLite for sandbox portability; production target is PostgreSQL (INTENT.md §15 v1.1).
-//  - Enum-like columns are strings (SQLite portability); valid values are enforced in zod/application logic.
+//  - Datasource is PostgreSQL (INTENT.md §15 v1.1 production target).
+//  - Enum-like columns are strings; valid values are enforced in zod/application logic.
 //  - All money columns are integer minor units (INTENT.md §9.1).
 //  - Migrations are additive; never destructive (INTENT.md §3).
 
@@ -10,7 +10,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

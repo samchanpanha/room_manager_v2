@@ -33,7 +33,7 @@ tests/
 vitest.config.ts
 __snapshots__/
 
-# Dev/test databases (seed creates fresh data)
+# SQLite-era databases (Postgres is the datasource — seed creates fresh data)
 prisma/dev.db
 prisma/test-billing.db
 test-billing.db

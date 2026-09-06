@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const envSchema = z.object({
-  DATABASE_URL: z.string().min(1).default("file:./dev.db"),
+  DATABASE_URL: z.string().min(1).default("postgresql://rentmanager:rentmanager@localhost:5432/rentmanager"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   SESSION_TTL_DAYS: z.coerce.number().int().positive().default(30),
   PAYMENT_WEBHOOK_SECRET: z.string().min(8).default("dev-webhook-secret-change-me"),

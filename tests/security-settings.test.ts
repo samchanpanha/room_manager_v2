@@ -1,7 +1,8 @@
 /**
  * Phase 21 (M27 Security + M28 Settings) — service-level tests against a
- * disposable COPY of the seeded database:
- *   DATABASE_URL=file:./test-billing.db npx vitest run tests/security-settings.test.ts
+ * disposable COPY of the seeded database (PostgreSQL rentmanager_test):
+ *   npm run test:pg:migrate && npm run test:pg:seed
+ *   DATABASE_URL=postgresql://rentmanager:rentmanager@localhost:5432/rentmanager_test npx vitest run tests/security-settings.test.ts
  *
  * Covers: RFC-6238 TOTP vectors (±1 window), sealed login challenges, AES-256-GCM
  * secret sealing + masking, the mandatory-enrollment permission gate, audit PII
@@ -12,6 +13,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 
 import { prisma } from "@/lib/db";
@@ -258,14 +260,26 @@ describe("M28 opening balances (balanced `opening` posting)", () => {
   });
 });
 
-describe("M27 backup snapshot job", () => {
+/// The backup job shells out to `pg_dump` (installed in the Docker image via
+/// postgresql-client). Skip when the binary is absent locally so the suite
+/// still runs on machines without the Postgres client tools.
+const hasPgDump = () => {
+  try {
+    return spawnSync("which", ["pg_dump"]).status === 0;
+  } catch {
+    return false;
+  }
+};
+const describeBackup = hasPgDump() ? describe : describe.skip;
+
+describeBackup("M27 backup snapshot job", () => {
   it("creates a consistent snapshot and prunes to the retention count", async () => {
     const dir = "/tmp/p21-backups";
     rmSync(dir, { recursive: true, force: true });
     process.env.BACKUP_DIR = dir;
     mkdirSync(dir, { recursive: true });
     for (let i = 0; i < KEEP_BACKUPS + 2; i++) {
-      writeFileSync(path.join(dir, `backup-2020-01-0${i % 10}-00-00-00-000Z.db`), "stale");
+      writeFileSync(path.join(dir, `backup-2020-01-0${i % 10}-00-00-00-000Z.dump`), "stale");
     }
     const result = await backupDatabase();
     expect(statSync(result.file).size).toBeGreaterThan(0);

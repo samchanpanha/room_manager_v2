@@ -32,22 +32,23 @@ let paymentTxBaseline = 0;
 
 beforeAll(async () => {
   // Self-clean payments + billing + ledger state so the flow starts pristine.
-  // Payments/allocations are append-only (Phase 8 triggers); the fresh copy is
-  // usually empty, but run order is not guaranteed — so the cleanup drops the
-  // payment triggers on this DISPOSABLE copy, purges leftovers and recreates
-  // them byte-identical to the Phase 8 migration.
-  await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS payment_no_delete`);
-  await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS payment_allocation_no_delete`);
-  await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS payment_allocation_no_update`);
-  await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS deposit_tx_no_delete`);
-  await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS deposit_tx_no_update`);
+  // Payments/allocations are append-only (append-only triggers); the fresh
+  // Postgres schema is usually clean, but run order is not guaranteed — so
+  // the cleanup drops the append-only triggers on this DISPOSABLE test
+  // database, purges leftovers and recreates them byte-identical to the
+  // baseline (`reject_append_only` guard, migration 2026…_init_postgres).
+  await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "payment_no_delete" ON "Payment"`);
+  await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "payment_allocation_no_delete" ON "PaymentAllocation"`);
+  await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "payment_allocation_no_update" ON "PaymentAllocation"`);
+  await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "deposit_tx_no_delete" ON "DepositTransaction"`);
+  await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "deposit_tx_no_update" ON "DepositTransaction"`);
   await prisma.paymentAllocation.deleteMany();
   await prisma.payment.deleteMany();
-  await prisma.$executeRawUnsafe(`CREATE TRIGGER payment_no_delete BEFORE DELETE ON "Payment" BEGIN SELECT RAISE(ABORT, 'Payments are append-only: refund or fail instead'); END;`);
-  await prisma.$executeRawUnsafe(`CREATE TRIGGER payment_allocation_no_delete BEFORE DELETE ON "PaymentAllocation" BEGIN SELECT RAISE(ABORT, 'Payment allocations are append-only'); END;`);
-  await prisma.$executeRawUnsafe(`CREATE TRIGGER payment_allocation_no_update BEFORE UPDATE ON "PaymentAllocation" BEGIN SELECT RAISE(ABORT, 'Payment allocations are immutable'); END;`);
-  await prisma.$executeRawUnsafe(`CREATE TRIGGER deposit_tx_no_update BEFORE UPDATE ON "DepositTransaction" BEGIN SELECT RAISE(ABORT, 'Deposit movements are append-only'); END;`);
-  await prisma.$executeRawUnsafe(`CREATE TRIGGER deposit_tx_no_delete BEFORE DELETE ON "DepositTransaction" BEGIN SELECT RAISE(ABORT, 'Deposit movements are append-only'); END;`);
+  await prisma.$executeRawUnsafe(`CREATE TRIGGER "payment_no_delete" BEFORE DELETE ON "Payment" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Payments are append-only: refund or fail instead')`);
+  await prisma.$executeRawUnsafe(`CREATE TRIGGER "payment_allocation_no_delete" BEFORE DELETE ON "PaymentAllocation" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Payment allocations are append-only')`);
+  await prisma.$executeRawUnsafe(`CREATE TRIGGER "payment_allocation_no_update" BEFORE UPDATE ON "PaymentAllocation" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Payment allocations are immutable')`);
+  await prisma.$executeRawUnsafe(`CREATE TRIGGER "deposit_tx_no_update" BEFORE UPDATE ON "DepositTransaction" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Deposit movements are append-only')`);
+  await prisma.$executeRawUnsafe(`CREATE TRIGGER "deposit_tx_no_delete" BEFORE DELETE ON "DepositTransaction" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Deposit movements are append-only')`);
   // Deposits (and their invoice link) may exist when this suite runs late —
   // they Restrict-delete the deposit invoices below.
   await prisma.deposit.updateMany({ data: { invoiceId: null } });

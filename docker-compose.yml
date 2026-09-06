@@ -1,14 +1,41 @@
 # ──────────────────────────────────────────────────────────────────────────────
-# RentManager — Docker Compose (local development)
+# RentManager — Docker Compose (local development, PostgreSQL)
 # ──────────────────────────────────────────────────────────────────────────────
 # Usage:
 #   docker compose up --build          # build + start (foreground)
 #   docker compose up -d --build       # build + start (detached)
 #   docker compose down                # stop + remove container
 #   docker compose logs -f rentmanager # follow logs
+#
+# PostgreSQL:
+#   - `rentmanager` DB for the app (persistent named volume)
+#   - `rentmanager_test` DB created on first init (host-side `npm test`)
+#   - exposed on host port 5432 for local `npm run dev` / `npm test`
 # ──────────────────────────────────────────────────────────────────────────────
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rentmanager-postgres
+    environment:
+      POSTGRES_USER: rentmanager
+      POSTGRES_PASSWORD: rentmanager
+      POSTGRES_DB: rentmanager
+    ports:
+      - "5432:5432"
+    volumes:
+      # Persistent Postgres data
+      - rentmanager-postgres:/var/lib/postgresql/data
+      # One-time init: creates the test/CI database
+      - ./deploy/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rentmanager -d rentmanager"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
   rentmanager:
     build:
       context: .
@@ -16,8 +43,11 @@ services:
     container_name: rentmanager
     ports:
       - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
-      - DATABASE_URL=file:/app/data/rentmanager.db
+      - DATABASE_URL=postgresql://rentmanager:rentmanager@postgres:5432/rentmanager
       - NODE_ENV=production
       - STORAGE_DIR=/app/storage
       - SESSION_TTL_DAYS=30
@@ -30,8 +60,6 @@ services:
       - SETTINGS_ENC_KEY=docker-settings-enc-key-change-me-32b
       - COOKIE_SECURE=false
     volumes:
-      # Persistent SQLite database
-      - rentmanager-data:/app/data
       # File storage (dev-disk driver)
       - rentmanager-storage:/app/storage
       # Backup snapshots
@@ -45,6 +73,6 @@ services:
       start_period: 40s
 
 volumes:
-  rentmanager-data:
+  rentmanager-postgres:
   rentmanager-storage:
   rentmanager-backups:

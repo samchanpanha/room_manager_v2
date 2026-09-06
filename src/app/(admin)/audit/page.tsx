@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
 import { getAuthUser } from "@/lib/auth/session";
 import { can } from "@/lib/rbac/can";
 import { MODULES } from "@/lib/rbac/catalog";
@@ -28,9 +29,9 @@ export default async function AuditPage({
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page ?? "1") || 1);
 
-  const where = {
+  const where: Prisma.AuditLogWhereInput = {
     ...(sp.module ? { module: sp.module } : {}),
-    ...(sp.q ? { OR: [{ actorName: { contains: sp.q } }, { summary: { contains: sp.q } }] } : {})
+    ...(sp.q ? { OR: [{ actorName: { contains: sp.q, mode: "insensitive" } }, { summary: { contains: sp.q, mode: "insensitive" } }] } : {})
   };
 
   const [logs, total] = await Promise.all([

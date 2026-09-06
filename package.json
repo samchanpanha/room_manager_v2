@@ -8,13 +8,16 @@
     "start": "next start -H 0.0.0.0 -p 3000",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "cp prisma/dev.db prisma/test-billing.db && DATABASE_URL=file:./test-billing.db vitest run",
-    "test:watch": "vitest",
+    "test": "npm run test:pg:reset && DATABASE_URL=postgresql://rentmanager:rentmanager@localhost:5432/rentmanager_test vitest run",
+    "test:watch": "DATABASE_URL=postgresql://rentmanager:rentmanager@localhost:5432/rentmanager_test vitest",
+    "test:pg:reset": "DATABASE_URL=postgresql://rentmanager:rentmanager@localhost:5432/rentmanager_test npx prisma migrate reset --force --skip-generate",
+    "test:pg:migrate": "DATABASE_URL=postgresql://rentmanager:rentmanager@localhost:5432/rentmanager_test npx prisma migrate deploy",
+    "test:pg:seed": "DATABASE_URL=postgresql://rentmanager:rentmanager@localhost:5432/rentmanager_test tsx prisma/seed.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force && npm run db:seed",
-    "test:billing": "cp prisma/dev.db prisma/test-billing.db && vitest run tests/billing-service.test.ts"
+    "test:billing": "npm run test:pg:reset && DATABASE_URL=postgresql://rentmanager:rentmanager@localhost:5432/rentmanager_test vitest run tests/billing-service.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -6,7 +6,8 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.ts"],
     setupFiles: ["tests/setup.ts"],
-    // DB-backed suites share one SQLite copy — they must not run in parallel
+    // DB-backed suites share one Postgres test database (rentmanager_test)
+    // — they must not run in parallel
     fileParallelism: false
   },
   resolve: {

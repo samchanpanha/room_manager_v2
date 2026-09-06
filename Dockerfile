@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────────────────────────────────────
-# RentManager — Multi-stage Dockerfile (Next.js 15 + Prisma + SQLite)
+# RentManager — Multi-stage Dockerfile (Next.js 15 + Prisma + PostgreSQL)
 # ──────────────────────────────────────────────────────────────────────────────
 
 # ── Stage 1: Install dependencies ────────────────────────────────────────────
@@ -29,6 +29,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# PostgreSQL client tools: pg_dump (backup job M27) + pg_isready (entrypoint wait)
+RUN apk add --no-cache postgresql-client
+
 # Copy the FULL node_modules (includes prisma CLI, tsx, esbuild — needed
 # at runtime for migrations and seeding)
 COPY --from=builder /app/node_modules ./node_modules
@@ -56,9 +59,6 @@ RUN chmod +x /docker-entrypoint.sh
 # Storage directory for dev-disk driver
 RUN mkdir -p /app/storage/objects && chown -R nextjs:nodejs /app/storage
 ENV STORAGE_DIR=/app/storage
-
-# Data directory for SQLite database
-RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
 
 # Backup directory
 RUN mkdir -p /app/backups && chown -R nextjs:nodejs /app/backups

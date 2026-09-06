@@ -44,9 +44,9 @@ export default async function MembersPage({
     ...(sp.q
       ? {
           OR: [
-            { party: { name: { contains: sp.q } } },
-            { party: { email: { contains: sp.q } } },
-            { idNumber: { contains: sp.q } }
+            { party: { name: { contains: sp.q, mode: "insensitive" } } },
+            { party: { email: { contains: sp.q, mode: "insensitive" } } },
+            { idNumber: { contains: sp.q, mode: "insensitive" } }
           ]
         }
       : {})
