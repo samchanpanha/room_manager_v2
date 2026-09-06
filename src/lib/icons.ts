@@ -31,6 +31,7 @@ export function navIcon(label: string): IconName {
     case "Purchase Orders": return "file-plus";
     case "Attendance": return "clock";
     case "My Account": return "user";
+    case "Help & Guide": return "book";
     case "Telegram Bot": return "send";
     case "Reports": return "chart";
     case "Users": return "user";
