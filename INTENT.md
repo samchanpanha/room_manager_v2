@@ -378,6 +378,20 @@ Any change request is appended here as: `vX.Y — date — description — affec
 then specs/matrix/build order are updated in place before code changes begin.
 (Log starts below this line.)
 
+v1.6 — 2026-09-06 — The User & Administrator Guide (the static single-file site built from
+`docs/manual/*.md` by `docs/manual/site/build.mjs`, published to `public/guide/` and served in-app
+at `/guide`) graduates to trilingual: English (`en`), Khmer (`km`), Chinese simplified (`zh`).
+All 13 parts are translated to `docs/manual/{km,zh}/*.md` — code-fenced state machines,
+ledger entries and the billing-math block, plus module codes (Mxx) and menu names, stay in
+English; h1/h2 structure mirrors the English 1:1 so per-part anchors are locale-stable
+(`sec-{partSlug}-{enSlug}` from the English slugs). Site chrome (meta, group/part labels,
+home, 14 walkthroughs, 17 diagrams) is localized in `docs/manual/site/i18n/{en,km,zh}.mjs`.
+Locale resolution mirrors the app: `rm-locale` cookie (the same non-httpOnly cookie the app's
+LanguageSwitcher writes — one shared cookie keeps guide and app in sync) → `rm-guide-locale`
+localStorage (file:// fallback) → `en`; the in-guide switcher writes both. Missing or
+structurally drifted translated parts fall back to English with a build warning (h2/TOC counts
+checked against the English part). — affected §13, docs/manual.
+
 v1.5 — 2026-09-05 — i18n graduates from the single-locale dictionary to switchable UI languages:
 English (`en`), Khmer (`km`), Chinese simplified (`zh`). Resolution order is `rm-locale` cookie
 (LanguageSwitcher in the admin header + standalone on /login) → §M28 `m28.locale.locale` org

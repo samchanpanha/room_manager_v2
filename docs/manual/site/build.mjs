@@ -1,56 +1,90 @@
-// Builds a self-contained single-page documentation site from the manual .md files.
+// Builds a self-contained single-page documentation site from the manual .md
+// files, in the app's three switchable languages:
+//   en — English (docs/manual/*.md — source of truth)
+//   km — Khmer   (docs/manual/km/*.md)
+//   zh — Chinese (docs/manual/zh/*.md)
 // Run: node docs/manual/site/build.mjs   ->   docs/manual/site/index.html
+// Also published into the Next.js public/ folder (in-app at /guide).
+//
+// Structural contract: km/zh parts must mirror the English parts' h2
+// structure 1:1 (same count, same order). Section anchors always use the
+// ENGLISH slugs, so the same link works in every language. The build warns
+// on any drift instead of failing.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { SITE_LOCALES, SITE_LOCALE_META, GROUP_NAMES, PART_LABELS, UI, WALKS, DIAGRAMS } from "./i18n.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const manualDir = path.resolve(here, "..");
 
 const PARTS = [
-  { file: "01-system-overview.md", label: "System Overview", group: "Start" },
-  { file: "02-quick-start.md", label: "Quick Start", group: "Start" },
-  { file: "03-user-guide.md", label: "User Guide", group: "Using RentManager" },
-  { file: "04-business-workflows.md", label: "Business Workflows", group: "Using RentManager" },
-  { file: "05-financial-accounting-guide.md", label: "Financial & Accounting", group: "Finance & Insights" },
-  { file: "06-reports-guide.md", label: "Reports", group: "Finance & Insights" },
-  { file: "07-telegram-notifications.md", label: "Telegram & Notifications", group: "Finance & Insights" },
-  { file: "08-administrator-guide.md", label: "Administrator Guide", group: "Administration" },
-  { file: "09-security-guide.md", label: "Security Guide", group: "Administration" },
-  { file: "10-troubleshooting.md", label: "Troubleshooting", group: "Reference" },
-  { file: "11-faq.md", label: "FAQ", group: "Reference" },
-  { file: "12-glossary.md", label: "Glossary", group: "Reference" },
-  { file: "13-golden-paths.md", label: "Golden Paths & Scenarios", group: "Reference" }
+  { file: "01-system-overview.md", g: 0 },
+  { file: "02-quick-start.md", g: 0 },
+  { file: "03-user-guide.md", g: 1 },
+  { file: "04-business-workflows.md", g: 1 },
+  { file: "05-financial-accounting-guide.md", g: 2 },
+  { file: "06-reports-guide.md", g: 2 },
+  { file: "07-telegram-notifications.md", g: 2 },
+  { file: "08-administrator-guide.md", g: 3 },
+  { file: "09-security-guide.md", g: 3 },
+  { file: "10-troubleshooting.md", g: 4 },
+  { file: "11-faq.md", g: 4 },
+  { file: "12-glossary.md", g: 4 },
+  { file: "13-golden-paths.md", g: 4 }
 ];
 
 const fileSlug = (f) => f.replace(/\.md$/, "");
 const slugify = (s) =>
   s.toLowerCase().replace(/[^a-z0-9\s-]/g, "").trim().replace(/\s+/g, "-");
+const normDashes = (s) => s.replace(/-+/g, "-");
 
 function esc(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function inline(s) {
-  // order: inline code, bold, italic, links
-  s = esc(s);
-  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
-  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-  s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
-  // links [text](href)  — rewrite .md links to internal routes
-  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, text, href) => {
-    const mm = href.match(/^(\d{2}-[a-z0-9-]+)\.md(?:#(.*))?$/);
-    if (mm) {
-      const target = mm[1];
-      const frag = mm[2] ? `#sec-${target}-${mm[2]}` : "";
-      return `<a href="#/part/${target}${frag}" class="inlink">${text}</a>`;
-    }
-    return `<a href="${esc(href)}" target="_blank" rel="noopener">${text}</a>`;
-  });
-  return s;
+// ── Diagram rendering (data-driven, shared by all languages) ──
+function nodeHtml(n) {
+  const [a, b] = n;
+  const v = a && /^v-(?:blue|green|amber|teal)$/.test(a) ? a : "";
+  const t = v ? b : a;
+  return `<div class="flow-node ${v}">${esc(t)}</div>`;
 }
 
-function table(rows) {
+function inlineMd(s) {
+  // plain inline markdown for diagram formula rows (no links)
+  return esc(s)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+}
+
+function renderDiagram(spec) {
+  if (spec.formula) {
+    const rows = spec.formula.rows;
+    const body = rows
+      .map(
+        (r, i) =>
+          `<div class="formula-row">${inlineMd(r)}</div>${i === rows.length - 2 ? '<div class="formula-rule"></div>' : ""}`
+      )
+      .join("");
+    return `<figure class="diagram"><figcaption>${esc(spec.cap)}</figcaption><div class="formula"><div class="formula-title">${esc(spec.formula.title)}</div>${body}</div></figure>`;
+  }
+  const arrow = spec.horiz ? '<div class="flow-arrow flow-arrow-h">→</div>' : '<div class="flow-arrow">↓</div>';
+  const nodes = spec.nodes.map(nodeHtml).join(arrow);
+  return `<figure class="diagram"><figcaption>${esc(spec.cap)}</figcaption><div class="flow${spec.horiz ? " flow-h" : ""}">${nodes}</div></figure>`;
+}
+
+// ── Markdown → HTML (per part, per language) ──
+function h2Texts(md) {
+  return md
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .filter((l) => /^##\s+/.test(l))
+    .map((l) => l.replace(/^##\s+/, "").trim());
+}
+
+function table(rows, inline) {
   const parse = (l) => l.replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
   const header = parse(rows[0]);
   const body = rows.slice(2).map(parse);
@@ -66,226 +100,42 @@ function table(rows) {
   return h;
 }
 
-// ── Flow diagram builder (returns HTML) ──
-function node(n, variant = "") {
-  return `<div class="flow-node ${variant}">${n}</div>`;
-}
-function chain(items, opts = {}) {
-  const horiz = opts.horiz ? " flow-h" : "";
-  const arrow = opts.horiz ? '<div class="flow-arrow flow-arrow-h">→</div>' : '<div class="flow-arrow">↓</div>';
-  return `<div class="flow${horiz}">${items
-    .map((it, i) => {
-      const [txt, v] = typeof it === "string" ? [it, ""] : [it.t, it.v || ""];
-      return node(txt, v) + (i < items.length - 1 ? arrow : "");
-    })
-    .join("")}</div>`;
-}
-function formula(title, rows) {
-  return `<div class="formula"><div class="formula-title">${title}</div>${rows
-    .map((r, i) => `<div class="formula-row">${inline(r)}</div>${i === rows.length - 2 ? '<div class="formula-rule"></div>' : ""}`)
-    .join("")}</div>`;
-}
-
-const DIAGRAMS = {
-  "01-system-overview": {
-    "14-how-the-system-works-the-end-to-end-lifecycle": () =>
-      `<figure class="diagram"><figcaption>End-to-end lifecycle — how information moves</figcaption>
-      ${chain([
-        { t: "Sign in → Dashboard", v: "v-blue" },
-        "Property → Building → Floor → Room (price &amp; status)",
-        "Owner + Owner contract",
-        { t: "Member profile + KYC (prospect → verified)", v: "v-green" },
-        { t: "Lease activated — room occupied, deposit billed, services on", v: "v-green" },
-        "Monthly billing job → Invoice (rent + services + utilities)",
-        { t: "Member pays (QR / cash / bank / card) → Receipt", v: "v-amber" },
-        "Ledger posts balanced entries (append-only)",
-        "Expenses · POS sales · stock movements",
-        { t: "Profit &amp; Loss → Owner statement → paid", v: "v-teal" },
-        "Reports · dashboard KPIs · Telegram"
-      ])}
-      </figure>`,
-    "15-key-relationships-between-modules": () =>
-      `<figure class="diagram"><figcaption>The hierarchy everything hangs off</figcaption>
-      ${chain([
-        "Property",
-        "Building (owned by one Owner)",
-        "Floor",
-        "Room",
-        "Beds · Meters · Leases · Tickets",
-        { t: "Lease → Invoices → Payments → Ledger", v: "v-teal" }
-      ], { horiz: false })}
-      </figure>`
-  },
-  "03-user-guide": {
-    "1-authentication-login": () =>
-      `<figure class="diagram"><figcaption>Signing in</figcaption>
-      ${chain([
-        "Open login · pick language (English / ខ្មែរ / 中文)",
-        "Email + password",
-        "2FA code? (required for Admin+)",
-        { t: "First login? Set a new password", v: "v-amber" },
-        { t: "Dashboard 🎉", v: "v-green" }
-      ])}
-      </figure>`,
-    "3-properties-rooms-m04": () =>
-      `<figure class="diagram"><figcaption>Room status machine</figcaption>
-      ${chain([
-        { t: "vacant", v: "v-green" },
-        "reserved (draft lease)",
-        { t: "occupied (lease active)", v: "v-blue" },
-        "cleaning (after move-out)",
-        "maintenance (reason required)",
-        { t: "back to vacant", v: "v-green" }
-      ], { horiz: true })}
-      </figure>`,
-    "4-members-m02-documents-m17": () =>
-      `<figure class="diagram"><figcaption>Member lifecycle</figcaption>
-      ${chain([
-        { t: "prospect", v: "v-amber" },
-        "KYC complete → verified",
-        "lease active → active",
-        "notice given",
-        { t: "moved_out", v: "v-blue" }
-      ], { horiz: true })}
-      </figure>`,
-    "6-leases-contracts-m05": () =>
-      `<figure class="diagram"><figcaption>Lease lifecycle &amp; its effects</figcaption>
-      ${chain([
-        { t: "draft — reserves the room", v: "v-amber" },
-        { t: "activate — room = occupied · member = active · deposit billed · first invoice scheduled", v: "v-green" },
-        "notice (move-out)",
-        { t: "terminate / complete — room = cleaning · member = moved_out · deposit settlement", v: "v-blue" }
-      ])}
-      </figure>`,
-    "10-invoices-monthly-billing-m07": () =>
-      `<figure class="diagram"><figcaption>An invoice's life</figcaption>
-      ${chain([
-        { t: "draft", v: "v-amber" },
-        "issued (immutable · gapless number · PDF filed)",
-        "partial_paid",
-        { t: "paid", v: "v-green" },
-        "overdue (after grace) / void (Super Admin + reason)"
-      ], { horiz: true })}
-      </figure>`,
-    "11-payments-receipts-m09": () =>
-      `<figure class="diagram"><figcaption>Payment lifecycle</figcaption>
-      ${chain([
-        { t: "pending", v: "v-amber" },
-        "confirmed → allocated oldest-first → receipt RCP-… → ledger posts",
-        { t: "refunded (Accountant+)", v: "v-blue" },
-        "failed (no receipt / no ledger impact)"
-      ])}
-      </figure>`,
-    "13-deposits-m10": () =>
-      `<figure class="diagram"><figcaption>Deposit lifecycle (money held, not income)</figcaption>
-      ${chain([
-        "billed (installment invoices at activation)",
-        "held in 2100 Deposit Liability",
-        { t: "settled: deductions (evidence) + refund (Accountant approval)", v: "v-teal" },
-        "liability nets to 0 for the closed lease"
-      ])}
-      </figure>`,
-    "18-pos-m14": () =>
-      `<figure class="diagram"><figcaption>POS register session</figcaption>
-      ${chain([
-        "Open session (opening float)",
-        "Sell — cash / QR / card / charge to room",
-        "Stock decrements · receipt PDF filed",
-        { t: "Close session — count cash → variance recorded", v: "v-amber" }
-      ])}
-      </figure>`
-  },
-  "04-business-workflows": {
-    "41-the-tenant-lifecycle-move-in-move-out": () =>
-      `<figure class="diagram"><figcaption>The full resident journey</figcaption>
-      ${chain([
-        "Prospect → Member (M02)",
-        "KYC uploads complete → verified (M17)",
-        "Lease draft → ACTIVE (room occupied, deposit billed) (M05/M10)",
-        "Monthly living: invoices · payments · meters · tickets · moves",
-        "Notice given · dues cleared to 0",
-        "Move-out inspection completed (hard gate) (M18)",
-        { t: "Lease terminated — room cleaning · deposit settled (M10)", v: "v-teal" },
-        "Room → vacant, ready to re-let"
-      ])}
-      </figure>`,
-    "42-billing-workflow-monthly-close-rhythm": () =>
-      `<figure class="diagram"><figcaption>Monthly close rhythm</figcaption>
-      ${chain([
-        "1 · Enter meter readings (M11)",
-        "2 · Log per-use services (M12) · 3 · POS room charges (M14)",
-        { t: "4 · RUN invoice generation (idempotent, gapless) (M06/M07)", v: "v-green" },
-        "5 · Spot-check totals",
-        "6 · Issue invoices → portal + Telegram",
-        "Daily job: late fees → overdue → dunning +3/+7/+14",
-        { t: "Collect → receipts → ledger", v: "v-amber" }
-      ])}
-      </figure>`,
-    "43-payment-workflow": () =>
-      `<figure class="diagram"><figcaption>From payment to books</figcaption>
-      ${chain([
-        "Member pays (QR in portal / cash / bank / card / cheque)",
-        "Cash/bank = confirmed · QR/card = pending → webhook (once)",
-        "Allocated oldest-first; deposit first; overpay → member credit",
-        { t: "Invoice partial_paid/paid · receipt filed · ledger posts · Telegram receipt", v: "v-teal" }
-      ])}
-      </figure>`,
-    "48-owner-statement-workflow": () =>
-      `<figure class="diagram"><figcaption>Owner statement → payout</figcaption>
-      ${chain([
-        "Generate (idempotent per contract+month) — Accountant+",
-        "collected × share% (or fixed rent) − fees − costs ± adjustments",
-        { t: "draft → approved  (DR 3900 · CR 2200)", v: "v-amber" },
-        { t: "paid (DR 2200 · CR cash/bank) · PDF filed → owner portal", v: "v-green" }
-      ])}
-      </figure>`
-  },
-  "05-financial-accounting-guide": {
-    "55-profit-loss-pl": () =>
-      `<figure class="diagram"><figcaption>Profit &amp; Loss in one picture</figcaption>
-      ${formula("Net profit = Revenue − Expenses − Owner payout", [
-        "**Revenue** — rent (4000) + services (4100) + utilities (4200) + late fees (4300) + other/POS (4900)",
-        "**− Expenses** — operating (5000) + bank fees (5100)",
-        "**− Owner payout** — per the owner contract",
-        "= **Net profit / loss** for the period"
-      ])}
-      </figure>`,
-    "57-owner-statements-m24-owner-payouts": () =>
-      `<figure class="diagram"><figcaption>What an owner is paid</figcaption>
-      ${formula("Net owner payout", [
-        "Money **collected** for the owner's units",
-        "× owner **share %**  (or fixed monthly master rent)",
-        "− **management fee** − pass-through expenses − owner-borne maintenance",
-        "± **approved adjustments** (audited)",
-        "= **Net owner payout**"
-      ])}
-      </figure>`
-  },
-  "08-administrator-guide": {
-    "87-admin-golden-path-initial-setup-order": () =>
-      `<figure class="diagram"><figcaption>Setup order for a new system</figcaption>
-      ${chain([
-        "1 · Company / locale (currency, timezone, language)",
-        "2 · Properties → buildings → floors → rooms",
-        "3 · Roles · 4 · Users (assign roles + properties)",
-        "5 · Rent engine · 6 · Opening balances",
-        "7 · Payment methods &amp; provider secrets",
-        "8 · Billing / dunning / rent alerts",
-        "9 · Owners + contracts + payout methods",
-        "10 · Notifications + Telegram bot",
-        "11 · Security (2FA, sessions, backups)",
-        "12 · Feature flags + reports",
-        { t: "13 · Test golden path · 14 · Review audit log · backup", v: "v-green" }
-      ])}
-      </figure>`
+// `ids`: section ids for this part, in h2 order (always English-slug based,
+// so anchors are stable across languages).
+function convert(md, partSlug, locale, ids) {
+  const prefix = `sec-${partSlug}-`;
+  const idByNormAnchor = new Map();
+  for (const id of ids) {
+    if (id.startsWith(prefix)) idByNormAnchor.set(normDashes(id.slice(prefix.length)), id);
   }
-};
 
-function convert(md, partSlug) {
+  const inline = (s) => {
+    s = esc(s);
+    s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+    s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+    // links [text](href) — rewrite .md links to internal routes, and
+    // in-part #anchors to the full `#/part/{slug}#sec-...` hash route
+    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, text, href) => {
+      const mm = href.match(/^(\d{2}-[a-z0-9-]+)\.md(?:#(.*))?$/);
+      if (mm) {
+        const target = mm[1];
+        const frag = mm[2] ? `#sec-${target}-${normDashes(mm[2])}` : "";
+        return `<a href="#/part/${target}${frag}" class="inlink">${text}</a>`;
+      }
+      const am = href.match(/^#([\w.:-]+)$/);
+      if (am && idByNormAnchor.has(normDashes(am[1]))) {
+        return `<a href="#/part/${partSlug}#${idByNormAnchor.get(normDashes(am[1]))}" class="inlink">${text}</a>`;
+      }
+      return `<a href="${esc(href)}" target="_blank" rel="noopener">${text}</a>`;
+    });
+    return s;
+  };
+
   const lines = md.replace(/\r\n/g, "\n").split("\n");
-  let out = [];
+  const out = [];
+  const toc = [];
   let i = 0;
-  let toc = [];
   let h2Index = 0;
 
   while (i < lines.length) {
@@ -304,7 +154,7 @@ function convert(md, partSlug) {
     if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[i + 1])) {
       const rows = [];
       while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) { rows.push(lines[i]); i++; }
-      out.push(table(rows));
+      out.push(table(rows, inline));
       continue;
     }
     // headings
@@ -312,25 +162,26 @@ function convert(md, partSlug) {
     if (hm) {
       const level = hm[1].length;
       const text = hm[2].trim();
-      const slug = slugify(text);
       if (level === 2) {
         h2Index++;
-        toc.push({ n: h2Index, slug, text });
-        out.push(`<h2 id="sec-${partSlug}-${slug}"><span class="sec-no">${h2Index}</span>${inline(text)}</h2>`);
-        // Diagram lookup: try full slug first, then match by trailing words
+        const id = ids[h2Index - 1] || `sec-${partSlug}-h2-${h2Index}`;
+        const anchor = id.startsWith(prefix) ? id.slice(prefix.length) : `h2-${h2Index}`;
+        toc.push({ n: h2Index, anchor, text });
+        out.push(`<h2 id="${id}"><span class="sec-no">${h2Index}</span>${inline(text)}</h2>`);
+        // Diagram lookup: exact English-slug key first, then fuzzy match
         // (heading numbers like "13." vary across key styles).
-        const table = DIAGRAMS[partSlug];
-        let diag = table && table[slug];
-        if (!diag && table) {
-          const words = slug.replace(/^\d+-/, "");
-          const key = Object.keys(table).find((k) => slug === k || slug.endsWith(k.replace(/^\d+-/, "")) || k.endsWith(words));
-          if (key) diag = table[key];
+        const table = DIAGRAMS[locale] && DIAGRAMS[locale][partSlug];
+        let spec = table && table[anchor];
+        if (!spec && table) {
+          const words = normDashes(anchor).replace(/^\d+-/, "");
+          const key = Object.keys(table).find((k) => normDashes(anchor) === k || normDashes(anchor).endsWith(normDashes(k).replace(/^\d+-/, "")) || k.endsWith(words));
+          if (key) spec = table[key];
         }
-        if (diag) out.push(diag());
+        if (spec) out.push(renderDiagram(spec));
       } else if (level === 1) {
         out.push(`<h1 class="part-title">${inline(text)}</h1>`);
       } else if (level === 3) {
-        out.push(`<h3 id="sec-${partSlug}-${slug}">${inline(text)}</h3>`);
+        out.push(`<h3 id="${`sec-${partSlug}-${slugify(text)}`}">${inline(text)}</h3>`);
       } else {
         out.push(`<h4>${inline(text)}</h4>`);
       }
@@ -392,224 +243,57 @@ const img = {
   admin: dataUri(path.join(here, "img/admin-security.png"))
 };
 
-const parts = PARTS.map((p) => {
+// ── Build every part for every language ──
+const enSlugs = {}; // part slug → [english h2 slugs]
+for (const p of PARTS) {
   const md = fs.readFileSync(path.join(manualDir, p.file), "utf8");
-  const slug = fileSlug(p.file);
-  const { html, toc } = convert(md, slug);
-  return { ...p, slug, html, toc };
-});
+  enSlugs[fileSlug(p.file)] = h2Texts(md).map(slugify);
+}
 
-const walkthroughs = [
-  {
-    id: "property",
-    title: "🏠 Set up a property & rooms",
-    role: "Admin / Property Manager",
-    time: "~15 min",
-    intro: "Create the physical inventory before any leases can start.",
-    steps: [
-      { t: "Open Portfolio → Properties", d: "Click **Properties** in the sidebar, then **New property**.", menu: "Portfolio → Properties" },
-      { t: "Enter the property", d: "Add a unique **code**, name and address. Optional: map coordinates + geofence radius for attendance.", menu: "Properties → New" },
-      { t: "Add a building", d: "Open the property and **add a building** (e.g. Building A). Link its **owner** if known.", menu: "Property → Building" },
-      { t: "Add a floor", d: "Add a floor with a name and level number.", menu: "Building → Floor" },
-      { t: "Add rooms (use the bulk wizard)", d: "Use **bulk create**: prefix, start number, count, beds per room, type (STANDARD/DELUXE/STUDIO/SUITE) and base price.", menu: "Floor → Rooms → Bulk" },
-      { t: "Verify the room grid", d: "Rooms show as **vacant** and occupancy stats update on the dashboard.", menu: "Properties → room grid" }
-    ]
-  },
-  {
-    id: "member",
-    title: "🧑‍💼 Onboard a member (tenant)",
-    role: "Staff / Manager",
-    time: "~10 min",
-    intro: "Register a resident and complete their KYC so they can sign a lease.",
-    steps: [
-      { t: "Open Members → New member", d: "Start the 4-step onboarding wizard.", menu: "Portfolio → Members → New" },
-      { t: "Personal details", d: "Enter name, type (person/company), email and phone.", menu: "Wizard step 1" },
-      { t: "Property & emergency contacts", d: "Assign the property; add an emergency contact name/phone.", menu: "Wizard step 2" },
-      { t: "Upload KYC documents", d: "Upload ID/passport and all required document types; set **expiry dates**.", menu: "Wizard step 3" },
-      { t: "Review & save", d: "Member is saved as **prospect**.", menu: "Wizard step 4" },
-      { t: "Complete KYC → verified", d: "When the KYC checklist is complete the member becomes **verified** and can be leased. A dues badge will show any balance later.", menu: "Members → profile" }
-    ]
-  },
-  {
-    id: "lease",
-    title: "📝 Create & activate a lease",
-    role: "Manager",
-    time: "~10 min",
-    intro: "Put a verified member into a vacant room. Activation is what starts billing.",
-    steps: [
-      { t: "Open Leases → New", d: "Go to `/leases/new` (or start from the member/room).", menu: "Portfolio → Leases → New" },
-      { t: "Choose member + room/bed", d: "Pick a **verified** member and a **vacant** room/bed.", menu: "Lease form" },
-      { t: "Set the rent terms", d: "Start/end dates, rent amount, **cycle day** (1–28) and **proration basis** (calendar or 30-day).", menu: "Lease form" },
-      { t: "Set deposit & services", d: "Deposit total + installments; add services (WiFi, parking…); set notice days / auto-renew.", menu: "Lease form" },
-      { t: "Save as draft", d: "The room becomes **reserved**; review the terms.", menu: "Lease → draft" },
-      { t: "Activate", d: "On **activate**: room → **occupied**, member → **active**, deposit is billed, first invoice is scheduled, contract PDF filed.", menu: "Lease → Activate" }
-    ]
-  },
-  {
-    id: "billing",
-    title: "🧾 Generate the month's invoices",
-    role: "Accountant / Manager",
-    time: "~20 min (monthly)",
-    intro: "Rent is billed automatically — you run the generation once per period.",
-    steps: [
-      { t: "Enter meter readings first", d: "In **Utilities**, enter electric/water/gas readings (manual or CSV). Check any >2× average spike flag.", menu: "Billing → Utilities" },
-      { t: "Log per-use services", d: "Record laundry / visitor parking usage so they become one-time lines.", menu: "Billing → Services" },
-      { t: "Run invoice generation", d: "On **Invoices**, click **Generate**. It bills every active lease, is idempotent (no duplicates) and gaplessly numbered `{PROP}-{YEAR}-{SEQ}`.", menu: "Billing → Invoices → Generate" },
-      { t: "Spot-check totals", d: "Confirm total = Σ lines − discount + tax; mid-month leases get a prorated stub.", menu: "Invoices list" },
-      { t: "Issue invoices", d: "Move drafts to **issued** — members see them in the portal and get a Telegram message.", menu: "Invoice → Issue" },
-      { t: "Let late fees/reminders run", d: "After the grace period the daily job adds late fees, marks overdue and sends dunning at +3/+7/+14.", menu: "Automatic (jobs)" }
-    ]
-  },
-  {
-    id: "payment",
-    title: "💵 Receive a payment & issue a receipt",
-    role: "Cashier / Staff / Accountant",
-    time: "~3 min",
-    intro: "Record money collected against invoices.",
-    steps: [
-      { t: "Open Payments → New", d: "Start from **Payments** (or an invoice/member).", menu: "Billing → Payments → New" },
-      { t: "Select the member", d: "Confirm identity; their open invoices are listed.", menu: "Payment form" },
-      { t: "Enter amount & method", d: "Type the amount; choose **cash / bank_transfer / qr / card / cheque**.", menu: "Payment form" },
-      { t: "Save", d: "Cash/bank confirm immediately. QR/card start **pending** and confirm via the gateway webhook (duplicates ignored).", menu: "Payment → Save" },
-      { t: "Check the automatic results", d: "Money is allocated **oldest-first**; the invoice flips to **partial_paid/paid**; a receipt `RCP-…` PDF is filed; ledger posts; a Telegram receipt can be sent.", menu: "Payment detail" },
-      { t: "Handle over/under payment", d: "Partial = remainder stays due. Overpayment = held as **member credit** (not income).", menu: "Automatic" }
-    ]
-  },
-  {
-    id: "moveout",
-    title: "🚪 Move a member out & settle the deposit",
-    role: "Manager / Accountant",
-    time: "~20 min",
-    intro: "End a lease correctly so the room can be re-let and the deposit settled.",
-    steps: [
-      { t: "Give notice", d: "Set the lease to **notice** once the member announces move-out.", menu: "Lease → Notice" },
-      { t: "Clear the balance", d: "Ensure dues = 0 (collect, or get an approved write-off).", menu: "Member statement" },
-      { t: "Complete the move-out inspection", d: "Run the **move-out inspection** checklist (pass/fail + photos). This is the hard gate to end the lease.", menu: "Operations → Inspections" },
-      { t: "Resolve findings", d: "Damage findings can open a maintenance ticket or propose a deposit deduction.", menu: "Inspection findings" },
-      { t: "Settle the deposit", d: "Deduct (with **evidence + reason**) and/or **refund** the remainder (Accountant approval, stored payout method). Liability nets to 0.", menu: "Billing → Deposits" },
-      { t: "Terminate/complete the lease", d: "Room → **cleaning**, member → **moved_out**. Return the room to **vacant** when ready to re-let.", menu: "Lease → Terminate" }
-    ]
-  },
-  {
-    id: "expense",
-    title: "🧾 Record an expense",
-    role: "Staff / Accountant",
-    time: "~5 min",
-    intro: "Capture vendor costs so they hit the P&L.",
-    steps: [
-      { t: "Open Expenses → New", d: "Go to **Finance → Expenses & P&L**.", menu: "Finance → Expenses → New" },
-      { t: "Fill the expense", d: "Vendor, category (maps to ledger 5000/5100), amount, date, payment method, property; attach the receipt.", menu: "Expense form" },
-      { t: "Save", d: "Below **$500** it **auto-approves** and posts to the ledger immediately.", menu: "Expense → Save" },
-      { t: "Above threshold? Wait for approval", d: "Amounts at/above $500 stay **pending** until an Accountant/Manager approves, then post.", menu: "Approval" },
-      { t: "Mistake? Void — don't delete", d: "A wrong expense is **voided**, which posts reversal entries (history preserved).", menu: "Expense → Void" }
-    ]
-  },
-  {
-    id: "ownerstatement",
-    title: "🤝 Generate & pay an owner statement",
-    role: "Accountant",
-    time: "~15 min (monthly)",
-    intro: "Calculate what each landlord is paid for the month.",
-    steps: [
-      { t: "Confirm the owner contract", d: "Ensure the building has an active owner contract — FIXED_RENT or REVENUE_SHARE % + management fee + payout day.", menu: "Portfolio → Owners → Contracts" },
-      { t: "Generate statements", d: "In **Owner Statements**, run **Generate** (Accountant+). Idempotent per contract+month.", menu: "Finance → Owner Statements → Generate" },
-      { t: "Review the math", d: "Collected × share (or fixed rent) − management fee − pass-through/owner maintenance ± adjustments = net payout.", menu: "Statement detail" },
-      { t: "Approve", d: "Approval accrues: DR 3900 Owner Distributions · CR 2200 Owner Payable.", menu: "Statement → Approve" },
-      { t: "Pay", d: "Pay via the owner's payout method: DR 2200 · CR cash/bank; payable nets back down.", menu: "Statement → Pay" },
-      { t: "Share with the owner", d: "A statement PDF is auto-filed and appears in the owner portal; the owner gets a Telegram notification.", menu: "Automatic" }
-    ]
-  },
-  {
-    id: "user",
-    title: "🛡️ Create a user & set permissions",
-    role: "Super Admin / Admin",
-    time: "~10 min",
-    intro: "Give a colleague access with the least privilege they need.",
-    steps: [
-      { t: "Open Users → New user", d: "Go to **Admin → Users**.", menu: "Admin → Users → New" },
-      { t: "Enter name + email + temporary password", d: "The account is created with must-change-password; the user sets their own on first login.", menu: "User form" },
-      { t: "Assign role(s)", d: "Pick a default role or a custom one. Permissions are the **union** of all roles.", menu: "User → roles" },
-      { t: "Assign properties", d: "For PROPERTY-scoped roles (Manager/Staff), assign the property/ies they may see.", menu: "User → properties" },
-      { t: "Need a bespoke role?", d: "In **Roles & Permissions**, tick the module × action × scope grid (e.g. a 'Cashier' with only payments write). Changes are audited.", menu: "Admin → Roles" },
-      { t: "Confirm 2FA for admins", d: "Admin/Super Admin must enroll an authenticator before other modules work. Reset a lost 2FA from Security.", menu: "Security" }
-    ]
-  },
-  {
-    id: "meters",
-    title: "🔌 Read meters & bill utilities",
-    role: "Staff / Manager",
-    time: "~15 min (monthly)",
-    intro: "Turn electric/water/gas meter readings into charges that land on the next invoice.",
-    steps: [
-      { t: "Open Utilities", d: "Go to **Billing → Utilities**. Each room/building meter (elec/water/gas) is listed.", menu: "Billing → Utilities", shot: "utilities.png" },
-      { t: "Enter the new reading", d: "Open a meter and enter the current reading in exact units. The system keeps the previous reading and computes the difference.", menu: "Meter → new reading" },
-      { t: "Choose how to read", d: "Type a real **manual** reading, use **estimate** (average of last 3, flagged), or **CSV import** for many rooms at once.", menu: "Manual / Estimated / Import" },
-      { t: "Apply the tariff", d: "Charges = consumption × tariff (tiered bands apply automatically).", menu: "Tariff" },
-      { t: "Check anomaly flags", d: "A reading more than **2× the average** is flagged as a possible mis-read — verify before billing.", menu: "Anomaly badge" },
-      { t: "Charges join the next invoice", d: "You don't bill meters directly. Utility charges attach to the **next invoice generation** cycle (run that in Invoices). They appear as utility lines.", menu: "Next invoice run" }
-    ]
-  },
-  {
-    id: "move",
-    title: "🚪 Move a resident to another room",
-    role: "Staff request → Manager approves",
-    time: "~10 min",
-    intro: "Move a member between rooms mid-lease with an automatic prorated adjustment.",
-    steps: [
-      { t: "Open Room Moves → New request", d: "Go to **Operations → Room Moves** and start a request (a member can also request from the portal).", menu: "Operations → Room Moves", shot: "moves.png" },
-      { t: "Choose target room & date", d: "Pick the destination room/bed and the **effective date**.", menu: "Move request form" },
-      { t: "Review the preview", d: "The system computes the money: prorated new rent + a move fee − credit for unused old rent = one net adjustment, plus any deposit delta. Billing catch-up runs first.", menu: "Preview delta" },
-      { t: "Approve", d: "A **manager approves** the request before it takes effect. A request can be cancelled up to this point.", menu: "Approve" },
-      { t: "Execute", d: "On execute: the old lease ends and a new one starts; **both rooms flip status** (old → cleaning, new → occupied); the deposit follows the member.", menu: "Execute" },
-      { t: "One adjustment invoice", d: "A single invoice carries the exact prorated delta; the full move history is recorded on the member timeline. Link move-out/move-in inspections if needed.", menu: "Adjustment invoice" }
-    ]
-  },
-  {
-    id: "maintenance",
-    title: "🔧 Handle a maintenance ticket",
-    role: "Staff / Maintenance",
-    time: "~varies",
-    intro: "Track a repair from report to verified close, with SLA timers and costs.",
-    steps: [
-      { t: "A ticket is raised", d: "Members raise tickets from the portal/Telegram; staff can log them too. It records category, priority, room/building and who reported it.", menu: "Operations → Maintenance" },
-      { t: "Acknowledge / assign", d: "Move **open → assigned** to a technician or vendor. The SLA clock is set by priority (urgent 4h … low 168h).", menu: "Ticket → Assign", shot: "maintenance.png" },
-      { t: "Start work", d: "Set the ticket **in_progress** while the repair is done.", menu: "In progress" },
-      { t: "Log parts & labour", d: "**Consume stock parts** (M15) — their cost flows onto the ticket automatically — and record labour cost.", menu: "Consume part / add cost" },
-      { t: "Resolve", d: "Mark **resolved** once the work is finished.", menu: "Resolve" },
-      { t: "Verify / close", d: "Move to **verified/closed**. Costs route to an **expense** (operator) or the **owner's P&L** (owner-borne → owner statement). A daily sweep flags any SLA breach.", menu: "Verify / close" }
-    ]
-  },
-  {
-    id: "pos",
-    title: "🏪 Run a POS sale (counter / canteen)",
-    role: "Staff / cashier",
-    time: "~5 min per sale",
-    intro: "Sell products over the counter and optionally charge them to a resident's room.",
-    steps: [
-      { t: "Open a POS session", d: "In **Store → POS**, open a register session with your opening **cash float**.", menu: "Store → POS → Open session", shot: "pos.png" },
-      { t: "Add items to the sale", d: "Pick products from the catalog or scan a **barcode (EAN-13)** badge. Linked products decrement stock when sold.", menu: "New sale" },
-      { t: "Take payment", d: "Choose **cash / QR / card**, or **charge to room**.", menu: "Payment method" },
-      { t: "Charge to room (optional)", d: "Charging to a room auto-issues a **one-time invoice** to that member and posts to receivables — the resident pays it with their normal rent.", menu: "Charge to room" },
-      { t: "Receipt", d: "A receipt PDF is auto-filed; thermal printing (58/80mm, auto-print, copies) is set in **Settings → Printers**.", menu: "Receipt" },
-      { t: "Close the session", d: "At end of shift, **close**: expected cash = float + Σ cash sales. Enter the counted cash and the system records the **variance**.", menu: "Close session" }
-    ]
-  },
-  {
-    id: "telegram",
-    title: "💬 Set up the Telegram bot & notifications",
-    role: "Admin / Super Admin",
-    time: "~15 min",
-    intro: "Connect Telegram so members get receipts/reminders and staff get alerts in chat.",
-    steps: [
-      { t: "Set the bot token", d: "In **Settings → Providers/Secrets**, store the Telegram bot token. It is sealed (AES-256-GCM) and shown masked. Configure the bot name/welcome in **Settings → Telegram**.", menu: "Settings → Telegram / Secrets", shot: "telegram.png" },
-      { t: "Allow member linking", d: "Enable **allowMemberLinking** in Settings → Telegram so residents can link their own accounts.", menu: "Settings → Telegram" },
-      { t: "Give a user their link code", d: "Open **Comms → Telegram Bot** and choose **link** — a one-time code is shown (the bot never sees a password).", menu: "Comms → Telegram Bot" },
-      { t: "Link in the chat", d: "In Telegram the user opens the bot and sends `/link <code>`. The bot binds their account (permission-checked) and confirms.", menu: "Bot → /link <code>" },
-      { t: "Set notification toggles", d: "Switch on/off which events they get: invoice issued, payment confirmed, dunning, reminders, ticket/complaint updates, owner statements, low stock, occupancy digest.", menu: "Notification toggles" },
-      { t: "Customise wording (optional)", d: "In **Settings → Templates**, override message text for the five member events using {placeholders}. In the demo system, messages are **mocked to the outbox** (shown on the Telegram screen).", menu: "Settings → Templates" }
-    ]
+const partsByLocale = {};
+for (const loc of SITE_LOCALES) {
+  partsByLocale[loc] = PARTS.map((p) => {
+    const slug = fileSlug(p.file);
+    const rel = loc === "en" ? p.file : path.join(loc, p.file);
+    const pAbs = path.join(manualDir, rel);
+    let md;
+    if (fs.existsSync(pAbs)) {
+      md = fs.readFileSync(pAbs, "utf8");
+    } else {
+      console.warn(`[guide] missing ${rel} — using the English text for this part`);
+      md = fs.readFileSync(path.join(manualDir, p.file), "utf8");
+    }
+    const h2s = h2Texts(md);
+    const enList = enSlugs[slug];
+    if (h2s.length !== enList.length) {
+      console.warn(`[guide] ${loc}/${p.file}: ${h2s.length} "## " sections vs ${enList.length} in English — anchors may drift`);
+    }
+    const ids = h2s.map((_, i) => `sec-${slug}-${enList[i] || `h2-${i + 1}`}`);
+    const { html, toc } = convert(md, slug, loc, ids);
+    return { slug, label: PART_LABELS[loc][slug], g: p.g, html, toc };
+  });
+}
+
+// ── Structural checks (walkthroughs & diagrams mirror English 1:1) ──
+{
+  for (const loc of SITE_LOCALES) {
+    if (loc === "en") continue;
+    if (WALKS[loc].length !== WALKS.en.length) {
+      console.warn(`[guide] ${loc}: ${WALKS[loc].length} walkthroughs vs ${WALKS.en.length} in English`);
+    }
+    WALKS.en.forEach((w, i) => {
+      const l = WALKS[loc][i];
+      if (!l || l.id !== w.id) console.warn(`[guide] ${loc}: walkthrough #${i + 1} id mismatch (${w.id} vs ${l && l.id})`);
+      else if (l.steps.length !== w.steps.length) console.warn(`[guide] ${loc}: walkthrough "${w.id}" has ${l.steps.length} steps vs ${w.steps.length} in English`);
+    });
+    for (const [partSlug, table] of Object.entries(DIAGRAMS.en)) {
+      const lt = DIAGRAMS[loc][partSlug] || {};
+      for (const key of Object.keys(table)) {
+        if (!lt[key]) console.warn(`[guide] ${loc}: missing diagram ${partSlug} → ${key}`);
+      }
+    }
   }
-];
+}
 
 // ── Styles ──
 const CSS = `
@@ -620,7 +304,8 @@ const CSS = `
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
-body{font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans Khmer","PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
+body{font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans Khmer","PingFang SC","Hiragino Sans","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
+html[lang="km"] body{line-height:1.9}
 a{color:var(--brand);text-decoration:none}
 a:hover{text-decoration:underline}
 img{max-width:100%}
@@ -631,6 +316,15 @@ img{max-width:100%}
 .brand-badge{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--brand),var(--teal));color:#fff;font-weight:800;display:grid;place-items:center;font-size:17px;letter-spacing:.5px}
 .brand-name{font-weight:800;font-size:16px;color:var(--ink)}
 .brand-sub{font-size:12px;color:var(--muted)}
+.lang-wrap{position:relative;margin:0 0 10px}
+#langBtn{width:100%;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:600;cursor:pointer;color:#334155;font-family:inherit}
+#langBtn:hover{border-color:var(--brand)}
+.lang-caret{margin-left:auto;font-size:10px;color:var(--muted)}
+.lang-menu{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.14);z-index:70;overflow:hidden}
+.lang-menu button{display:flex;width:100%;align-items:center;gap:8px;background:none;border:0;padding:9px 13px;font-size:13.5px;cursor:pointer;color:#334155;text-align:left;font-family:inherit}
+.lang-menu button:hover{background:var(--soft)}
+.lang-menu button.current{color:var(--brand-d);font-weight:700}
+.lang-menu button.current:after{content:"✓";margin-left:auto;color:var(--brand-d)}
 .nav-group{margin:14px 0 4px}
 .nav-group-title{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;padding:0 10px 6px}
 .nav-link{display:block;padding:7px 10px;border-radius:9px;color:#334155;font-size:14px;margin:1px 0}
@@ -703,7 +397,7 @@ figure.diagram figcaption:before{content:"▣";color:var(--teal)}
 /* walks */
 .walk-layout{display:grid;grid-template-columns:270px 1fr;gap:24px;align-items:start}
 .walk-list{position:sticky;top:20px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px}
-.walk-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;padding:10px 11px;border-radius:10px;cursor:pointer;font-size:13.5px;color:#334155;font-weight:600}
+.walk-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;padding:10px 11px;border-radius:10px;cursor:pointer;font-size:13.5px;color:#334155;font-weight:600;font-family:inherit}
 .walk-item:hover{background:var(--soft)}
 .walk-item.active{background:var(--brand);color:#fff}
 .walk-num{flex:0 0 24px;width:24px;height:24px;border-radius:50%;background:var(--soft);color:var(--brand-d);display:grid;place-items:center;font-size:12.5px;font-weight:800}
@@ -730,7 +424,7 @@ figure.diagram figcaption:before{content:"▣";color:var(--teal)}
 .shot-cap{position:absolute;top:8px;left:8px;background:rgba(15,23,42,.72);color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px}
 .step.todo .shot-wrap{display:none}
 .walk-controls{display:flex;justify-content:space-between;margin-top:22px;gap:10px}
-.wbtn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 18px;font-weight:700;cursor:pointer;color:#334155;font-size:14px}
+.wbtn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 18px;font-weight:700;cursor:pointer;color:#334155;font-size:14px;font-family:inherit}
 .wbtn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
 .wbtn:disabled{opacity:.4;cursor:not-allowed}
 .progress{height:8px;background:#eef2f7;border-radius:99px;overflow:hidden;margin:6px 0 20px}
@@ -757,158 +451,218 @@ figure.diagram figcaption:before{content:"▣";color:var(--teal)}
 }
 `;
 
-// ── Client app ──
+// ── Client app (locale-aware) ──
 const APP_JS = `
-const $ = (s,r=document)=>r.querySelector(s);
+const $ = (s, r = document) => r.querySelector(s);
 const main = $('#main');
 
-function route(){
+// Locale resolution mirrors the app: the rm-locale cookie (set by the app's
+// 🌐 LanguageSwitcher and shared with it) wins, then this guide's own
+// localStorage choice (covers standalone/file:// use), then English.
+function readCookie(name) {
+  const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+function initLocale() {
+  const c = readCookie('rm-locale');
+  if (c && LOCALES.includes(c)) return c;
+  try {
+    const s = localStorage.getItem('rm-guide-locale');
+    if (s && LOCALES.includes(s)) return s;
+  } catch (e) {}
+  return 'en';
+}
+let locale = initLocale();
+
+function applyLocale(next) {
+  if (!LOCALES.includes(next) || next === locale) return;
+  locale = next;
+  try { localStorage.setItem('rm-guide-locale', next); } catch (e) {}
+  document.cookie = 'rm-locale=' + next + '; path=/; max-age=31536000; samesite=lax';
+  document.documentElement.lang = META[locale].htmlLang;
+  document.title = UI[locale].title;
+  renderLang();
+  renderSidebar();
+  route();
+}
+
+function renderLang() {
+  $('#langCur').textContent = META[locale].native;
+  document.querySelectorAll('#langMenu button').forEach(b => {
+    b.classList.toggle('current', b.dataset.loc === locale);
+  });
+}
+
+function renderSidebar() {
+  const u = UI[locale];
+  const groups = GROUPS[locale];
+  $('#brandSub').textContent = u.brandSub;
+  let html = '';
+  html += '<a class="nav-link nav-home" data-route="home" href="#/home">' + u.side.home + '</a>';
+  html += '<a class="nav-link nav-walk" data-route="walks" href="#/walks">' + u.side.walks + '</a>';
+  for (let gi = 0; gi < groups.length; gi++) {
+    html += '<div class="nav-group"><div class="nav-group-title">' + groups[gi] + '</div>';
+    for (const p of PARTS[locale]) {
+      if (p.g === gi) html += '<a class="nav-link" data-route="part/' + p.slug + '" href="#/part/' + p.slug + '">' + p.label + '</a>';
+    }
+    html += '</div>';
+  }
+  $('#sideNav').innerHTML = html;
+  $('.side-foot').textContent = u.side.foot.replace('{n}', PARTS[locale].length);
+}
+
+function route() {
   const hash = location.hash || '#/home';
-  const h = hash.replace(/^#\\//,'');
-  document.querySelectorAll('.nav-link').forEach(a=>{
+  const h = hash.replace(/^#\\\//, '');
+  document.querySelectorAll('.nav-link').forEach(a => {
     a.classList.toggle('active', a.dataset.route && h.startsWith(a.dataset.route));
   });
   $('#sidebar').classList.remove('open');
-  if(h==='home') return renderHome();
-  if(h==='walks'||h.startsWith('walk/')) return renderWalks(h);
-  if(h.startsWith('part/')){
-    const slug = h.split('/')[1];
-    const sec = (h.split('#')[1])||null;
-    return renderPart(slug, sec);
+  if (h === 'home') return renderHome();
+  if (h === 'walks' || h.startsWith('walk/')) return renderWalks(h);
+  if (h.startsWith('part/')) {
+    const pp = h.split('#');
+    const slug = pp[0].split('/')[1];
+    return renderPart(slug, pp[1] || null);
   }
   renderHome();
 }
 
-function renderHome(){
-  const groups=[...new Set(PARTS.map(p=>p.group))];
-  let cards='';
-  for(const g of groups){
-    cards += '<div class="section-label">'+g+'</div><div class="home-grid">';
-    for(const p of PARTS.filter(x=>x.group===g)){
-      cards += '<a class="home-card" href="#/part/'+p.slug+'"><div class="ico">📘</div><h3>'+p.label+'</h3><p>'+p.toc.length+' sections</p></a>';
+function renderHome() {
+  const u = UI[locale];
+  const groups = GROUPS[locale];
+  let cards = '';
+  for (let gi = 0; gi < groups.length; gi++) {
+    cards += '<div class="section-label">' + groups[gi] + '</div><div class="home-grid">';
+    for (const p of PARTS[locale]) {
+      if (p.g === gi) cards += '<a class="home-card" href="#/part/' + p.slug + '"><div class="ico">📘</div><h3>' + p.label + '</h3><p>' + u.home.sections.replace('{n}', p.toc.length) + '</p></a>';
     }
     cards += '</div>';
   }
   main.innerHTML =
-   '<div class="hero"><div><h1>RentManager Guide</h1>'+
-   '<p>A plain-language manual for staff, managers, finance and administrators — with diagrams and step-by-step walkthroughs. Verified against the actual application, so every button described really exists.</p>'+
-   '<a class="btn" href="#/walks">🧭 Start a step-by-step workflow</a>'+
-   '<a class="btn ghost" href="#/part/02-quick-start">⚡ Quick start</a></div>'+
-   '<div class="hero-img"><img src="'+IMG.hero+'" alt="RentManager illustration"/></div></div>'+
-   '<div class="feature-row">'+
-   '<div class="feature-box"><img src="'+IMG.tenant+'" alt="Tenant"/><div><h3>For staff &amp; tenants</h3><p>Onboard members, create leases, bill monthly rent, collect payments and receipts, and help tenants pay by QR or the portal.</p><a href="#/part/03-user-guide">Open the User Guide →</a></div></div>'+
-   '<div class="feature-box"><img src="'+IMG.admin+'" alt="Admin"/><div><h3>For administrators</h3><p>Set up users &amp; roles, permissions, business settings, 2FA security, Telegram, reports and backups.</p><a href="#/part/08-administrator-guide">Open the Admin Guide →</a></div></div>'+
-   '</div>'+ cards;
-  window.scrollTo(0,0);
+   '<div class="hero"><div><h1>' + u.home.heroTitle + '</h1>' +
+   '<p>' + u.home.heroSub + '</p>' +
+   '<a class="btn" href="#/walks">' + u.home.btnWalks + '</a>' +
+   '<a class="btn ghost" href="#/part/02-quick-start">' + u.home.btnQuick + '</a></div>' +
+   '<div class="hero-img"><img src="' + IMG.hero + '" alt="RentManager illustration"/></div></div>' +
+   '<div class="feature-row">' +
+   '<div class="feature-box"><img src="' + IMG.tenant + '" alt="Tenant"/><div><h3>' + u.home.featStaffTitle + '</h3><p>' + u.home.featStaffText + '</p><a href="#/part/03-user-guide">' + u.home.featStaffLink + '</a></div></div>' +
+   '<div class="feature-box"><img src="' + IMG.admin + '" alt="Admin"/><div><h3>' + u.home.featAdminTitle + '</h3><p>' + u.home.featAdminText + '</p><a href="#/part/08-administrator-guide">' + u.home.featAdminLink + '</a></div></div>' +
+   '</div>' + cards;
+  window.scrollTo(0, 0);
 }
 
-function renderPart(slug, sec){
-  const p = PARTS.find(x=>x.slug===slug);
-  if(!p){ main.innerHTML='<p>Part not found.</p>'; return; }
-  const toc = p.toc.map(t=>'<a href="#/part/'+p.slug+'#sec-'+p.slug+'-'+t.slug+'">'+t.n+'. '+t.text+'</a>').join('');
+function renderPart(slug, sec) {
+  const u = UI[locale];
+  const p = PARTS[locale].find(x => x.slug === slug);
+  if (!p) { main.innerHTML = '<p>' + u.part.notFound + '</p>'; return; }
+  const groups = GROUPS[locale];
+  const toc = p.toc.map(t => '<a href="#/part/' + p.slug + '#sec-' + p.slug + '-' + t.anchor + '">' + t.n + '. ' + t.text + '</a>').join('');
   main.innerHTML =
-    '<div class="crumbs">Guide · <b>'+p.group+'</b> · '+p.label+'</div>'+
-    '<div class="content">'+p.html+'</div>';
-  if(p.toc.length){
-    const bar=document.createElement('div');
-    bar.className='subtoc';
-    bar.innerHTML='<b>On this page</b><br>'+toc;
-    $('.content',main).insertBefore(bar, $('.content',main).firstChild);
+    '<div class="crumbs">' + u.part.crumb + ' · <b>' + groups[p.g] + '</b> · ' + p.label + '</div>' +
+    '<div class="content">' + p.html + '</div>';
+  if (p.toc.length) {
+    const bar = document.createElement('div');
+    bar.className = 'subtoc';
+    bar.innerHTML = '<b>' + u.part.onThisPage + '</b><br>' + toc;
+    $('.content', main).insertBefore(bar, $('.content', main).firstChild);
   }
-  window.scrollTo(0,0);
-  if(sec){
-    const el=document.getElementById(sec);
-    if(el) setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'start'}),60);
+  window.scrollTo(0, 0);
+  if (sec) {
+    const el = document.getElementById(sec);
+    if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
   }
 }
 
-function renderWalks(h){
-  const id = h.startsWith('walk/') ? h.split('/')[1] : WALKS[0].id;
-  const w = WALKS.find(x=>x.id===id) || WALKS[0];
-  const idx = WALKS.findIndex(x=>x.id===w.id);
+function renderWalks(h) {
+  const u = UI[locale];
+  const list = WALKS[locale];
+  const id = h.startsWith('walk/') ? h.split('/')[1] : list[0].id;
+  const w = list.find(x => x.id === id) || list[0];
+  const idx = list.findIndex(x => x.id === w.id);
+  const nav = list.map((x, i) => '<button class="walk-item" data-walk="' + x.id + '"><span class="walk-num">' + (i + 1) + '</span><span>' + x.title + '</span></button>').join('');
   main.innerHTML =
-    '<div class="crumbs">Guide · <b>Step-by-step Workflows</b></div>'+
-    '<h1 style="margin:6px 0 18px;font-size:28px">🧭 Step-by-step Workflows</h1>'+
-    '<div class="walk-layout"><div class="walk-list">'+WALK_NAV+'</div>'+
+    '<div class="crumbs">' + u.part.crumb + ' · <b>' + u.walks.crumb + '</b></div>' +
+    '<h1 style="margin:6px 0 18px;font-size:28px">' + u.walks.title + '</h1>' +
+    '<div class="walk-layout"><div class="walk-list">' + nav + '</div>' +
     '<div class="walk-panel" id="walkPanel"></div></div>';
-  drawWalk(idx,0);
-  document.querySelectorAll('.walk-item').forEach(b=>b.addEventListener('click',()=>{
-    drawWalk(WALKS.findIndex(x=>x.id===b.dataset.walk),0);
+  document.querySelectorAll('.walk-item').forEach(b => b.addEventListener('click', () => {
+    drawWalk(list.findIndex(x => x.id === b.dataset.walk), 0);
   }));
-  window.scrollTo(0,0);
+  drawWalk(idx, 0);
+  window.scrollTo(0, 0);
 }
 
-function drawWalk(idx, step){
-  const w = WALKS[idx];
-  document.querySelectorAll('.walk-item').forEach((b,i)=>b.classList.toggle('active', i===idx));
+function drawWalk(idx, step) {
+  const u = UI[locale];
+  const list = WALKS[locale];
+  const w = list[idx];
+  document.querySelectorAll('.walk-item').forEach((b, i) => b.classList.toggle('active', i === idx));
   const total = w.steps.length;
-  const pct = Math.round((step/total)*100);
-  let stepsHtml = w.steps.map((s,i)=>{
-    const cls = i<step ? 'done' : i===step ? 'current' : 'todo';
-    const badge = i<step ? '✓' : (i+1);
-    return '<li class="step '+cls+'"><div class="step-badge">'+badge+'</div><div class="step-body">'+
-      '<h4>'+s.t+'</h4><p>'+md(s.d)+'</p>'+
-      (s.shot?'<div class="shot-wrap"><img class="shot" loading="lazy" src="img/'+s.shot+'" alt="'+s.t+'" /><span class="shot-cap">🖼️ Illustrated screen preview</span></div>':'')+
-      (s.menu?'<span class="step-menu">'+s.menu+'</span>':'')+'</div></li>';
+  const pct = Math.round((step / total) * 100);
+  let stepsHtml = w.steps.map((s, i) => {
+    const cls = i < step ? 'done' : i === step ? 'current' : 'todo';
+    const badge = i < step ? '✓' : (i + 1);
+    return '<li class="step ' + cls + '"><div class="step-badge">' + badge + '</div><div class="step-body">' +
+      '<h4>' + s.t + '</h4><p>' + md(s.d) + '</p>' +
+      (s.shot ? '<div class="shot-wrap"><img class="shot" loading="lazy" src="img/' + s.shot + '" alt="' + s.t + '" /><span class="shot-cap">' + u.walks.shotCap + '</span></div>' : '') +
+      (s.menu ? '<span class="step-menu">' + s.menu + '</span>' : '') + '</div></li>';
   }).join('');
-  const panel=$('#walkPanel');
+  const panel = $('#walkPanel');
   panel.innerHTML =
-    '<h2 style="margin:0;font-size:22px">'+w.title+'</h2>'+
-    '<div class="walk-meta"><span class="chip">👤 '+w.role+'</span><span class="chip time">⏱ '+w.time+'</span></div>'+
-    '<p class="walk-intro">'+w.intro+'</p>'+
-    '<div class="progress"><div style="width:'+pct+'%"></div></div>'+
-    '<ol class="steps">'+stepsHtml+'</ol>'+
-    '<div class="walk-done'+(step>=total?' show':'')+'">✅ Workflow complete — you can do this unaided. Pick the next workflow from the list.</div>'+
-    '<div class="walk-controls">'+
-      '<div><button class="wbtn" id="prevBtn" '+(step<=0?'disabled':'')+'>← Back</button> '+
-      '<button class="wbtn" id="restartBtn">↺ Restart</button></div>'+
-      '<button class="wbtn primary" id="nextBtn" '+(step>=total?'disabled':'')+'>'+(step>=total-1?'Finish ✓':'Next step →')+'</button>'+
+    '<h2 style="margin:0;font-size:22px">' + w.title + '</h2>' +
+    '<div class="walk-meta"><span class="chip">👤 ' + w.role + '</span><span class="chip time">⏱ ' + w.time + '</span></div>' +
+    '<p class="walk-intro">' + w.intro + '</p>' +
+    '<div class="progress"><div style="width:' + pct + '%"></div></div>' +
+    '<ol class="steps">' + stepsHtml + '</ol>' +
+    '<div class="walk-done' + (step >= total ? ' show' : '') + '">' + u.walks.done + '</div>' +
+    '<div class="walk-controls">' +
+      '<div><button class="wbtn" id="prevBtn" ' + (step <= 0 ? 'disabled' : '') + '>' + u.walks.prev + '</button> ' +
+      '<button class="wbtn" id="restartBtn">' + u.walks.restart + '</button></div>' +
+      '<button class="wbtn primary" id="nextBtn" ' + (step >= total ? 'disabled' : '') + '>' + (step >= total - 1 ? u.walks.finish : u.walks.next) + '</button>' +
     '</div>';
-  $('#prevBtn').onclick=()=>drawWalk(idx,Math.max(0,step-1));
-  $('#nextBtn').onclick=()=>drawWalk(idx,Math.min(total,step+1));
-  $('#restartBtn').onclick=()=>drawWalk(idx,0);
+  $('#prevBtn').onclick = () => drawWalk(idx, Math.max(0, step - 1));
+  $('#nextBtn').onclick = () => drawWalk(idx, Math.min(total, step + 1));
+  $('#restartBtn').onclick = () => drawWalk(idx, 0);
 }
 
-// minimal inline markdown for walkthrough descriptions (**bold**)
-function md(s){
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/\\*\\*([^*]+)\\*\\*/g,'<strong>$1</strong>')
-    .replace(/\\x60([^\\x60]+)\\x60/g,'<code>$1</code>');
+// minimal inline markdown for walkthrough descriptions (**bold**, \`code\`)
+function md(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>')
+    .replace(/\\x60([^\\x60]+)\\x60/g, '<code>$1</code>');
 }
 
 window.addEventListener('hashchange', route);
-$('#menuBtn').addEventListener('click',()=>$('#sidebar').classList.toggle('open'));
+$('#menuBtn').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
+$('#langBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const menu = $('#langMenu');
+  menu.hidden = !menu.hidden;
+});
+document.querySelectorAll('#langMenu button').forEach(b => {
+  b.addEventListener('click', () => { $('#langMenu').hidden = true; applyLocale(b.dataset.loc); });
+});
+document.addEventListener('click', (e) => {
+  const wrap = document.querySelector('.lang-wrap');
+  if (wrap && !wrap.contains(e.target)) $('#langMenu').hidden = true;
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('#langMenu').hidden = true; });
+
+document.documentElement.lang = META[locale].htmlLang;
+document.title = UI[locale].title;
+renderLang();
+renderSidebar();
 route();
 `;
 
 // ── Assemble the page ──
-const navGroups = ["Start", "Using RentManager", "Finance & Insights", "Administration", "Reference"];
-let sidebar = "";
-for (const g of navGroups) {
-  sidebar += `<div class="nav-group"><div class="nav-group-title">${g}</div>`;
-  for (const p of parts.filter((x) => x.group === g)) {
-    sidebar += `<a class="nav-link" data-route="part/${p.slug}" href="#/part/${p.slug}">${p.label}</a>`;
-  }
-  sidebar += `</div>`;
-}
-
-const partsJSON = JSON.stringify(
-  parts.map((p) => ({ slug: p.slug, label: p.label, group: p.group, html: p.html, toc: p.toc }))
-);
-const walkJSON = JSON.stringify(walkthroughs);
-const walkNav = walkthroughs
-  .map(
-    (w, i) =>
-      `<button class="walk-item" data-walk="${w.id}"><span class="walk-num">${i + 1}</span><span>${w.title}</span></button>`
-  )
-  .join("");
-
 const html = `<!doctype html>
-<html lang="en">
+<html lang="${SITE_LOCALE_META.en.htmlLang}">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>RentManager — User &amp; Administrator Guide</title>
+<title>${UI.en.title}</title>
 <style>${CSS}</style>
 </head>
 <body>
@@ -916,22 +670,27 @@ const html = `<!doctype html>
 <aside id="sidebar">
   <a class="brand" href="#/home">
     <div class="brand-badge">RM</div>
-    <div><div class="brand-name">RentManager</div><div class="brand-sub">User &amp; Admin Guide</div></div>
+    <div><div class="brand-name">RentManager</div><div class="brand-sub" id="brandSub">${UI.en.brandSub}</div></div>
   </a>
-  <nav>
-    <a class="nav-link nav-home" data-route="home" href="#/home">🏠 Home</a>
-    <a class="nav-link nav-walk" data-route="walks" href="#/walks">🧭 Step-by-step Workflows</a>
-    ${sidebar}
-  </nav>
-  <div class="side-foot">Verified against the application source · ${parts.length} parts</div>
+  <div class="lang-wrap">
+    <button id="langBtn" type="button" aria-haspopup="listbox" aria-label="Language">🌐 <span id="langCur">${SITE_LOCALE_META.en.native}</span><span class="lang-caret">▾</span></button>
+    <div id="langMenu" class="lang-menu" hidden>
+      ${SITE_LOCALES.map((l) => `<button type="button" data-loc="${l}">${SITE_LOCALE_META[l].native}</button>`).join("\n      ")}
+    </div>
+  </div>
+  <nav id="sideNav"></nav>
+  <div class="side-foot"></div>
 </aside>
 <main id="main"></main>
 
 <script>
-const PARTS = ${partsJSON};
-const WALKS = ${walkJSON};
+const LOCALES = ${JSON.stringify(SITE_LOCALES)};
+const META = ${JSON.stringify(SITE_LOCALE_META)};
+const GROUPS = ${JSON.stringify(GROUP_NAMES)};
+const UI = ${JSON.stringify(UI)};
+const PARTS = ${JSON.stringify(partsByLocale)};
+const WALKS = ${JSON.stringify(WALKS)};
 const IMG = { hero: "${img.hero}", tenant: "${img.tenant}", admin: "${img.admin}" };
-const WALK_NAV = ${JSON.stringify(walkNav)};
 ${APP_JS}
 </script>
 </body>
@@ -947,5 +706,5 @@ fs.mkdirSync(publicGuide, { recursive: true });
 fs.writeFileSync(path.join(publicGuide, "index.html"), html);
 fs.cpSync(path.join(here, "img"), path.join(publicGuide, "img"), { recursive: true });
 
-console.log("Built docs/manual/site/index.html —", parts.length, "parts,", walkthroughs.length, "walkthroughs");
+console.log(`Built docs/manual/site/index.html — ${PARTS.length} parts × ${SITE_LOCALES.length} languages (${SITE_LOCALES.join(" / ")}), ${WALKS.en.length} walkthroughs per language`);
 console.log("Published to public/guide/ (in-app at /guide)");
