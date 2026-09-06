@@ -4,6 +4,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/auth/password";
+import { seedFullDemo } from "./seed-demo";
 import {
   ACTIONS,
   DEFAULT_ROLES,
@@ -969,6 +970,11 @@ async function main(): Promise<void> {
   await seedStatements();
   await seedPortal();
   await seedStay();
+  // Optional full client-demo dataset (rich multi-module sample data, guarded by
+  // the `demo.full` marker so it only ever applies once) — SEED_FULL_DEMO=1.
+  if (process.env.SEED_FULL_DEMO === "1") {
+    await seedFullDemo(db);
+  }
   await db.auditLog.create({
     data: {
       actorName: "system",

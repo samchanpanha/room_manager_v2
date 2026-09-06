@@ -49,6 +49,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://rentmanager:rentmanager@postgres:5432/rentmanager
       - NODE_ENV=production
+      - SEED_FULL_DEMO=1
       - STORAGE_DIR=/app/storage
       - SESSION_TTL_DAYS=30
       - FILE_SIGNING_SECRET=docker-file-signing-secret-change-me-in-prod

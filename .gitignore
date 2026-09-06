@@ -88,3 +88,6 @@ backups/
 
 # i18n audit artifacts (regenerate: node scripts/extract-strings.mjs)
 i18n-strings.json
+
+# Generated demo/KYC documents (regenerate: SEED_FULL_DEMO=1 npx prisma db seed)
+.storage/
