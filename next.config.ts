@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { BACKEND_ENABLED, BACKEND_ORIGIN, MIGRATED_PREFIXES } from "./src/lib/backend/config";
 
 /// §M27 security headers. CSP frame-ancestors admits the sandbox preview host
 /// (*.e2b.app) alongside same-origin; a production deploy should tighten this
@@ -32,6 +33,17 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
+  },
+  // Frontend/backend split (strangler-fig): proxy migrated `/api/*` prefixes to
+  // the Spring Boot backend; everything else stays on the in-app route handlers.
+  // Same-origin from the browser's view, so the `rm_session` cookie flows without
+  // CORS. Flip modules by editing `src/lib/backend/config.ts`.
+  async rewrites() {
+    if (!BACKEND_ENABLED) return [];
+    return MIGRATED_PREFIXES.flatMap((prefix) => [
+      { source: prefix, destination: `${BACKEND_ORIGIN}${prefix}` },
+      { source: `${prefix}/:path*`, destination: `${BACKEND_ORIGIN}${prefix}/:path*` }
+    ]);
   }
 };
 

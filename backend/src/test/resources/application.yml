@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:rentmanager;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
+
+rentmanager:
+  auth:
+    session-cookie: rm_session
+    session-ttl-days: 30
+    cookie-secure: false
+    challenge-secret: test-challenge-secret-1234567890
+  security:
+    settings-enc-key: test-settings-enc-key-1234567890
+  tenancy:
+    default-tenant: DEFAULT
