@@ -25,9 +25,17 @@ com.rentmanager
 ├── platform        # shared: security (session auth + RBDC), tenancy, error, config
 ├── kernel          # shared: Party, Settings, NumberSequence, AuditLog, DomainEvent, Tenant, Cuid
 ├── iam             # M01/M27: users, roles, permissions, sessions, auth
+│                   #   (+ PortalUserApi: provision portal logins for other modules)
 ├── members         # M02: tenant/resident lifecycle
-└── properties      # M04: Property → Building → Floor → Room → Bed (+ room status machine)
+├── properties      # M04: Property → Building → Floor → Room → Bed (+ room status machine)
+│                   #   (+ BuildingOwnershipApi: assign buildings to owners)
+└── owners          # M03: landlords, payout methods, optional OWNER portal login
 ```
+
+Cross-module calls go through APIs published in a module's **base package**
+(e.g. `iam.PortalUserApi`, `properties.BuildingOwnershipApi`); a module's
+`domain`/`service`/`web` sub-packages stay internal. `ModularityTests` fails the
+build if a boundary is crossed.
 
 Each business module exposes a **service** (its public API) + **web** controller
 and keeps its **domain** entities package-private-ish. Cross-module calls go
@@ -42,6 +50,7 @@ through the published service or application events.
 | `POST /api/auth/logout` | `src/app/api/auth/logout/route.ts` |
 | `GET  /api/account` | `src/app/api/account/route.ts` |
 | `GET/POST /api/members`, `GET /api/members/{id}` | `src/app/api/members/*` |
+| `GET/POST /api/owners`, `GET /api/owners/{id}` | `src/app/api/owners/route.ts` |
 | `GET/POST /api/properties`, `GET /api/properties/{id}` | `src/app/api/properties/route.ts` |
 | `GET /api/buildings`, `/api/floors`, `/api/rooms` | `src/app/api/{buildings,floors,rooms}/*` |
 | `POST /api/rooms/{id}/status` | `src/app/api/rooms/[id]/status/route.ts` |

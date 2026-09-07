@@ -83,6 +83,7 @@ public class User {
   public boolean isMustChangePassword() { return mustChangePassword; }
   public void setMustChangePassword(boolean v) { this.mustChangePassword = v; }
   public String getPartyId() { return partyId; }
+  public void linkParty(String partyId) { this.partyId = partyId; }
   public String getTotpSecret() { return totpSecret; }
   public String getTenantId() { return tenantId; }
   public Set<UserRole> getRoles() { return roles; }

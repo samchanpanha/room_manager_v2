@@ -110,7 +110,7 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 | `iam` | **M01** users/roles/permissions/sessions/auth, M27 security bits | **1 (impl)** |
 | `members` | **M02** | **1 (impl)** |
 | `properties` | **M04** properties/buildings/floors/rooms/beds | **1 (impl)** |
-| `owners` | M03, M24 statements | 2 |
+| `owners` | **M03** (M24 statements later) | **2 (impl)** |
 | `leasing` | M05 leases, M06 rent engine, M32 short stays | 2 |
 | `billing` | M07 invoices, M09 payments, M13 QR pay | 3 |
 | `finance` | M08 ledger, M10 deposits, M20 expenses/P&L | 3 |
@@ -150,12 +150,28 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 - [x] **Properties (M04)**: JPA Property/Building/Floor/Room/Bed; `PropertyService`;
       REST mirroring `/api/properties`, `/api/buildings`, `/api/floors`,
       `/api/rooms*`.
-- [ ] Wire the three slices in the FE via the proxy; delete direct-Prisma reads
-      on those pages (replace RSC Prisma with server-side `fetch` to backend).
+- [x] Wire a real page to the backend via the proxy: the **Properties list page**
+      (`src/app/(admin)/properties/page.tsx`) now sources data from the backend
+      when `BACKEND_ORIGIN` is set (occupancy + building counts computed in
+      `PropertyService`), with the legacy Prisma path kept as an automatic
+      fallback so the app is unchanged until the backend is wired.
+- [x] Backend web-layer tests (MockMvc): health public, protected endpoints
+      return Next-compatible `UNAUTHENTICATED`, bad-credentials `BAD_CREDENTIALS`,
+      validation `VALIDATION_ERROR`.
+- [ ] Wire the Members page + owners page the same way (config prefixes ready).
 - [ ] Contract tests: replay a saved set of requests against both old handlers
       and new controllers; assert identical status + JSON shape.
 
-### Phase 2–6 — Port remaining modules (one vertical per module, same recipe)
+### Phase 2 — Owners (M03) — DONE (this PR)
+- [x] JPA OwnerProfile/OwnerPayoutMethod; `OwnerService` (onboard: party +
+      profile + primary payout + building ownership + optional OWNER portal
+      login, atomic); REST mirroring `/api/owners`.
+- [x] Cross-module APIs published in module base packages to keep boundaries
+      clean: `properties.BuildingOwnershipApi` (assign buildings) and
+      `iam.PortalUserApi` (provision portal user + role).
+- [x] Flyway `V2` extended to tenant-scope the owner tables.
+
+### Phase 3–6 — Port remaining modules (one vertical per module, same recipe)
 For each module: entities → service (port `src/lib/**` logic) → controller →
 Flyway (only if new columns) → contract tests → flip the FE proxy route →
 delete the old `route.ts` and the module's `src/lib` server logic.

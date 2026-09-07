@@ -36,7 +36,18 @@ public class PropertyController {
   @GetMapping("/api/properties")
   public List<Map<String, Object>> listProperties() {
     AuthPrincipal user = currentUser.require();
-    return service.listProperties(user).stream().map(this::propertyJson).toList();
+    return service.listPropertiesWithStats(user).stream().map(r -> {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("id", r.id());
+      m.put("code", r.code());
+      m.put("name", r.name());
+      m.put("address", r.address());
+      m.put("status", r.status());
+      m.put("buildingCount", r.buildingCount());
+      m.put("roomsTotal", r.roomsTotal());
+      m.put("roomsOccupied", r.roomsOccupied());
+      return m;
+    }).toList();
   }
 
   @PostMapping("/api/properties")

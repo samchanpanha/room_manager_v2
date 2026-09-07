@@ -87,6 +87,19 @@ export interface PropertySummary {
   status: string;
 }
 
+export interface PropertyRow extends PropertySummary {
+  buildingCount: number;
+  roomsTotal: number;
+  roomsOccupied: number;
+}
+
+export interface OwnerSummary {
+  id: string;
+  status: string;
+  companyName: string | null;
+  payoutMethods: { id: string; kind: string; accountName: string; isPrimary: boolean }[];
+}
+
 export const api = {
   account: {
     me: () => backendFetch<Record<string, unknown>>("/api/account")
@@ -103,8 +116,13 @@ export const api = {
     create: (body: unknown) => backendFetch<{ id: string }>("/api/members", { json: body })
   },
   properties: {
-    list: () => backendFetch<PropertySummary[]>("/api/properties"),
+    list: () => backendFetch<PropertyRow[]>("/api/properties"),
     get: (id: string) => backendFetch<PropertySummary>(`/api/properties/${id}`),
     create: (body: unknown) => backendFetch<PropertySummary>("/api/properties", { json: body })
+  },
+  owners: {
+    list: () => backendFetch<OwnerSummary[]>("/api/owners"),
+    get: (id: string) => backendFetch<Record<string, unknown>>(`/api/owners/${id}`),
+    create: (body: unknown) => backendFetch<{ id: string }>("/api/owners", { json: body })
   }
 };

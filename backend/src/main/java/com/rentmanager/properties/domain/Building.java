@@ -40,4 +40,6 @@ public class Building {
   public String getPropertyId() { return propertyId; }
   public String getName() { return name; }
   public String getAddress() { return address; }
+  public String getOwnerId() { return ownerId; }
+  public void setOwnerId(String ownerId) { this.ownerId = ownerId; }
 }

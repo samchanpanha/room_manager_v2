@@ -33,6 +33,7 @@ DECLARE
     scoped text[] := ARRAY[
         'Party','User','Role','MemberProfile','EmergencyContact',
         'Property','Building','Floor','Room','Bed',
+        'OwnerProfile','OwnerPayoutMethod',
         'AuditLog','DomainEvent','Setting','NumberSequence'
     ];
 BEGIN

@@ -7,11 +7,14 @@ import com.rentmanager.properties.domain.Floor;
 import com.rentmanager.properties.domain.Property;
 import com.rentmanager.properties.domain.PropertyRepositories;
 import com.rentmanager.properties.domain.Room;
+import com.rentmanager.properties.dto.PropertyRow;
 import com.rentmanager.platform.security.AuthPrincipal;
 import com.rentmanager.platform.security.Rbdc;
 import com.rentmanager.kernel.tenant.TenantContext;
 import com.rentmanager.platform.web.ApiException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +54,23 @@ public class PropertyService {
       return all.stream().filter(p -> user.propertyIds().contains(p.getId())).toList();
     }
     return List.of();
+  }
+
+  /** Properties with occupancy + building counts for the list page (M04). */
+  @Transactional(readOnly = true)
+  public List<PropertyRow> listPropertiesWithStats(AuthPrincipal user) {
+    List<Property> visible = listProperties(user);
+    String tenantId = TenantContext.get();
+    Map<String, long[]> stats = new HashMap<>(); // propertyId -> [total, occupied]
+    for (var s : rooms.roomStatsByProperty(tenantId)) {
+      stats.put(s.getPropertyId(), new long[] {s.getTotal(), s.getOccupied()});
+    }
+    return visible.stream().map(p -> {
+      long[] rs = stats.getOrDefault(p.getId(), new long[] {0, 0});
+      long buildingCount = buildings.countByPropertyIdAndTenantId(p.getId(), tenantId);
+      return new PropertyRow(p.getId(), p.getCode(), p.getName(), p.getAddress(),
+          p.getStatus(), buildingCount, rs[0], rs[1]);
+    }).toList();
   }
 
   @Transactional(readOnly = true)
