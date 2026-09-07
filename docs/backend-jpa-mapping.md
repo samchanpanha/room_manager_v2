@@ -27,7 +27,10 @@ class User {
   covers the Phase 1–3 tables; `V3__billing_tenant.sql` extends the same pattern
   to `Invoice`/`InvoiceItem`/`CreditNote` (+ a `(tenantId,memberProfileId,status)`
   index powering the leasing open-dues gate). `V4__payments_tenant.sql` extends
-  it to `Payment`/`PaymentAllocation`.
+  it to `Payment`/`PaymentAllocation`. `V5__deposits_tenant.sql` covers
+  `Deposit`/`DepositTransaction`. `V6__ledger.sql` tenant-scopes
+  `LedgerTransaction`/`LedgerEntry` (but **not** `LedgerAccount` — it is shared
+  reference data) and idempotently seeds the 14 system accounts.
 
 ## Auth compatibility (must match byte-for-byte)
 | Concern | Next (TS) | Backend (Java) |
@@ -63,5 +66,13 @@ Floor, Room, Bed, AuditLog, Tenant`.
   `held`/`settled` are derived from the invoice's `amountPaidMinor` and the
   movements' released total. Cross-module cycles are inverted via named-interface
   SPIs (`leasing::spi`, `billing::spi`) that finance implements.
+- Phase 7 (finance M08 ledger): `LedgerAccount, LedgerTransaction, LedgerEntry`
+  (`V6__ledger.sql`). `LedgerAccount` is shared reference data (no `tenantId`);
+  the books (`LedgerTransaction`/`LedgerEntry`) carry `tenantId`. Entries map via
+  `@OneToMany @JoinColumn(transactionId)` (the entity's own `transactionId`
+  column is read-only to avoid a double mapping). The ledger is append-only —
+  corrections are reversals with a `reversalOf` back-link. Finance's
+  `LedgerPostingAdapter` implements `billing.spi.LedgerPostingPort` (`@Primary`,
+  replacing the no-op) so invoice/payment/deposit events post balanced entries.
 
 Remaining models follow the same recipe as their modules are ported.

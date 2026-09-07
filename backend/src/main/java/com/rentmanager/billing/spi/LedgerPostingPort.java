@@ -9,14 +9,23 @@ package com.rentmanager.billing.spi;
  */
 public interface LedgerPostingPort {
 
-  /** Post the issue transaction (DR receivable / CR revenue) for an invoice. */
-  void onInvoiceIssued(String invoiceId, String propertyId, String memberProfileId, int totalMinor);
+  /** One aggregated invoice line (kind + net minor amount) for revenue splitting. */
+  record InvoiceLine(String kind, int amountMinor) {}
+
+  /**
+   * Post the issue transaction (DR receivable / CR revenue by kind, tax → 2300)
+   * for an invoice. {@code items} lets the ledger split revenue across accounts
+   * and prorate the discount, matching the accrual-basis posting rules.
+   */
+  void onInvoiceIssued(String invoiceId, String propertyId, String memberProfileId,
+      int totalMinor, int discountMinor, int taxMinor, java.util.List<InvoiceLine> items);
 
   /** Reverse all live postings when an invoice is voided. */
   void onInvoiceVoided(String invoiceId, String reason);
 
   /** Post a credit-note reversal (DR revenue / CR receivable) pro-rata. */
-  void onCreditNoteIssued(String invoiceId, String noteCode, int amountMinor, String reason);
+  void onCreditNoteIssued(String invoiceId, String propertyId, String memberProfileId,
+      String noteCode, int amountMinor, String reason);
 
   /** Post a confirmed payment (DR cash/bank drawer / CR receivable). */
   void onPaymentConfirmed(String paymentId, String propertyId, String memberProfileId,

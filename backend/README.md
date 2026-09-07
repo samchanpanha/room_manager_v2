@@ -38,9 +38,11 @@ com.rentmanager
 │                   #   payments/allocations, issue/void/credit + confirm/fail/refund
 │                   #   (+ BillingQueryApi for leasing/finance;
 │                   #    billing::spi LedgerPostingPort → M08, DepositAdvancePort → finance)
-└── finance         # M10 deposits: installment billing, hold/settle lifecycle,
-                    #   deduction/refund movements. Implements leasing/billing SPIs
-                    #   (dependency inversion); LedgerPostingPort SPI → M08 when ported
+└── finance         # M10 deposits (installment billing, hold/settle lifecycle,
+                    #   deduction/refund) + M08 double-entry ledger sub-module
+                    #   (finance.ledger: chart of accounts, postings, journal,
+                    #   trial balance, member statement). Implements leasing/billing
+                    #   SPIs incl. LedgerPostingPort (dependency inversion)
 ```
 
 Cross-module calls go through APIs published in a module's **base package**

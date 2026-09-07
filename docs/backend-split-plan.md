@@ -113,7 +113,7 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 | `owners` | **M03** (M24 statements later) | **2 (impl)** |
 | `leasing` | **M05 leases** (M06 rent engine, M32 short stays later) | **2 (impl)** |
 | `billing` | **M07 invoices, M09 payments** (M13 QR pay later) | **3 (impl)** |
-| `finance` | **M10 deposits** (M08 ledger, M20 expenses/P&L later) | **3 (impl)** |
+| `finance` | **M10 deposits + M08 double-entry ledger** (M20 expenses/P&L later) | **3 (impl)** |
 | `utilities` | M11 utilities/meters, M12 services | 4 |
 | `operations` | M16 room moves, M18 inspections, M19 maintenance, M22 complaints | 4 |
 | `inventory` | M14 POS, M15 stock, M29 purchase orders | 5 |
@@ -204,10 +204,10 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
       matching `recomputeAmountsTx`.
 - [x] Ledger side-effects (M08) delegated through the
       `billing.spi.LedgerPostingPort` SPI with a `@ConditionalOnMissingBean`
-      no-op default, so postings light up automatically when the finance module
-      is ported. **Parity gap** until then: no double-entry postings on
-      issue/void/credit; no invoice-PDF filing (M17); no utility/usage
-      re-billing on void (M11/M12). All tracked here.
+      no-op default. **Live as of Phase 7**: finance's `LedgerPostingAdapter`
+      now posts double entries on issue/void/credit. Remaining parity gaps: no
+      invoice-PDF filing (M17); no utility/usage re-billing on void (M11/M12).
+      Tracked here.
 - [x] Payments (M09) not yet ported, so `amountPaidMinor` stays 0 and the
       `partial_paid`/auto-`overdue`/dunning transitions are reachable in the
       machine but not yet driven — they land with the payments + M06 jobs.
@@ -237,10 +237,10 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 - [x] This closes the loop M07 left open: payments now drive
       `issued→partial_paid→paid`. (`overdue`/dunning still await the M06 job.)
 - [x] Ledger side-effects (M08) via the extended `billing.spi.LedgerPostingPort`
-      (`onPaymentConfirmed`/`onPaymentRefunded`), no-op until finance is ported.
-      **Parity gap** until then: no DR-cash/CR-receivable postings, no
-      receipt-PDF filing (M17), no deposit advance on deposit-invoice payment
-      (M10). Tracked here.
+      (`onPaymentConfirmed`/`onPaymentRefunded`). **Live as of Phase 7**:
+      finance's `LedgerPostingAdapter` posts DR-cash/CR-receivable on confirm
+      and the mirror on refund. Remaining parity gap: no receipt-PDF filing
+      (M17). (Deposit advance on deposit-invoice payment was closed in Phase 6.)
 - [x] `Invoice.recompute()` extracted onto the entity so M07 and M09 share the
       single derived-money rule (subtotal/total/amountDue).
 - [x] REST mirroring `/api/payments*`: list (`?status`,`?method`), get detail,
@@ -281,10 +281,10 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
     `leasing.LeasingQueryApi` (lease deposit terms + settlement-window check)
     give finance read/bill access without reaching into internals.
 - [x] Ledger postings (M08) via the extended `LedgerPostingPort`
-      (`onDepositBilled`/`onDepositDeducted`/`onDepositRefunded`) — no-op until
-      the ledger module is ported. **Parity gap** until then: no DR-receivable/
-      CR-2100-liability on billing, no liability-release postings on
-      deduct/refund. Tracked here.
+      (`onDepositBilled`/`onDepositDeducted`/`onDepositRefunded`). **Parity gap
+      closed in Phase 7**: the finance `LedgerPostingAdapter` now posts the
+      DR-receivable/CR-2100-liability on billing and the liability-release
+      entries on deduct/refund.
 - [x] REST mirroring `/api/deposits*`: list (`?status`), get detail,
       `POST /{id}/{deduct,refund}`. (No manual create — deposits are billed at
       activation, parity with the Next app.)
@@ -295,7 +295,43 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
       Next service verifies the doc against the M17 registry; here we require a
       non-blank `evidenceDocId` and will validate it once documents are ported).
 
-### Phase 7+ — Port remaining modules (one vertical per module, same recipe)
+### Phase 7 — Ledger (M08, `finance.ledger` sub-module) — DONE (this PR)
+- [x] JPA `LedgerAccount` (shared reference data, **not** tenant-scoped),
+      `LedgerTransaction` + `LedgerEntry` (tenant-scoped, EAGER entries via
+      `@JoinColumn`) bound to the existing Prisma tables.
+- [x] `ChartOfAccounts` — port of `src/lib/ledger/accounts.ts`: the 14 system
+      accounts (incl. `2300 Tax Payable` so invoice tax has a home),
+      `CREDIT_ACCOUNT_BY_KIND`, `settlementAccountCode`, `isDebitNormal`.
+- [x] `Postings` — pure, unit-tested builders (`LedgerPostingsTest`):
+      `invoiceIssueLines` (DR 1300 / CR revenue-by-kind, largest-remainder
+      discount proration, tax → 2300), `lateFeeLines`, `creditNoteLines`
+      (pro-rata of the original revenue lines, fallback 4900), `reversalLines`,
+      `allocateProportional`, and the `assertBalanced` invariant.
+- [x] `LedgerService` — the only writer: append-only `post()` (resolves codes →
+      active accounts, else UNBALANCED) and `reverse()` (mirror + `reversalOf`
+      back-link, rejects double reversal with `REVERSAL_FAILED`), plus
+      `liveTransactions`/`liveRevenueLines` for void & credit-note proration.
+- [x] `LedgerQueryService` — chart of accounts, trial balance, journal browser
+      (all GLOBAL M08:read), member statement (GLOBAL **or** own party), and the
+      integrity probe.
+- [x] **Closes the M04/M07/M09/M10 ledger parity gap** — finance's
+      `LedgerPostingAdapter` (`@Primary`, implements `billing.spi.LedgerPostingPort`)
+      replaces `NoopLedgerPosting`, so every invoice issue/void/credit-note,
+      payment confirm/refund, and deposit billed/deducted/refunded now posts
+      balanced double entries. `onInvoiceIssued` was enriched with
+      discount/tax/line breakdown so revenue splits and prorations match the
+      accrual rules. Dependency inversion preserved — billing never imports
+      finance.
+- [x] REST mirroring the Next routes: `GET /api/ledger/{accounts,journal,
+      trial-balance}` and `GET /api/members/{id}/statement` (parity path, same
+      guard). No write endpoints — the ledger is append-only and posts through
+      the SPI on domain events.
+- [x] Flyway `V6` tenant-scopes `LedgerTransaction`/`LedgerEntry` (LedgerAccount
+      stays global) and idempotently seeds the 14 system accounts.
+- [x] FE seam wired: `/api/ledger` added to `MIGRATED_PREFIXES`; typed
+      `api.ledger` (accounts/trialBalance/journal) + `api.members.statement`.
+
+### Phase 8+ — Port remaining modules (one vertical per module, same recipe)
 For each module: entities → service (port `src/lib/**` logic) → controller →
 Flyway (only if new columns) → contract tests → flip the FE proxy route →
 delete the old `route.ts` and the module's `src/lib` server logic.

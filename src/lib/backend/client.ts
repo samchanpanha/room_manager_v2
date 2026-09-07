@@ -215,6 +215,70 @@ export interface SettlementResult {
   status: string;
 }
 
+export interface LedgerAccountDto {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  isSystem: boolean;
+  isActive: boolean;
+}
+
+export interface TrialBalanceRow {
+  code: string;
+  name: string;
+  type: string;
+  debit: number;
+  credit: number;
+  balance: number;
+}
+
+export interface TrialBalance {
+  rows: TrialBalanceRow[];
+  totalDebit: number;
+  totalCredit: number;
+  balanced: boolean;
+}
+
+export interface JournalEntryLine {
+  code: string;
+  name: string;
+  debit: number;
+  credit: number;
+  memo: string | null;
+}
+
+export interface JournalTxn {
+  id: string;
+  postedAt: string;
+  memo: string;
+  refType: string;
+  refId: string | null;
+  propertyId: string | null;
+  memberId: string | null;
+  isReversal: boolean;
+  totalMinor: number;
+  entries: JournalEntryLine[];
+}
+
+export interface StatementRow {
+  id: string;
+  postedAt: string;
+  memo: string;
+  refType: string;
+  refId: string | null;
+  isReversal: boolean;
+  totalMinor: number;
+  receivableAfter: number;
+  entries: JournalEntryLine[];
+}
+
+export interface MemberStatement {
+  member: { id: string; name: string | null };
+  rows: StatementRow[];
+  receivableMinor: number;
+}
+
 export const api = {
   account: {
     me: () => backendFetch<Record<string, unknown>>("/api/account")
@@ -228,7 +292,8 @@ export const api = {
       return backendFetch<MemberSummary[]>(`/api/members${suffix}`);
     },
     get: (id: string) => backendFetch<Record<string, unknown>>(`/api/members/${id}`),
-    create: (body: unknown) => backendFetch<{ id: string }>("/api/members", { json: body })
+    create: (body: unknown) => backendFetch<{ id: string }>("/api/members", { json: body }),
+    statement: (id: string) => backendFetch<MemberStatement>(`/api/members/${id}/statement`)
   },
   properties: {
     list: () => backendFetch<PropertyRow[]>("/api/properties"),
@@ -314,5 +379,31 @@ export const api = {
       backendFetch<SettlementResult>(`/api/deposits/${id}/deduct`, { json: body }),
     refund: (id: string, body: { amount?: number; method?: string; note: string }) =>
       backendFetch<SettlementResult>(`/api/deposits/${id}/refund`, { json: body })
+  },
+  ledger: {
+    accounts: () => backendFetch<LedgerAccountDto[]>("/api/ledger/accounts"),
+    trialBalance: () => backendFetch<TrialBalance>("/api/ledger/trial-balance"),
+    journal: (params?: {
+      account?: string;
+      propertyId?: string;
+      memberId?: string;
+      refType?: string;
+      refId?: string;
+      from?: string;
+      to?: string;
+      take?: number;
+    }) => {
+      const qs = new URLSearchParams();
+      if (params?.account) qs.set("account", params.account);
+      if (params?.propertyId) qs.set("propertyId", params.propertyId);
+      if (params?.memberId) qs.set("memberId", params.memberId);
+      if (params?.refType) qs.set("refType", params.refType);
+      if (params?.refId) qs.set("refId", params.refId);
+      if (params?.from) qs.set("from", params.from);
+      if (params?.to) qs.set("to", params.to);
+      if (params?.take !== undefined) qs.set("take", String(params.take));
+      const suffix = qs.toString() ? `?${qs}` : "";
+      return backendFetch<JournalTxn[]>(`/api/ledger/journal${suffix}`);
+    }
   }
 };

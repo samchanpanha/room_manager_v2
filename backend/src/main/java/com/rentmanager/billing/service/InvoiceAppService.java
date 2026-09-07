@@ -174,9 +174,13 @@ public class InvoiceAppService {
     invoice.recompute();
     invoices.save(invoice);
 
-    // M08 ledger post (DR receivable / CR revenue) via SPI — no-op until ported.
+    // M08 ledger post (DR receivable / CR revenue by kind, tax → 2300) via SPI.
     ledger.onInvoiceIssued(invoice.getId(), invoice.getPropertyId(),
-        invoice.getMemberProfileId(), invoice.getTotalMinor());
+        invoice.getMemberProfileId(), invoice.getTotalMinor(),
+        invoice.getDiscountMinor(), invoice.getTaxMinor(),
+        invoice.getItems().stream()
+            .map(it -> new LedgerPostingPort.InvoiceLine(it.getKind(), it.getAmountMinor()))
+            .toList());
 
     audit.log(AuditEntry.builder()
         .actorId(user.id()).actorName(user.name())
@@ -257,7 +261,8 @@ public class InvoiceAppService {
     }
     invoices.save(invoice);
 
-    ledger.onCreditNoteIssued(invoice.getId(), code, amountMinor, req.reason());
+    ledger.onCreditNoteIssued(invoice.getId(), invoice.getPropertyId(),
+        invoice.getMemberProfileId(), code, amountMinor, req.reason());
 
     audit.log(AuditEntry.builder()
         .actorId(user.id()).actorName(user.name())
