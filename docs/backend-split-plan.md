@@ -112,7 +112,7 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 | `properties` | **M04** properties/buildings/floors/rooms/beds | **1 (impl)** |
 | `owners` | **M03** (M24 statements later) | **2 (impl)** |
 | `leasing` | **M05 leases** (M06 rent engine, M32 short stays later) | **2 (impl)** |
-| `billing` | **M07 invoices** (M09 payments, M13 QR pay later) | **3 (impl)** |
+| `billing` | **M07 invoices, M09 payments** (M13 QR pay later) | **3 (impl)** |
 | `finance` | M08 ledger, M10 deposits, M20 expenses/P&L | 3 |
 | `utilities` | M11 utilities/meters, M12 services | 4 |
 | `operations` | M16 room moves, M18 inspections, M19 maintenance, M22 complaints | 4 |
@@ -222,7 +222,39 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 - [x] FE seam wired: `/api/invoices` added to `MIGRATED_PREFIXES`; typed
       `api.invoices` client (list/get/create/issue/void/creditNote).
 
-### Phase 5+ — Port remaining modules (one vertical per module, same recipe)
+### Phase 5 — Payments (M09) — DONE (this PR)
+- [x] JPA Payment/PaymentAllocation bound to the existing Prisma tables.
+- [x] `PaymentMachine` (port of `src/lib/payments/machines.ts`: statuses,
+      methods, cash-drawer settlement accounts) and `PaymentAllocator` (pure
+      port of `allocation.ts`: oldest-first FIFO + explicit-allocation
+      validation). Unit-tested in `PaymentRulesTest`.
+- [x] `PaymentAppService`: record (pending; explicit or oldest-first
+      allocations; **idempotent on `idempotencyKey`** §9.6), confirm (allocate
+      `RCP-YYYY-####` receipt, apply allocations to invoices, flip invoice
+      status to `partial_paid`/`paid` via `amountPaidMinor` + `Invoice.recompute()`,
+      post to the ledger; **idempotent** — re-confirm is a no-op), fail, and
+      refund of the unallocated remainder (Accountant-only, GLOBAL M09:update).
+- [x] This closes the loop M07 left open: payments now drive
+      `issued→partial_paid→paid`. (`overdue`/dunning still await the M06 job.)
+- [x] Ledger side-effects (M08) via the extended `billing.spi.LedgerPostingPort`
+      (`onPaymentConfirmed`/`onPaymentRefunded`), no-op until finance is ported.
+      **Parity gap** until then: no DR-cash/CR-receivable postings, no
+      receipt-PDF filing (M17), no deposit advance on deposit-invoice payment
+      (M10). Tracked here.
+- [x] `Invoice.recompute()` extracted onto the entity so M07 and M09 share the
+      single derived-money rule (subtotal/total/amountDue).
+- [x] REST mirroring `/api/payments*`: list (`?status`,`?method`), get detail,
+      create, `POST /{id}/{confirm,fail,refund}`. (Gateway webhook intake
+      `/api/webhooks/payments` deferred — see below.)
+- [x] Flyway `V4` tenant-scopes Payment/PaymentAllocation.
+- [x] FE seam wired: `/api/payments` added to `MIGRATED_PREFIXES`; typed
+      `api.payments` client (list/get/create/confirm/fail/refund).
+- [ ] Deferred: signed gateway webhook (`/api/webhooks/payments`) and QR-pay
+      (M13) intake — need the webhook-signature verifier; they reuse
+      `PaymentAppService.confirm/fail` once added.
+- [ ] Deferred: receipt PDF (M17) — same SPI approach as the invoice PDF.
+
+### Phase 6+ — Port remaining modules (one vertical per module, same recipe)
 For each module: entities → service (port `src/lib/**` logic) → controller →
 Flyway (only if new columns) → contract tests → flip the FE proxy route →
 delete the old `route.ts` and the module's `src/lib` server logic.

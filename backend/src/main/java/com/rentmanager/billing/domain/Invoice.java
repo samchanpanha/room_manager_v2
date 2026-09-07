@@ -107,6 +107,20 @@ public class Invoice {
 
   @PreUpdate void touch() { this.updatedAt = Instant.now(); }
 
+  /**
+   * Recompute subtotal / total / amountDue from the line items, payments and
+   * credits — the single source of the derived-money rules shared by the
+   * invoice (M07) and payment (M09) services. Mirrors {@code recomputeAmountsTx}
+   * in {@code src/lib/billing/service.tsx}: total = subtotal − discount + tax;
+   * amountDue = max(0, total − paid − credited).
+   */
+  public void recompute() {
+    int subtotal = items.stream().mapToInt(InvoiceItem::getAmountMinor).sum();
+    this.subtotalMinor = subtotal;
+    this.totalMinor = subtotal - discountMinor + taxMinor;
+    this.amountDueMinor = Math.max(0, totalMinor - amountPaidMinor - amountCreditedMinor);
+  }
+
   public String getId() { return id; }
   public String getCode() { return code; }
   public void setCode(String c) { this.code = c; }

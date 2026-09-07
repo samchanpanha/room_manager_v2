@@ -33,7 +33,8 @@ com.rentmanager
 ├── owners          # M03: landlords, payout methods, optional OWNER portal login
 ├── leasing         # M05: member leases, state machine, occupancy rules, activation/ending effects
 │                   #   (open-dues gate at end-of-lease calls billing.BillingQueryApi)
-└── billing         # M07: invoices, invoice items, credit notes, issue/void/credit lifecycle
+└── billing         # M07 invoices + M09 payments: invoices/items/credit notes,
+                    #   payments/allocations, issue/void/credit + confirm/fail/refund
                     #   (+ BillingQueryApi: member open-dues for leasing;
                     #    LedgerPostingPort SPI → finance/M08 when ported)
 ```
@@ -61,6 +62,8 @@ through the published service or application events.
 | `POST /api/leases/{id}/{activate,notice,complete,terminate}` | `src/app/api/leases/[id]/*` |
 | `GET/POST /api/invoices`, `GET /api/invoices/{id}` | `src/app/api/invoices/*` |
 | `POST /api/invoices/{id}/{issue,void}`, `POST /api/invoices/{id}/credit-notes` | `src/app/api/invoices/[id]/*` |
+| `GET/POST /api/payments`, `GET /api/payments/{id}` | `src/app/api/payments/*` |
+| `POST /api/payments/{id}/{confirm,fail,refund}` | `src/app/api/payments/[id]/*` |
 | `GET/POST /api/properties`, `GET /api/properties/{id}` | `src/app/api/properties/route.ts` |
 | `GET /api/buildings`, `/api/floors`, `/api/rooms` | `src/app/api/{buildings,floors,rooms}/*` |
 | `POST /api/rooms/{id}/status` | `src/app/api/rooms/[id]/status/route.ts` |

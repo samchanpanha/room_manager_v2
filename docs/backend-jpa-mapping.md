@@ -26,7 +26,8 @@ class User {
   to the `DEFAULT` tenant so existing single-tenant data is untouched. `V2`
   covers the Phase 1–3 tables; `V3__billing_tenant.sql` extends the same pattern
   to `Invoice`/`InvoiceItem`/`CreditNote` (+ a `(tenantId,memberProfileId,status)`
-  index powering the leasing open-dues gate).
+  index powering the leasing open-dues gate). `V4__payments_tenant.sql` extends
+  it to `Payment`/`PaymentAllocation`.
 
 ## Auth compatibility (must match byte-for-byte)
 | Concern | Next (TS) | Backend (Java) |
@@ -48,7 +49,13 @@ Floor, Room, Bed, AuditLog, Tenant`.
 - Phase 3 (leasing M05): `Lease, LeaseService`, `NumberSequence` (kernel).
 - Phase 4 (billing M07): `Invoice, InvoiceItem, CreditNote`. Money kept in
   integer minor units; `amountDueMinor` maintained as `total − paid − credited`
-  (≥0) exactly as `recomputeAmountsTx`. `CreditNote` is append-only; issued
-  invoices stay immutable (credits adjust `amountCreditedMinor`, never items).
+  (≥0) exactly as `recomputeAmountsTx` (now `Invoice.recompute()`). `CreditNote`
+  is append-only; issued invoices stay immutable (credits adjust
+  `amountCreditedMinor`, never items).
+- Phase 5 (billing M09): `Payment, PaymentAllocation`. `remainingMinor` is the
+  unallocated member credit; `receiptCode`/`gatewayRef`/`idempotencyKey` are
+  unique. Confirmation increments each allocated invoice's `amountPaidMinor` and
+  re-derives status via `Invoice.recompute()`. Year-scoped codes `PMT-YYYY-####`
+  / `RCP-YYYY-####` use per-year `NumberSequence` keys (`PMT:YYYY`, `RCP:YYYY`).
 
 Remaining models follow the same recipe as their modules are ported.

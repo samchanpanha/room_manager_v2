@@ -22,13 +22,14 @@ public class MemberAccessApi {
   }
 
   /** Eligibility snapshot. */
-  public record MemberInfo(String id, String status, boolean blacklisted, String name) {}
+  public record MemberInfo(String id, String status, boolean blacklisted, String name,
+      String homePropertyId) {}
 
   @Transactional(readOnly = true)
   public MemberInfo get(String memberProfileId) {
     MemberProfile m = members.findByIdAndTenantId(memberProfileId, TenantContext.get())
         .orElseThrow(() -> ApiException.notFound("Member not found"));
-    return new MemberInfo(m.getId(), m.getStatus(), m.isBlacklisted(), null);
+    return new MemberInfo(m.getId(), m.getStatus(), m.isBlacklisted(), null, m.getHomePropertyId());
   }
 
   /** Transition a member's status (used by lease activation / ending effects). */

@@ -27,4 +27,17 @@ public interface InvoiceRepository extends JpaRepository<Invoice, String> {
         and i.status in ('issued','partial_paid','overdue')
       """)
   long sumOpenDuesForMember(@Param("tenantId") String tenantId, @Param("memberId") String memberId);
+
+  /**
+   * A member's open invoices (positive due) ordered oldest-first — the FIFO
+   * ordering the M09 allocation engine consumes (due date, then period start).
+   */
+  @Query("""
+      select i from Invoice i
+      where i.tenantId = :tenantId and i.memberProfileId = :memberId
+        and i.status in ('issued','partial_paid','overdue')
+        and i.amountDueMinor > 0
+      order by coalesce(i.dueDate, i.periodStart) asc, i.periodStart asc
+      """)
+  List<Invoice> findOpenForMember(@Param("tenantId") String tenantId, @Param("memberId") String memberId);
 }

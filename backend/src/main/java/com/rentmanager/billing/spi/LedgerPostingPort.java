@@ -17,4 +17,12 @@ public interface LedgerPostingPort {
 
   /** Post a credit-note reversal (DR revenue / CR receivable) pro-rata. */
   void onCreditNoteIssued(String invoiceId, String noteCode, int amountMinor, String reason);
+
+  /** Post a confirmed payment (DR cash/bank drawer / CR receivable). */
+  void onPaymentConfirmed(String paymentId, String propertyId, String memberProfileId,
+      String method, int amountMinor, String receiptCode);
+
+  /** Post a refund of unallocated member credit (DR receivable / CR drawer). */
+  void onPaymentRefunded(String paymentId, String propertyId, String memberProfileId,
+      String method, int amountMinor, String reason);
 }

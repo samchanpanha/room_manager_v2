@@ -146,7 +146,7 @@ public class InvoiceAppService {
       int qty = line.qty() == null ? 1 : line.qty();
       invoice.getItems().add(new InvoiceItem(line.kind(), line.name(), qty, toMinor(line.unit()), tenantId));
     }
-    recompute(invoice);
+    invoice.recompute();
     invoices.save(invoice);
 
     audit.log(AuditEntry.builder()
@@ -171,7 +171,7 @@ public class InvoiceAppService {
     invoice.setStatus("issued");
     invoice.setIssuedAt(Instant.now());
     if (invoice.getDueDate() == null) invoice.setDueDate(Instant.now());
-    recompute(invoice);
+    invoice.recompute();
     invoices.save(invoice);
 
     // M08 ledger post (DR receivable / CR revenue) via SPI — no-op until ported.
@@ -251,7 +251,7 @@ public class InvoiceAppService {
     // The issued document stays immutable (§9.3): credits reduce the amount due
     // via amountCreditedMinor, they do not rewrite invoice items.
     invoice.setAmountCreditedMinor(invoice.getAmountCreditedMinor() + amountMinor);
-    recompute(invoice);
+    invoice.recompute();
     if (invoice.getAmountDueMinor() == 0 && InvoiceMachine.canTransition(invoice.getStatus(), "paid")) {
       invoice.setStatus("paid");
     }
@@ -269,16 +269,6 @@ public class InvoiceAppService {
   }
 
   // ---- helpers ------------------------------------------------------------
-
-  /** Recompute subtotal/total/amountDue from the line items, payments, credits. */
-  private void recompute(Invoice invoice) {
-    int subtotal = invoice.getItems().stream().mapToInt(InvoiceItem::getAmountMinor).sum();
-    int total = subtotal - invoice.getDiscountMinor() + invoice.getTaxMinor();
-    int due = Math.max(0, total - invoice.getAmountPaidMinor() - invoice.getAmountCreditedMinor());
-    invoice.setSubtotalMinor(subtotal);
-    invoice.setTotalMinor(total);
-    invoice.setAmountDueMinor(due);
-  }
 
   private Invoice load(String id) {
     return invoices.findByIdAndTenantId(id, TenantContext.get())

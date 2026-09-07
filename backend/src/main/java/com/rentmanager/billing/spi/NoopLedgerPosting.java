@@ -19,6 +19,8 @@ public class NoopLedgerPosting {
       @Override public void onInvoiceIssued(String i, String p, String m, int t) {}
       @Override public void onInvoiceVoided(String i, String r) {}
       @Override public void onCreditNoteIssued(String i, String c, int a, String r) {}
+      @Override public void onPaymentConfirmed(String i, String p, String m, String me, int a, String rc) {}
+      @Override public void onPaymentRefunded(String i, String p, String m, String me, int a, String r) {}
     };
   }
 }

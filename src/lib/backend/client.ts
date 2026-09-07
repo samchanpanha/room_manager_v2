@@ -147,6 +147,40 @@ export interface InvoiceDetail {
   items: InvoiceItemDto[];
 }
 
+export interface PaymentSummary {
+  id: string;
+  code: string;
+  memberProfileId: string;
+  propertyId: string | null;
+  method: string;
+  status: string;
+  amountMinor: number;
+  remainingMinor: number;
+  refundedMinor: number;
+  receiptCode: string | null;
+  receivedAt: string;
+  confirmedAt: string | null;
+}
+
+export interface PaymentAllocationDto {
+  id: string;
+  invoiceId: string;
+  amountMinor: number;
+}
+
+export interface PaymentDetail {
+  payment: PaymentSummary;
+  allocations: PaymentAllocationDto[];
+}
+
+export interface CreatePaymentResult {
+  paymentId: string;
+  code: string;
+  allocatedMinor: number;
+  remainderMinor: number;
+  deduplicated: boolean;
+}
+
 export const api = {
   account: {
     me: () => backendFetch<Record<string, unknown>>("/api/account")
@@ -205,6 +239,35 @@ export const api = {
     creditNote: (id: string, amount: number, reason: string) =>
       backendFetch<{ code: string; invoiceStatus: string }>(`/api/invoices/${id}/credit-notes`, {
         json: { amount, reason }
+      })
+  },
+  payments: {
+    list: (params?: { status?: string; method?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.status) qs.set("status", params.status);
+      if (params?.method) qs.set("method", params.method);
+      const suffix = qs.toString() ? `?${qs}` : "";
+      return backendFetch<PaymentSummary[]>(`/api/payments${suffix}`);
+    },
+    get: (id: string) => backendFetch<PaymentDetail>(`/api/payments/${id}`),
+    create: (body: {
+      memberProfileId: string;
+      method: string;
+      amount: number;
+      allocations?: { invoiceId: string; amount: number }[];
+      idempotencyKey?: string;
+      gatewayRef?: string;
+    }) => backendFetch<CreatePaymentResult>("/api/payments", { json: body }),
+    confirm: (id: string) =>
+      backendFetch<{ ignored: boolean; receiptCode: string; paymentStatus: string }>(
+        `/api/payments/${id}/confirm`,
+        { json: {} }
+      ),
+    fail: (id: string, reason: string) =>
+      backendFetch<{ paymentStatus: string }>(`/api/payments/${id}/fail`, { json: { reason } }),
+    refund: (id: string, reason: string) =>
+      backendFetch<{ paymentStatus: string; receiptCode: string }>(`/api/payments/${id}/refund`, {
+        json: { reason }
       })
   }
 };
