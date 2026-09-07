@@ -27,9 +27,11 @@ com.rentmanager
 ├── iam             # M01/M27: users, roles, permissions, sessions, auth
 │                   #   (+ PortalUserApi: provision portal logins for other modules)
 ├── members         # M02: tenant/resident lifecycle
+│                   #   (+ MemberAccessApi: eligibility + lifecycle status for leasing)
 ├── properties      # M04: Property → Building → Floor → Room → Bed (+ room status machine)
-│                   #   (+ BuildingOwnershipApi: assign buildings to owners)
-└── owners          # M03: landlords, payout methods, optional OWNER portal login
+│                   #   (+ BuildingOwnershipApi, RoomAccessApi for owners/leasing)
+├── owners          # M03: landlords, payout methods, optional OWNER portal login
+└── leasing         # M05: member leases, state machine, occupancy rules, activation/ending effects
 ```
 
 Cross-module calls go through APIs published in a module's **base package**
@@ -51,6 +53,8 @@ through the published service or application events.
 | `GET  /api/account` | `src/app/api/account/route.ts` |
 | `GET/POST /api/members`, `GET /api/members/{id}` | `src/app/api/members/*` |
 | `GET/POST /api/owners`, `GET /api/owners/{id}` | `src/app/api/owners/route.ts` |
+| `GET/POST /api/leases`, `GET /api/leases/{id}` | `src/app/api/leases/*` |
+| `POST /api/leases/{id}/{activate,notice,complete,terminate}` | `src/app/api/leases/[id]/*` |
 | `GET/POST /api/properties`, `GET /api/properties/{id}` | `src/app/api/properties/route.ts` |
 | `GET /api/buildings`, `/api/floors`, `/api/rooms` | `src/app/api/{buildings,floors,rooms}/*` |
 | `POST /api/rooms/{id}/status` | `src/app/api/rooms/[id]/status/route.ts` |

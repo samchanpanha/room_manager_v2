@@ -34,6 +34,7 @@ DECLARE
         'Party','User','Role','MemberProfile','EmergencyContact',
         'Property','Building','Floor','Room','Bed',
         'OwnerProfile','OwnerPayoutMethod',
+        'Lease','LeaseService',
         'AuditLog','DomainEvent','Setting','NumberSequence'
     ];
 BEGIN

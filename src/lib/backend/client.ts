@@ -100,6 +100,20 @@ export interface OwnerSummary {
   payoutMethods: { id: string; kind: string; accountName: string; isPrimary: boolean }[];
 }
 
+export interface LeaseSummary {
+  id: string;
+  code: string;
+  status: string;
+  memberProfileId: string;
+  roomId: string;
+  bedId: string | null;
+  propertyId: string;
+  rentAmountMinor: number;
+  startDate: string | null;
+  endDate: string | null;
+  nextBillingDate: string | null;
+}
+
 export const api = {
   account: {
     me: () => backendFetch<Record<string, unknown>>("/api/account")
@@ -124,5 +138,21 @@ export const api = {
     list: () => backendFetch<OwnerSummary[]>("/api/owners"),
     get: (id: string) => backendFetch<Record<string, unknown>>(`/api/owners/${id}`),
     create: (body: unknown) => backendFetch<{ id: string }>("/api/owners", { json: body })
+  },
+  leases: {
+    list: (params?: { status?: string }) => {
+      const qs = params?.status ? `?status=${encodeURIComponent(params.status)}` : "";
+      return backendFetch<LeaseSummary[]>(`/api/leases${qs}`);
+    },
+    get: (id: string) => backendFetch<Record<string, unknown>>(`/api/leases/${id}`),
+    create: (body: unknown) => backendFetch<{ id: string; code: string }>("/api/leases", { json: body }),
+    activate: (id: string) =>
+      backendFetch<{ status: string; notes: string[] }>(`/api/leases/${id}/activate`, { json: {} }),
+    notice: (id: string, endDate?: string) =>
+      backendFetch<{ status: string; notes: string[] }>(`/api/leases/${id}/notice`, { json: { endDate } }),
+    complete: (id: string) =>
+      backendFetch<{ status: string; notes: string[] }>(`/api/leases/${id}/complete`, { json: {} }),
+    terminate: (id: string, reason: string) =>
+      backendFetch<{ status: string; notes: string[] }>(`/api/leases/${id}/terminate`, { json: { reason } })
   }
 };

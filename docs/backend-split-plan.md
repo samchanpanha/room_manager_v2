@@ -111,7 +111,7 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 | `members` | **M02** | **1 (impl)** |
 | `properties` | **M04** properties/buildings/floors/rooms/beds | **1 (impl)** |
 | `owners` | **M03** (M24 statements later) | **2 (impl)** |
-| `leasing` | M05 leases, M06 rent engine, M32 short stays | 2 |
+| `leasing` | **M05 leases** (M06 rent engine, M32 short stays later) | **2 (impl)** |
 | `billing` | M07 invoices, M09 payments, M13 QR pay | 3 |
 | `finance` | M08 ledger, M10 deposits, M20 expenses/P&L | 3 |
 | `utilities` | M11 utilities/meters, M12 services | 4 |
@@ -171,7 +171,24 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
       `iam.PortalUserApi` (provision portal user + role).
 - [x] Flyway `V2` extended to tenant-scope the owner tables.
 
-### Phase 3–6 — Port remaining modules (one vertical per module, same recipe)
+### Phase 3 — Leases (M05) — DONE (this PR)
+- [x] Kernel `NumberingService` (row-locked gapless `LSE-####`, port of
+      `src/lib/numbering.ts`).
+- [x] Cross-module published APIs to keep boundaries clean:
+      `properties.RoomAccessApi` (room facts + status machine + bed checks) and
+      `members.MemberAccessApi` (eligibility + lifecycle status).
+- [x] JPA Lease/LeaseService; `LeaseMachine`, `Occupancy`, `BillingDates`
+      (ports of `machine.ts`/`rules.ts`/`billing.ts`).
+- [x] `LeaseAppService`: draft creation (room→reserved), activation (occupancy
+      checks + room→occupied + member verified→active + first-invoice date),
+      notice, complete/terminate (room→cleaning, member→moved_out).
+- [x] REST `/api/leases` (+ activate/notice/complete/terminate); unit tests for
+      the machine/occupancy/billing math; Flyway `V2` extended to Lease tables.
+- [ ] Re-enable the two cross-module end-of-lease gates once their modules land:
+      open-dues clearance (**M07 invoices**) and completed move-out inspection
+      (**M18**). Marked with `TODO(M07)`/`TODO(M18)` in `LeaseAppService.end()`.
+
+### Phase 4–6 — Port remaining modules (one vertical per module, same recipe)
 For each module: entities → service (port `src/lib/**` logic) → controller →
 Flyway (only if new columns) → contract tests → flip the FE proxy route →
 delete the old `route.ts` and the module's `src/lib` server logic.
