@@ -3,6 +3,7 @@ package com.rentmanager.billing;
 import com.rentmanager.billing.domain.Invoice;
 import com.rentmanager.billing.domain.InvoiceItem;
 import com.rentmanager.billing.domain.InvoiceRepository;
+import com.rentmanager.billing.service.RentEngineService;
 import com.rentmanager.kernel.numbering.NumberingService;
 import com.rentmanager.kernel.tenant.TenantContext;
 import java.time.Instant;
@@ -23,16 +24,44 @@ public class BillingQueryApi {
   /** A deposit installment line requested by finance (M10). */
   public record DepositLine(String name, int amountMinor) {}
 
+  /** A fixed-monthly lease service snapshot for rent-engine generation (M06). */
+  public record ServiceSnapshot(String name, int amountMinor, String pricingModel,
+      Instant activeFrom, Instant activeThrough) {}
+
+  /** Everything billing needs to generate one active lease's pending invoices (M06). */
+  public record LeaseGenerationInput(String leaseId, String leaseCode, String propertyId,
+      String propertyCode, String memberProfileId, String memberName, int rentMinor,
+      int billingCycleDay, String prorationBasis, Instant startDate,
+      List<ServiceSnapshot> services) {}
+
+  /** One generated invoice, echoed back to the leasing job for its summary (M06). */
+  public record GeneratedInvoice(String id, String code, String leaseCode, int totalMinor,
+      Instant periodStart, Instant periodEnd) {}
+
   /** Collection facts of an invoice needed to advance a deposit (M10). */
   public record InvoiceFacts(String id, String status, int totalMinor,
       int amountPaidMinor, boolean isDeposit, String leaseId) {}
 
   private final InvoiceRepository invoices;
   private final NumberingService numbering;
+  private final RentEngineService rentEngine;
 
-  public BillingQueryApi(InvoiceRepository invoices, NumberingService numbering) {
+  public BillingQueryApi(InvoiceRepository invoices, NumberingService numbering,
+      RentEngineService rentEngine) {
     this.invoices = invoices;
     this.numbering = numbering;
+    this.rentEngine = rentEngine;
+  }
+
+  /**
+   * Generate (compose + issue) the pending invoices for one active lease (M06).
+   * Called by the leasing generation job, which owns lease state; billing owns
+   * the pricing engine and persistence. Idempotent per (lease, period).
+   */
+  @Transactional
+  public List<GeneratedInvoice> generateForLease(LeaseGenerationInput lease, String actorId,
+      String actorName) {
+    return rentEngine.generateForLease(lease, actorId, actorName);
   }
 
   /** Sum of outstanding dues (minor units) across a member's live invoices. */

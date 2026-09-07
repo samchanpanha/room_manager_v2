@@ -32,10 +32,14 @@ com.rentmanager
 │                   #   (+ BuildingOwnershipApi, RoomAccessApi, PropertyAccessApi for owners/leasing/billing)
 ├── owners          # M03: landlords, payout methods, optional OWNER portal login
 ├── leasing         # M05: member leases, state machine, occupancy rules, activation/ending effects
+│                   #   + M06 monthly generation job (InvoiceGenerationService drives
+│                   #    billing.BillingQueryApi.generateForLease per active lease)
 │                   #   (open-dues gate calls billing.BillingQueryApi; bills deposits
 │                   #    via leasing::spi DepositBillingPort, LeasingQueryApi published)
-├── billing         # M07 invoices + M09 payments: invoices/items/credit notes,
-│                   #   payments/allocations, issue/void/credit + confirm/fail/refund
+├── billing         # M06 rent engine + M07 invoices + M09 payments: pure engine
+│                   #   (billing.engine: proration + composition + late-fee/dunning),
+│                   #   invoices/items/credit notes, payments/allocations, and the
+│                   #   daily late-fee/dunning job (RentEngineService)
 │                   #   (+ BillingQueryApi for leasing/finance;
 │                   #    billing::spi LedgerPostingPort → M08, DepositAdvancePort → finance)
 └── finance         # M10 deposits (installment billing, hold/settle lifecycle,
@@ -72,6 +76,10 @@ through the published service or application events.
 | `POST /api/payments/{id}/{confirm,fail,refund}` | `src/app/api/payments/[id]/*` |
 | `GET /api/deposits`, `GET /api/deposits/{id}` | `src/app/api/deposits/*` |
 | `POST /api/deposits/{id}/{deduct,refund}` | `src/app/api/deposits/[id]/*` |
+| `GET /api/ledger/{accounts,journal,trial-balance}` | `src/app/api/ledger/*` |
+| `GET /api/members/{id}/statement` | `src/app/api/members/[id]/statement/route.ts` |
+| `POST /api/jobs/invoice-generation` | `src/app/api/jobs/invoice-generation/route.ts` |
+| `POST /api/jobs/billing-daily` | `src/app/api/jobs/billing-daily/route.ts` |
 | `GET/POST /api/properties`, `GET /api/properties/{id}` | `src/app/api/properties/route.ts` |
 | `GET /api/buildings`, `/api/floors`, `/api/rooms` | `src/app/api/{buildings,floors,rooms}/*` |
 | `POST /api/rooms/{id}/status` | `src/app/api/rooms/[id]/status/route.ts` |

@@ -18,6 +18,7 @@ public class NoopLedgerPosting {
     return new LedgerPostingPort() {
       @Override public void onInvoiceIssued(String i, String p, String m, int t, int d, int tx,
           java.util.List<LedgerPostingPort.InvoiceLine> items) {}
+      @Override public void onLateFeeApplied(String i, String p, String m, String c, int f) {}
       @Override public void onInvoiceVoided(String i, String r) {}
       @Override public void onCreditNoteIssued(String i, String p, String m, String c, int a, String r) {}
       @Override public void onPaymentConfirmed(String i, String p, String m, String me, int a, String rc) {}

@@ -279,6 +279,26 @@ export interface MemberStatement {
   receivableMinor: number;
 }
 
+export interface GeneratedInvoiceRow {
+  id: string;
+  code: string;
+  leaseCode: string;
+  totalMinor: number;
+  periodStart: string;
+  periodEnd: string;
+}
+
+export interface GenerationSummary {
+  generated: number;
+  skipped: number;
+  invoices: GeneratedInvoiceRow[];
+}
+
+export interface BillingDailyResult {
+  lateFees: { applied: number; checked: number };
+  dunning: { overdueMarked: number; remindersSent: number };
+}
+
 export const api = {
   account: {
     me: () => backendFetch<Record<string, unknown>>("/api/account")
@@ -405,5 +425,10 @@ export const api = {
       const suffix = qs.toString() ? `?${qs}` : "";
       return backendFetch<JournalTxn[]>(`/api/ledger/journal${suffix}`);
     }
+  },
+  jobs: {
+    generateInvoices: () =>
+      backendFetch<GenerationSummary>("/api/jobs/invoice-generation", { json: {} }),
+    billingDaily: () => backendFetch<BillingDailyResult>("/api/jobs/billing-daily", { json: {} })
   }
 };

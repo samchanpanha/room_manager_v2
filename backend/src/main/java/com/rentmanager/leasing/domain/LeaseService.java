@@ -49,4 +49,6 @@ public class LeaseService {
   public String getName() { return name; }
   public int getAmountMinor() { return amountMinor; }
   public String getPricingModel() { return pricingModel; }
+  public Instant getActiveFrom() { return activeFrom; }
+  public Instant getActiveThrough() { return activeThrough; }
 }

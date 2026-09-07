@@ -66,6 +66,12 @@ Floor, Room, Bed, AuditLog, Tenant`.
   `held`/`settled` are derived from the invoice's `amountPaidMinor` and the
   movements' released total. Cross-module cycles are inverted via named-interface
   SPIs (`leasing::spi`, `billing::spi`) that finance implements.
+- Phase 8 (M06 rent engine): `TaxRule, LateFeeRule` (billing) + `Setting`
+  (kernel), all bound to their Prisma tables. `V7__rent_engine_tenant.sql`
+  tenant-scopes the pricing catalog (TaxRule/LateFeeRule/RentPlan/DiscountRule).
+  `Setting` stays global (JSON blob per `m28.*` group key), read by
+  `kernel.settings.SettingsService`. The engine itself (`billing.engine`) is pure
+  and holds no state.
 - Phase 7 (finance M08 ledger): `LedgerAccount, LedgerTransaction, LedgerEntry`
   (`V6__ledger.sql`). `LedgerAccount` is shared reference data (no `tenantId`);
   the books (`LedgerTransaction`/`LedgerEntry`) carry `tenantId`. Entries map via

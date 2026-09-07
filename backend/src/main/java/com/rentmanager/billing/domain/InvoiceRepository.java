@@ -1,5 +1,6 @@
 package com.rentmanager.billing.domain;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -40,4 +41,35 @@ public interface InvoiceRepository extends JpaRepository<Invoice, String> {
       order by coalesce(i.dueDate, i.periodStart) asc, i.periodStart asc
       """)
   List<Invoice> findOpenForMember(@Param("tenantId") String tenantId, @Param("memberId") String memberId);
+
+  // ---- M06 rent-engine job support ---------------------------------------
+
+  /** The latest non-void, non-deposit invoice for a lease — the period chain head. */
+  Optional<Invoice> findFirstByLeaseIdAndTenantIdAndDepositFalseAndStatusNotOrderByPeriodEndDesc(
+      String leaseId, String tenantId, String status);
+
+  /** Whether a live (non-void) invoice already covers a lease period (idempotency). */
+  boolean existsByLeaseIdAndPeriodStartAndTenantIdAndDepositFalseAndStatusNot(
+      String leaseId, Instant periodStart, String tenantId, String status);
+
+  /** Late-fee candidates: live invoices with a positive balance past the grace cutoff. */
+  @Query("""
+      select i from Invoice i
+      where i.tenantId = :tenantId
+        and i.status in ('issued','partial_paid','overdue')
+        and i.amountDueMinor > 0
+        and i.dueDate is not null and i.dueDate < :graceCutoff
+      """)
+  List<Invoice> findLateFeeCandidates(@Param("tenantId") String tenantId,
+      @Param("graceCutoff") Instant graceCutoff);
+
+  /** Dunning candidates: live invoices already past their due date. */
+  @Query("""
+      select i from Invoice i
+      where i.tenantId = :tenantId
+        and i.status in ('issued','partial_paid','overdue')
+        and i.dueDate is not null and i.dueDate < :today
+      """)
+  List<Invoice> findDunningCandidates(@Param("tenantId") String tenantId,
+      @Param("today") Instant today);
 }

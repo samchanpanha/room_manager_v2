@@ -20,6 +20,10 @@ public interface LedgerPostingPort {
   void onInvoiceIssued(String invoiceId, String propertyId, String memberProfileId,
       int totalMinor, int discountMinor, int taxMinor, java.util.List<InvoiceLine> items);
 
+  /** Post an auto-applied late fee (DR receivable / CR 4300 late-fee revenue). M06. */
+  void onLateFeeApplied(String invoiceId, String propertyId, String memberProfileId,
+      String invoiceCode, int feeMinor);
+
   /** Reverse all live postings when an invoice is voided. */
   void onInvoiceVoided(String invoiceId, String reason);
 

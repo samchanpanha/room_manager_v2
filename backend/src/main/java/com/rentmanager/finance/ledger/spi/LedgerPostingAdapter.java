@@ -38,6 +38,15 @@ public class LedgerPostingAdapter implements LedgerPostingPort {
   }
 
   @Override
+  public void onLateFeeApplied(String invoiceId, String propertyId, String memberProfileId,
+      String invoiceCode, int feeMinor) {
+    // DR 1300 receivable / CR 4300 late-fee revenue.
+    List<Line> lines = Postings.lateFeeLines(feeMinor, invoiceCode);
+    ledger.post(new LedgerService.PostInput("Late fee on " + invoiceCode, "late_fee", invoiceId,
+        propertyId, memberProfileId, null, null, lines));
+  }
+
+  @Override
   public void onInvoiceVoided(String invoiceId, String reason) {
     // Reverse the live issue + late-fee postings that make up the invoice.
     ledger.liveTransactions(List.of("invoice", "late_fee"), invoiceId)

@@ -111,8 +111,8 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 | `members` | **M02** | **1 (impl)** |
 | `properties` | **M04** properties/buildings/floors/rooms/beds | **1 (impl)** |
 | `owners` | **M03** (M24 statements later) | **2 (impl)** |
-| `leasing` | **M05 leases** (M06 rent engine, M32 short stays later) | **2 (impl)** |
-| `billing` | **M07 invoices, M09 payments** (M13 QR pay later) | **3 (impl)** |
+| `leasing` | **M05 leases + M06 generation job** (M32 short stays later) | **2 (impl)** |
+| `billing` | **M06 rent engine, M07 invoices, M09 payments** (M13 QR pay later) | **3 (impl)** |
 | `finance` | **M10 deposits + M08 double-entry ledger** (M20 expenses/P&L later) | **3 (impl)** |
 | `utilities` | M11 utilities/meters, M12 services | 4 |
 | `operations` | M16 room moves, M18 inspections, M19 maintenance, M22 complaints | 4 |
@@ -331,7 +331,43 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 - [x] FE seam wired: `/api/ledger` added to `MIGRATED_PREFIXES`; typed
       `api.ledger` (accounts/trialBalance/journal) + `api.members.statement`.
 
-### Phase 8+ — Port remaining modules (one vertical per module, same recipe)
+### Phase 8 — Rent engine + billing jobs (M06) — DONE (this PR)
+- [x] Pure engine in `billing.engine`: `Proration` (cycle boundaries, calendar
+      vs 30-day proration, UTC date math) and `RentEngine` (invoice composition
+      with rent + fixed-monthly services + one-time lines, invoice-level discount
+      clamp, tax, the §9.4 `total = Σ − discount + tax` invariant, `evalLateFee`
+      and `dunningStage`). Ports `src/lib/billing/{proration,engine}.ts`;
+      exhaustively unit-tested in `RentEngineTest`.
+- [x] `RentEngineService` (billing): per-lease generation (compose → issue →
+      persist → M08 ledger post, idempotent per (lease, period), catch-up up to
+      24 periods), `applyLateFees` (once per invoice past the grace cutoff;
+      explicit M06 `LateFeeRule` wins, else the M28 org defaults), and
+      `runDunning` (mark overdue past grace + advance the +3/+7/+14 stage ladder).
+- [x] **Cross-module cycle avoided** — `leasing` already depends on `billing`, so
+      billing must not depend on leasing. Generation is therefore driven from
+      leasing's `InvoiceGenerationService`, which snapshots each active lease and
+      calls the published `BillingQueryApi.generateForLease(...)`; billing owns
+      the pricing engine and persistence, leasing owns lease selection + scoping.
+- [x] New M06 ledger hook `LedgerPostingPort.onLateFeeApplied` (DR 1300 / CR 4300)
+      wired through the finance `LedgerPostingAdapter`, so auto-applied late fees
+      post to the ledger too.
+- [x] Minimal M28 settings reader `kernel.settings.SettingsService` (billing +
+      lateFee groups, JSON-over-defaults) bound to the existing Prisma `Setting`
+      table; `TaxRule`/`LateFeeRule` entities bound to their Prisma tables.
+- [x] REST at the Next job paths: `POST /api/jobs/invoice-generation` (M07:create,
+      property-scoped) and `POST /api/jobs/billing-daily` (M06:update).
+- [x] Flyway `V7` tenant-scopes the rent-engine catalog (TaxRule, LateFeeRule,
+      RentPlan, DiscountRule).
+- [x] FE seam: both job prefixes added to `MIGRATED_PREFIXES`; typed `api.jobs`
+      (generateInvoices / billingDaily) client.
+- [x] **Closes the loop M07/M09 left open**: invoices are now machine-generated
+      for active leases, late fees auto-apply, and the `issued → overdue` +
+      dunning transitions are driven by the daily job.
+- [ ] Deferred: M11/M12 utility/service one-time lines on the generated invoice
+      (the engine already accepts them; wiring lands with those modules), and
+      invoice-PDF filing (M17).
+
+### Phase 9+ — Port remaining modules (one vertical per module, same recipe)
 For each module: entities → service (port `src/lib/**` logic) → controller →
 Flyway (only if new columns) → contract tests → flip the FE proxy route →
 delete the old `route.ts` and the module's `src/lib` server logic.
