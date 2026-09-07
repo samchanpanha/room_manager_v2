@@ -114,6 +114,39 @@ export interface LeaseSummary {
   nextBillingDate: string | null;
 }
 
+export interface InvoiceSummary {
+  id: string;
+  code: string;
+  propertyId: string;
+  leaseId: string | null;
+  memberProfileId: string;
+  status: string;
+  periodStart: string;
+  periodEnd: string;
+  issuedAt: string | null;
+  dueDate: string | null;
+  totalMinor: number;
+  amountPaidMinor: number;
+  amountCreditedMinor: number;
+  amountDueMinor: number;
+  dunningStage: number;
+  isDeposit: boolean;
+}
+
+export interface InvoiceItemDto {
+  id: string;
+  kind: string;
+  name: string;
+  qty: number;
+  unitMinor: number;
+  amountMinor: number;
+}
+
+export interface InvoiceDetail {
+  invoice: InvoiceSummary;
+  items: InvoiceItemDto[];
+}
+
 export const api = {
   account: {
     me: () => backendFetch<Record<string, unknown>>("/api/account")
@@ -154,5 +187,24 @@ export const api = {
       backendFetch<{ status: string; notes: string[] }>(`/api/leases/${id}/complete`, { json: {} }),
     terminate: (id: string, reason: string) =>
       backendFetch<{ status: string; notes: string[] }>(`/api/leases/${id}/terminate`, { json: { reason } })
+  },
+  invoices: {
+    list: (params?: { status?: string; propertyId?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.status) qs.set("status", params.status);
+      if (params?.propertyId) qs.set("propertyId", params.propertyId);
+      const suffix = qs.toString() ? `?${qs}` : "";
+      return backendFetch<InvoiceSummary[]>(`/api/invoices${suffix}`);
+    },
+    get: (id: string) => backendFetch<InvoiceDetail>(`/api/invoices/${id}`),
+    create: (body: unknown) => backendFetch<InvoiceDetail>("/api/invoices", { json: body }),
+    issue: (id: string) =>
+      backendFetch<{ issued: boolean; invoice: InvoiceSummary }>(`/api/invoices/${id}/issue`, { json: {} }),
+    void: (id: string, reason: string) =>
+      backendFetch<{ voided: boolean }>(`/api/invoices/${id}/void`, { json: { reason } }),
+    creditNote: (id: string, amount: number, reason: string) =>
+      backendFetch<{ code: string; invoiceStatus: string }>(`/api/invoices/${id}/credit-notes`, {
+        json: { amount, reason }
+      })
   }
 };

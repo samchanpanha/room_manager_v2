@@ -29,9 +29,13 @@ com.rentmanager
 ├── members         # M02: tenant/resident lifecycle
 │                   #   (+ MemberAccessApi: eligibility + lifecycle status for leasing)
 ├── properties      # M04: Property → Building → Floor → Room → Bed (+ room status machine)
-│                   #   (+ BuildingOwnershipApi, RoomAccessApi for owners/leasing)
+│                   #   (+ BuildingOwnershipApi, RoomAccessApi, PropertyAccessApi for owners/leasing/billing)
 ├── owners          # M03: landlords, payout methods, optional OWNER portal login
-└── leasing         # M05: member leases, state machine, occupancy rules, activation/ending effects
+├── leasing         # M05: member leases, state machine, occupancy rules, activation/ending effects
+│                   #   (open-dues gate at end-of-lease calls billing.BillingQueryApi)
+└── billing         # M07: invoices, invoice items, credit notes, issue/void/credit lifecycle
+                    #   (+ BillingQueryApi: member open-dues for leasing;
+                    #    LedgerPostingPort SPI → finance/M08 when ported)
 ```
 
 Cross-module calls go through APIs published in a module's **base package**
@@ -55,6 +59,8 @@ through the published service or application events.
 | `GET/POST /api/owners`, `GET /api/owners/{id}` | `src/app/api/owners/route.ts` |
 | `GET/POST /api/leases`, `GET /api/leases/{id}` | `src/app/api/leases/*` |
 | `POST /api/leases/{id}/{activate,notice,complete,terminate}` | `src/app/api/leases/[id]/*` |
+| `GET/POST /api/invoices`, `GET /api/invoices/{id}` | `src/app/api/invoices/*` |
+| `POST /api/invoices/{id}/{issue,void}`, `POST /api/invoices/{id}/credit-notes` | `src/app/api/invoices/[id]/*` |
 | `GET/POST /api/properties`, `GET /api/properties/{id}` | `src/app/api/properties/route.ts` |
 | `GET /api/buildings`, `/api/floors`, `/api/rooms` | `src/app/api/{buildings,floors,rooms}/*` |
 | `POST /api/rooms/{id}/status` | `src/app/api/rooms/[id]/status/route.ts` |

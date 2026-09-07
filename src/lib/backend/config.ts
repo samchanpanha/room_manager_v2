@@ -31,6 +31,7 @@ export const MIGRATED_PREFIXES: string[] = [
   "/api/members",
   "/api/owners",
   "/api/leases",
+  "/api/invoices",
   "/api/properties",
   "/api/buildings",
   "/api/floors",

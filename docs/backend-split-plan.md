@@ -112,7 +112,7 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 | `properties` | **M04** properties/buildings/floors/rooms/beds | **1 (impl)** |
 | `owners` | **M03** (M24 statements later) | **2 (impl)** |
 | `leasing` | **M05 leases** (M06 rent engine, M32 short stays later) | **2 (impl)** |
-| `billing` | M07 invoices, M09 payments, M13 QR pay | 3 |
+| `billing` | **M07 invoices** (M09 payments, M13 QR pay later) | **3 (impl)** |
 | `finance` | M08 ledger, M10 deposits, M20 expenses/P&L | 3 |
 | `utilities` | M11 utilities/meters, M12 services | 4 |
 | `operations` | M16 room moves, M18 inspections, M19 maintenance, M22 complaints | 4 |
@@ -184,11 +184,45 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
       notice, complete/terminate (room→cleaning, member→moved_out).
 - [x] REST `/api/leases` (+ activate/notice/complete/terminate); unit tests for
       the machine/occupancy/billing math; Flyway `V2` extended to Lease tables.
-- [ ] Re-enable the two cross-module end-of-lease gates once their modules land:
-      open-dues clearance (**M07 invoices**) and completed move-out inspection
-      (**M18**). Marked with `TODO(M07)`/`TODO(M18)` in `LeaseAppService.end()`.
+- [x] Open-dues clearance gate at complete/terminate — **re-enabled** now that
+      the billing module (M07) is ported: `LeaseAppService.end()` calls
+      `billing.BillingQueryApi.hasOpenDues(member)` and returns `422 OPEN_DUES`
+      when the member carries any outstanding balance.
+- [ ] Re-enable the remaining end-of-lease gate once its module lands: completed
+      move-out inspection (**M18**). Marked `TODO(M18)` in `LeaseAppService.end()`.
 
-### Phase 4–6 — Port remaining modules (one vertical per module, same recipe)
+### Phase 4 — Invoices (M07) — DONE (this PR)
+- [x] JPA Invoice/InvoiceItem/CreditNote bound to the existing Prisma tables.
+- [x] `InvoiceMachine` — port of `src/lib/billing/machines.ts` (statuses,
+      transitions, item kinds). Unit-tested in `InvoiceRulesTest`.
+- [x] `InvoiceAppService`: manual draft creation (with live-per-period
+      uniqueness per `(leaseId, periodStart)`, voided periods re-billable),
+      issue (allocate `INV-####` via `NumberingService`, set due date), void
+      (reason required, `amountDue→0`), and credit notes (`CN-####`,
+      immutable-document semantics: reduce `amountCreditedMinor`, auto-settle to
+      `paid` at zero due). `recompute()` keeps subtotal/total/amountDue in sync,
+      matching `recomputeAmountsTx`.
+- [x] Ledger side-effects (M08) delegated through the
+      `billing.spi.LedgerPostingPort` SPI with a `@ConditionalOnMissingBean`
+      no-op default, so postings light up automatically when the finance module
+      is ported. **Parity gap** until then: no double-entry postings on
+      issue/void/credit; no invoice-PDF filing (M17); no utility/usage
+      re-billing on void (M11/M12). All tracked here.
+- [x] Payments (M09) not yet ported, so `amountPaidMinor` stays 0 and the
+      `partial_paid`/auto-`overdue`/dunning transitions are reachable in the
+      machine but not yet driven — they land with the payments + M06 jobs.
+- [x] Cross-module published API `billing.BillingQueryApi` (open-dues sum per
+      member) consumed by leasing; new `properties.PropertyAccessApi`
+      (propertyId validation) consumed by billing.
+- [x] REST mirroring `/api/invoices*`: list (`?status`,`?propertyId`), get
+      detail, create draft, `POST /{id}/issue`, `POST /{id}/void`,
+      `POST /{id}/credit-notes`.
+- [x] Flyway `V3` tenant-scopes Invoice/InvoiceItem/CreditNote (+ composite
+      `(tenantId,memberProfileId,status)` index for the open-dues gate).
+- [x] FE seam wired: `/api/invoices` added to `MIGRATED_PREFIXES`; typed
+      `api.invoices` client (list/get/create/issue/void/creditNote).
+
+### Phase 5+ — Port remaining modules (one vertical per module, same recipe)
 For each module: entities → service (port `src/lib/**` logic) → controller →
 Flyway (only if new columns) → contract tests → flip the FE proxy route →
 delete the old `route.ts` and the module's `src/lib` server logic.

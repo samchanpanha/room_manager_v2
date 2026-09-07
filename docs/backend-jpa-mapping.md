@@ -20,10 +20,13 @@ class User {
 }
 ```
 
-## New, backend-owned columns (Flyway `V2__add_tenant.sql`, additive)
-- `Tenant` table (SaaS tenant registry).
+## New, backend-owned columns (Flyway, additive)
+- `Tenant` table (SaaS tenant registry) — `V2__add_tenant.sql`.
 - `tenantId TEXT NOT NULL DEFAULT 'DEFAULT'` on tenant-scoped tables, backfilled
-  to the `DEFAULT` tenant so existing single-tenant data is untouched.
+  to the `DEFAULT` tenant so existing single-tenant data is untouched. `V2`
+  covers the Phase 1–3 tables; `V3__billing_tenant.sql` extends the same pattern
+  to `Invoice`/`InvoiceItem`/`CreditNote` (+ a `(tenantId,memberProfileId,status)`
+  index powering the leasing open-dues gate).
 
 ## Auth compatibility (must match byte-for-byte)
 | Concern | Next (TS) | Backend (Java) |
@@ -40,4 +43,12 @@ class User {
 UserPropertyAssignment, MemberProfile, EmergencyContact, Property, Building,
 Floor, Room, Bed, AuditLog, Tenant`.
 
-Remaining 69 models follow the same recipe as their modules are ported (Phases 2–6).
+## Entities mapped in Phases 2–4
+- Phase 2 (owners M03): `OwnerProfile, OwnerPayoutMethod`.
+- Phase 3 (leasing M05): `Lease, LeaseService`, `NumberSequence` (kernel).
+- Phase 4 (billing M07): `Invoice, InvoiceItem, CreditNote`. Money kept in
+  integer minor units; `amountDueMinor` maintained as `total − paid − credited`
+  (≥0) exactly as `recomputeAmountsTx`. `CreditNote` is append-only; issued
+  invoices stay immutable (credits adjust `amountCreditedMinor`, never items).
+
+Remaining models follow the same recipe as their modules are ported.

@@ -1,5 +1,6 @@
 package com.rentmanager.leasing.service;
 
+import com.rentmanager.billing.BillingQueryApi;
 import com.rentmanager.kernel.audit.AuditEntry;
 import com.rentmanager.kernel.audit.AuditService;
 import com.rentmanager.kernel.numbering.NumberingService;
@@ -34,14 +35,16 @@ public class LeaseAppService {
   private final MemberAccessApi membersApi;
   private final NumberingService numbering;
   private final AuditService audit;
+  private final BillingQueryApi billing;
 
   public LeaseAppService(LeaseRepository leases, RoomAccessApi rooms, MemberAccessApi membersApi,
-      NumberingService numbering, AuditService audit) {
+      NumberingService numbering, AuditService audit, BillingQueryApi billing) {
     this.leases = leases;
     this.rooms = rooms;
     this.membersApi = membersApi;
     this.numbering = numbering;
     this.audit = audit;
+    this.billing = billing;
   }
 
   public record EffectResult(String status, List<String> notes) {}
@@ -242,10 +245,17 @@ public class LeaseAppService {
     if ("terminated".equals(to) && (reason == null || reason.isBlank())) {
       throw new ApiException(422, "REASON_REQUIRED", "Termination requires a written reason");
     }
-    // TODO(M07): open-dues clearance gate — requires the invoices module.
-    // TODO(M18): completed move-out inspection gate — requires the inspections module.
-    // Both are enforced in the Next app; they are re-enabled here as those
-    // modules are ported (tracked in docs/backend-split-plan.md).
+    // M07 open-dues clearance gate (now enforced — billing module ported):
+    // completing/terminating a lease is blocked while the member carries any
+    // outstanding balance across live invoices, matching the Next app.
+    if (billing.hasOpenDues(lease.getMemberProfileId())) {
+      long dueMinor = billing.openDuesForMember(lease.getMemberProfileId());
+      throw new ApiException(422, "OPEN_DUES",
+          "Member has outstanding dues (" + String.format("%.2f", dueMinor / 100.0)
+              + ") — settle or credit them before ending the lease");
+    }
+    // TODO(M18): completed move-out inspection gate — requires the inspections
+    // module; re-enabled when it is ported (tracked in docs/backend-split-plan.md).
 
     List<String> notes = new ArrayList<>();
     String tenantId = TenantContext.get();
