@@ -57,5 +57,11 @@ Floor, Room, Bed, AuditLog, Tenant`.
   unique. Confirmation increments each allocated invoice's `amountPaidMinor` and
   re-derives status via `Invoice.recompute()`. Year-scoped codes `PMT-YYYY-####`
   / `RCP-YYYY-####` use per-year `NumberSequence` keys (`PMT:YYYY`, `RCP:YYYY`).
+- Phase 6 (finance M10): `Deposit, DepositTransaction` (`V5__deposits_tenant.sql`).
+  A deposit is billed as an `isDeposit=true` invoice (period sentinel
+  `2000-01-01`, due at move-in) via `BillingQueryApi.billDepositInvoice`;
+  `held`/`settled` are derived from the invoice's `amountPaidMinor` and the
+  movements' released total. Cross-module cycles are inverted via named-interface
+  SPIs (`leasing::spi`, `billing::spi`) that finance implements.
 
 Remaining models follow the same recipe as their modules are ported.

@@ -32,11 +32,15 @@ com.rentmanager
 │                   #   (+ BuildingOwnershipApi, RoomAccessApi, PropertyAccessApi for owners/leasing/billing)
 ├── owners          # M03: landlords, payout methods, optional OWNER portal login
 ├── leasing         # M05: member leases, state machine, occupancy rules, activation/ending effects
-│                   #   (open-dues gate at end-of-lease calls billing.BillingQueryApi)
-└── billing         # M07 invoices + M09 payments: invoices/items/credit notes,
-                    #   payments/allocations, issue/void/credit + confirm/fail/refund
-                    #   (+ BillingQueryApi: member open-dues for leasing;
-                    #    LedgerPostingPort SPI → finance/M08 when ported)
+│                   #   (open-dues gate calls billing.BillingQueryApi; bills deposits
+│                   #    via leasing::spi DepositBillingPort, LeasingQueryApi published)
+├── billing         # M07 invoices + M09 payments: invoices/items/credit notes,
+│                   #   payments/allocations, issue/void/credit + confirm/fail/refund
+│                   #   (+ BillingQueryApi for leasing/finance;
+│                   #    billing::spi LedgerPostingPort → M08, DepositAdvancePort → finance)
+└── finance         # M10 deposits: installment billing, hold/settle lifecycle,
+                    #   deduction/refund movements. Implements leasing/billing SPIs
+                    #   (dependency inversion); LedgerPostingPort SPI → M08 when ported
 ```
 
 Cross-module calls go through APIs published in a module's **base package**
@@ -64,6 +68,8 @@ through the published service or application events.
 | `POST /api/invoices/{id}/{issue,void}`, `POST /api/invoices/{id}/credit-notes` | `src/app/api/invoices/[id]/*` |
 | `GET/POST /api/payments`, `GET /api/payments/{id}` | `src/app/api/payments/*` |
 | `POST /api/payments/{id}/{confirm,fail,refund}` | `src/app/api/payments/[id]/*` |
+| `GET /api/deposits`, `GET /api/deposits/{id}` | `src/app/api/deposits/*` |
+| `POST /api/deposits/{id}/{deduct,refund}` | `src/app/api/deposits/[id]/*` |
 | `GET/POST /api/properties`, `GET /api/properties/{id}` | `src/app/api/properties/route.ts` |
 | `GET /api/buildings`, `/api/floors`, `/api/rooms` | `src/app/api/{buildings,floors,rooms}/*` |
 | `POST /api/rooms/{id}/status` | `src/app/api/rooms/[id]/status/route.ts` |

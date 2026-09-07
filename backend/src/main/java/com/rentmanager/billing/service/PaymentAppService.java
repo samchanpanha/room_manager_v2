@@ -12,6 +12,7 @@ import com.rentmanager.billing.dto.PaymentDetail;
 import com.rentmanager.billing.dto.PaymentSummary;
 import com.rentmanager.billing.service.PaymentAllocator.Allocation;
 import com.rentmanager.billing.service.PaymentAllocator.OpenInvoice;
+import com.rentmanager.billing.spi.DepositAdvancePort;
 import com.rentmanager.billing.spi.LedgerPostingPort;
 import com.rentmanager.kernel.audit.AuditEntry;
 import com.rentmanager.kernel.audit.AuditService;
@@ -48,16 +49,18 @@ public class PaymentAppService {
   private final AuditService audit;
   private final MemberAccessApi membersApi;
   private final LedgerPostingPort ledger;
+  private final DepositAdvancePort deposits;
 
   public PaymentAppService(PaymentRepository payments, InvoiceRepository invoices,
       NumberingService numbering, AuditService audit, MemberAccessApi membersApi,
-      LedgerPostingPort ledger) {
+      LedgerPostingPort ledger, DepositAdvancePort deposits) {
     this.payments = payments;
     this.invoices = invoices;
     this.numbering = numbering;
     this.audit = audit;
     this.membersApi = membersApi;
     this.ledger = ledger;
+    this.deposits = deposits;
   }
 
   public record ConfirmResult(boolean ignored, String receiptCode, String paymentStatus) {}
@@ -217,8 +220,12 @@ public class PaymentAppService {
         inv.setStatus("partial_paid");
       }
       invoices.save(inv);
-      // TODO(M10): paying a deposit invoice advances the deposit (billed→held)
-      // once the deposits module is ported.
+      // M10: paying (part of) a deposit invoice advances its deposit
+      // (billed→held). No-op until the finance/deposits module registers the
+      // DepositAdvancePort bean.
+      if (inv.isDeposit()) {
+        deposits.onDepositInvoicePaid(inv.getId());
+      }
     }
     payments.save(payment);
 

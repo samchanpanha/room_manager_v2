@@ -1,6 +1,7 @@
 package com.rentmanager.leasing.service;
 
 import com.rentmanager.billing.BillingQueryApi;
+import com.rentmanager.leasing.spi.DepositBillingPort;
 import com.rentmanager.kernel.audit.AuditEntry;
 import com.rentmanager.kernel.audit.AuditService;
 import com.rentmanager.kernel.numbering.NumberingService;
@@ -36,15 +37,18 @@ public class LeaseAppService {
   private final NumberingService numbering;
   private final AuditService audit;
   private final BillingQueryApi billing;
+  private final DepositBillingPort depositBilling;
 
   public LeaseAppService(LeaseRepository leases, RoomAccessApi rooms, MemberAccessApi membersApi,
-      NumberingService numbering, AuditService audit, BillingQueryApi billing) {
+      NumberingService numbering, AuditService audit, BillingQueryApi billing,
+      DepositBillingPort depositBilling) {
     this.leases = leases;
     this.rooms = rooms;
     this.membersApi = membersApi;
     this.numbering = numbering;
     this.audit = audit;
     this.billing = billing;
+    this.depositBilling = depositBilling;
   }
 
   public record EffectResult(String status, List<String> notes) {}
@@ -189,9 +193,15 @@ public class LeaseAppService {
     }
     notes.add("first invoice scheduled " + nextBilling.toString().substring(0, 10));
     if (lease.getDepositTotalMinor() > 0) {
-      // TODO(M10): bill the deposit as a liability-backed installment invoice once
-      // the deposits module is ported. Behavior parity noted in the plan.
-      notes.add("deposit billing deferred (M10 not yet ported)");
+      // M10: bill the deposit as a liability-backed installment invoice. Handled
+      // by the finance/deposits module through the DepositBillingPort (no-op
+      // until it is registered, in which case billing is simply noted deferred).
+      DepositBillingPort.DepositBilled billed = depositBilling.ensureDepositForLease(lease.getId());
+      if (billed != null && billed.invoiceCode() != null) {
+        notes.add("deposit billed — invoice " + billed.invoiceCode());
+      } else {
+        notes.add("deposit billing deferred (finance module not active)");
+      }
     }
 
     audit.log(AuditEntry.builder()

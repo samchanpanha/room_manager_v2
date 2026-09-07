@@ -113,7 +113,7 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 | `owners` | **M03** (M24 statements later) | **2 (impl)** |
 | `leasing` | **M05 leases** (M06 rent engine, M32 short stays later) | **2 (impl)** |
 | `billing` | **M07 invoices, M09 payments** (M13 QR pay later) | **3 (impl)** |
-| `finance` | M08 ledger, M10 deposits, M20 expenses/P&L | 3 |
+| `finance` | **M10 deposits** (M08 ledger, M20 expenses/P&L later) | **3 (impl)** |
 | `utilities` | M11 utilities/meters, M12 services | 4 |
 | `operations` | M16 room moves, M18 inspections, M19 maintenance, M22 complaints | 4 |
 | `inventory` | M14 POS, M15 stock, M29 purchase orders | 5 |
@@ -254,7 +254,48 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
       `PaymentAppService.confirm/fail` once added.
 - [ ] Deferred: receipt PDF (M17) — same SPI approach as the invoice PDF.
 
-### Phase 6+ — Port remaining modules (one vertical per module, same recipe)
+### Phase 6 — Deposits (M10, new `finance` module) — DONE (this PR)
+- [x] JPA Deposit/DepositTransaction bound to the existing Prisma tables.
+- [x] `DepositMachine` (port of `src/lib/deposits/machines.ts`: forward-only
+      pending→billed→held→settled, installment split with last-absorbs-remainder,
+      deduction credit-account routing, move-out settlement window). Unit-tested
+      in `DepositRulesTest`.
+- [x] `DepositAppService`: bill a deposit as an installment `deposit`-kind
+      invoice at lease activation (idempotent per lease), advance status from
+      collection/settlement facts, and record deduction (evidence + note
+      mandatory) / refund (Accountant-only) movements at move-out.
+- [x] **Cross-module cycles broken by dependency inversion** — finance depends
+      on `leasing`/`billing`, never the reverse:
+  - `leasing.spi.DepositBillingPort` (named interface `leasing::spi`) — leasing
+    calls it on activation; finance's `DepositBillingAdapter` implements it.
+    **Closes the M05 `TODO(M10)`**: `LeaseAppService.activate()` now bills the
+    deposit and notes the invoice code.
+  - `billing.spi.DepositAdvancePort` (named interface `billing::spi`) — billing
+    calls it when a deposit invoice is paid; finance's `DepositAdvanceAdapter`
+    implements it. **Closes the M09 `TODO(M10)`**: `PaymentAppService.confirm()`
+    advances the deposit billed→held.
+  - Both adapters are `@Primary` so they deterministically replace the no-op
+    defaults (`NoopDepositBilling`/`NoopDepositAdvance`) once finance is on the
+    classpath.
+  - New published `billing.BillingQueryApi.billDepositInvoice/invoiceFacts` and
+    `leasing.LeasingQueryApi` (lease deposit terms + settlement-window check)
+    give finance read/bill access without reaching into internals.
+- [x] Ledger postings (M08) via the extended `LedgerPostingPort`
+      (`onDepositBilled`/`onDepositDeducted`/`onDepositRefunded`) — no-op until
+      the ledger module is ported. **Parity gap** until then: no DR-receivable/
+      CR-2100-liability on billing, no liability-release postings on
+      deduct/refund. Tracked here.
+- [x] REST mirroring `/api/deposits*`: list (`?status`), get detail,
+      `POST /{id}/{deduct,refund}`. (No manual create — deposits are billed at
+      activation, parity with the Next app.)
+- [x] Flyway `V5` tenant-scopes Deposit/DepositTransaction.
+- [x] FE seam wired: `/api/deposits` added to `MIGRATED_PREFIXES`; typed
+      `api.deposits` client (list/get/deduct/refund).
+- [ ] Deferred: the M17 evidence-document existence check on deductions (the
+      Next service verifies the doc against the M17 registry; here we require a
+      non-blank `evidenceDocId` and will validate it once documents are ported).
+
+### Phase 7+ — Port remaining modules (one vertical per module, same recipe)
 For each module: entities → service (port `src/lib/**` logic) → controller →
 Flyway (only if new columns) → contract tests → flip the FE proxy route →
 delete the old `route.ts` and the module's `src/lib` server logic.

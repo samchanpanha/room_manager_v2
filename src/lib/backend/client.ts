@@ -181,6 +181,40 @@ export interface CreatePaymentResult {
   deduplicated: boolean;
 }
 
+export interface DepositSummary {
+  id: string;
+  leaseId: string;
+  memberProfileId: string;
+  propertyId: string | null;
+  status: string;
+  requiredMinor: number;
+  collectedMinor: number;
+  deductedMinor: number;
+  refundedMinor: number;
+  remainingMinor: number;
+  invoiceId: string | null;
+}
+
+export interface DepositTransactionDto {
+  id: string;
+  type: string;
+  amountMinor: number;
+  reason: string | null;
+  evidenceDocId: string | null;
+  note: string;
+  method: string | null;
+}
+
+export interface DepositDetail {
+  deposit: DepositSummary;
+  transactions: DepositTransactionDto[];
+}
+
+export interface SettlementResult {
+  remainingMinor: number;
+  status: string;
+}
+
 export const api = {
   account: {
     me: () => backendFetch<Record<string, unknown>>("/api/account")
@@ -269,5 +303,16 @@ export const api = {
       backendFetch<{ paymentStatus: string; receiptCode: string }>(`/api/payments/${id}/refund`, {
         json: { reason }
       })
+  },
+  deposits: {
+    list: (params?: { status?: string }) => {
+      const qs = params?.status ? `?status=${encodeURIComponent(params.status)}` : "";
+      return backendFetch<DepositSummary[]>(`/api/deposits${qs}`);
+    },
+    get: (id: string) => backendFetch<DepositDetail>(`/api/deposits/${id}`),
+    deduct: (id: string, body: { amount: number; reason: string; evidenceDocId: string; note: string }) =>
+      backendFetch<SettlementResult>(`/api/deposits/${id}/deduct`, { json: body }),
+    refund: (id: string, body: { amount?: number; method?: string; note: string }) =>
+      backendFetch<SettlementResult>(`/api/deposits/${id}/refund`, { json: body })
   }
 };

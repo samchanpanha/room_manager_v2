@@ -25,4 +25,20 @@ public interface LedgerPostingPort {
   /** Post a refund of unallocated member credit (DR receivable / CR drawer). */
   void onPaymentRefunded(String paymentId, String propertyId, String memberProfileId,
       String method, int amountMinor, String reason);
+
+  /** Post the deposit obligation (DR receivable / CR deposit liability). M10. */
+  void onDepositBilled(String depositInvoiceId, String propertyId, String memberProfileId,
+      int totalMinor);
+
+  /**
+   * Post a deposit deduction (DR deposit liability / CR revenue or receivable
+   * depending on reason). Returns the ledger transaction id (or null when the
+   * ledger module is not active). M10.
+   */
+  String onDepositDeducted(String depositId, String propertyId, String memberProfileId,
+      int amountMinor, String reason);
+
+  /** Post a deposit refund (DR deposit liability / CR cash/bank drawer). M10. */
+  String onDepositRefunded(String depositId, String propertyId, String memberProfileId,
+      int amountMinor, String method, String reason);
 }

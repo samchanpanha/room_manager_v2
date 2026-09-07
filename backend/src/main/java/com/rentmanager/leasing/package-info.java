@@ -6,6 +6,6 @@
  * in later phases.
  */
 @org.springframework.modulith.ApplicationModule(
-    allowedDependencies = { "platform", "kernel", "iam", "members", "properties", "billing" }
+    allowedDependencies = { "platform", "kernel", "members", "properties", "billing" }
 )
 package com.rentmanager.leasing;
