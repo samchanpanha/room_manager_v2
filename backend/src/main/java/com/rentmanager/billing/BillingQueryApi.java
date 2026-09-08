@@ -4,9 +4,12 @@ import com.rentmanager.billing.domain.Invoice;
 import com.rentmanager.billing.domain.InvoiceItem;
 import com.rentmanager.billing.domain.InvoiceRepository;
 import com.rentmanager.billing.service.RentEngineService;
+import com.rentmanager.billing.spi.LedgerPostingPort;
 import com.rentmanager.kernel.numbering.NumberingService;
 import com.rentmanager.kernel.tenant.TenantContext;
+import com.rentmanager.members.MemberAccessApi;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,15 +45,59 @@ public class BillingQueryApi {
   public record InvoiceFacts(String id, String status, int totalMinor,
       int amountPaidMinor, boolean isDeposit, String leaseId) {}
 
+  /** One-time invoice line requested by another module (e.g. an M14 POS room charge). */
+  public record OneTimeLine(String name, int amountMinor) {}
+
+  /** The issued invoice created for a POS room charge (M14). */
+  public record OneTimeInvoice(String id, String code, int totalMinor) {}
+
   private final InvoiceRepository invoices;
   private final NumberingService numbering;
   private final RentEngineService rentEngine;
+  private final LedgerPostingPort ledger;
+  private final MemberAccessApi membersApi;
 
   public BillingQueryApi(InvoiceRepository invoices, NumberingService numbering,
-      RentEngineService rentEngine) {
+      RentEngineService rentEngine, LedgerPostingPort ledger, MemberAccessApi membersApi) {
     this.invoices = invoices;
     this.numbering = numbering;
     this.rentEngine = rentEngine;
+    this.ledger = ledger;
+    this.membersApi = membersApi;
+  }
+
+  /**
+   * Create + issue a standalone {@code one_time} invoice on a member's account
+   * and post it to the ledger (DR 1300 receivable / CR 4900 other revenue via
+   * the M08 SPI). Used by M14 POS "charge to room": every sale line becomes a
+   * one-time item, append-only (no mutation of existing invoices), exactly like
+   * {@code recordSale}'s room_charge branch in {@code pos-service.tsx}. Runs in
+   * the caller's transaction so the sale + invoice + postings commit atomically.
+   */
+  @Transactional
+  public OneTimeInvoice createOneTimeInvoice(String code, String propertyId, String memberProfileId,
+      List<OneTimeLine> lines, int discountMinor, String actorId) {
+    membersApi.get(memberProfileId); // 404s if the member is outside the tenant
+    String tenantId = TenantContext.get();
+    Instant now = Instant.now();
+    Invoice invoice = new Invoice(code, propertyId, memberProfileId, now, now, tenantId);
+    invoice.setStatus("issued");
+    invoice.setIssuedAt(now);
+    invoice.setDueDate(now.plus(7, ChronoUnit.DAYS));
+    invoice.setDiscountMinor(Math.max(0, discountMinor));
+    invoice.setCreatedById(actorId);
+    for (OneTimeLine l : lines) {
+      invoice.getItems().add(new InvoiceItem("one_time", l.name(), 1, l.amountMinor(), tenantId));
+    }
+    invoice.recompute();
+    invoices.save(invoice);
+
+    ledger.onInvoiceIssued(invoice.getId(), propertyId, memberProfileId,
+        invoice.getTotalMinor(), invoice.getDiscountMinor(), invoice.getTaxMinor(),
+        invoice.getItems().stream()
+            .map(it -> new LedgerPostingPort.InvoiceLine(it.getKind(), it.getAmountMinor()))
+            .toList());
+    return new OneTimeInvoice(invoice.getId(), invoice.getCode(), invoice.getTotalMinor());
   }
 
   /**

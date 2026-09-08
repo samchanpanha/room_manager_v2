@@ -8,10 +8,12 @@
  * ({@code finance.ledger}) implements the billing
  * {@link com.rentmanager.billing.spi.LedgerPostingPort} SPI, so every invoice /
  * payment / deposit event posts balanced double entries. This module implements
- * the deposit and ledger SPIs declared by leasing and billing (dependency
- * inversion — those modules never depend on finance).
+ * the deposit and ledger SPIs declared by leasing, billing and inventory
+ * (dependency inversion — those modules never depend on finance). The M14 POS
+ * drawer posting is one such seam: finance implements
+ * {@link com.rentmanager.inventory.spi.PosLedgerPort}.
  */
 @org.springframework.modulith.ApplicationModule(
-    allowedDependencies = { "platform", "kernel", "members", "leasing", "leasing :: spi", "billing", "billing :: spi" }
+    allowedDependencies = { "platform", "kernel", "members", "leasing", "leasing :: spi", "billing", "billing :: spi", "inventory :: spi" }
 )
 package com.rentmanager.finance;

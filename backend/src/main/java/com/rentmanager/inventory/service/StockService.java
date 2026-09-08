@@ -318,6 +318,18 @@ public class StockService {
   }
 
   /**
+   * Lightweight on-hand lookup for the current tenant (published for M14 POS's
+   * pre-sale stock check). Returns {@code null} if the item does not exist.
+   */
+  @Transactional(readOnly = true)
+  public ItemSummary itemSummary(String stockItemId) {
+    return items.findByIdAndTenantId(stockItemId, TenantContext.get())
+        .map(i -> new ItemSummary(i.getId(), i.getName(), i.getUnit(), i.getQtyMilli(),
+            i.getAvgCostMilli()))
+        .orElse(null);
+  }
+
+  /**
    * POS sale leg (published for the pos module M14): decrement stock at the
    * current moving average as a {@code sale} movement tied to the POS sale row.
    */

@@ -117,7 +117,7 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 | `utilities` | **M11 utilities/meters/tariffs/charges** | **4 (impl)** |
 | `services` | **M12 catalog/assignments/usages, parking, WiFi** | **4 (impl)** |
 | `operations` | M16 room moves, M18 inspections, M19 maintenance, M22 complaints | 4 |
-| `inventory` | **M15 stock/movements/stocktakes/suppliers/categories** (M14 POS, M29 purchase orders later) | **4 (impl)** |
+| `inventory` | **M15 stock/movements/stocktakes/suppliers/categories + M14 POS** (`inventory.pos`) (M29 purchase orders later) | **4 (impl)** |
 | `workforce` | M23 attendance | 5 |
 | `documents` | M17 documents/storage | 5 |
 | `portal` | M25 tenant portal, M21 telegram, M33 alerts | 6 |
@@ -522,7 +522,48 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
       `MaintenanceCostPort` land with M19; the stock-item image endpoints wait on
       M17 object storage (same as M12).
 
-### Phase 12+ — Port remaining modules (one vertical per module, same recipe)
+### Phase 12 — POS (M14, `inventory.pos` sub-package) — DONE (this PR)
+- [x] M14 lands **inside the `inventory` module** as the `inventory.pos`
+      sub-package (like `billing.qrpay`), so it shares the M15 stock engine
+      directly. Entities bound to the Prisma tables: `PosProduct` (global
+      catalog, name + barcode unique — no tenant column, like `Supplier`),
+      `PosSession`, `PosSale` (+ cascaded `PosSaleItem`), all `SAL-YYYY-NNNN`.
+- [x] `PosService` ports `pos-service.tsx` + the routes: **sessions** (open — one
+      open session per property; close = expected float + Σ net cash sales vs
+      counted → variance, audited), and **sales** — validates active products,
+      checks stock availability up-front, decrements each linked stock item via
+      the M15 `StockService.applyStockSale` `sale` movement, then settles:
+      cash/qr/card post DR drawer / CR 4900 through the new
+      `inventory.spi.PosLedgerPort`; `room_charge` issues a one-time member
+      invoice via `BillingQueryApi.createOneTimeInvoice` (which posts 1300/4900
+      itself). `PosMath` (pure) + `Ean13` carry the line/variance math and
+      barcode check-digit, unit-tested in `PosRulesTest`.
+- [x] `PosProductService` ports the catalog CRUD: EAN-13 normalize + uniqueness,
+      optional M15 stock link, category-path snapshot reusing the M15
+      `StockCategory` tree. RBDC mirrors the routes (`M14:read/create/update`,
+      property-scoped for sessions/sales, global for the catalog).
+- [x] New billing seam `BillingQueryApi.createOneTimeInvoice(...)` (mirrors
+      `billDepositInvoice`): creates + issues a standalone `one_time` member
+      invoice and posts it via the existing M08 ledger SPI — append-only, runs in
+      the POS transaction so sale + stock + invoice + postings commit atomically.
+- [x] Dependency inversion: `inventory.spi.PosLedgerPort` (+ `NoopPosLedger`
+      default) for the immediate cash/qr/card drawer posting; finance implements
+      `PosLedgerAdapter` (`@Primary`). `finance` adds `inventory :: spi` to its
+      allowed dependencies; `inventory` adds `billing`. No cycle (billing/finance
+      never import inventory).
+- [x] Flyway `V11__pos_tenant.sql` tenant-scopes `PosSession`, `PosSale`,
+      `PosSaleItem` (catalog `PosProduct` stays global). `/api/pos` added to
+      `MIGRATED_PREFIXES`; `PosEndpointsTest` covers the auth surface.
+- [ ] Deferred: the receipt PDF (`/api/pos/sales/{id}/receipt`) and product photo
+      (`/api/pos/products/{id}/image`) wait on M17 object storage; the EAN-13
+      **label sheet** (`/api/pos/products/label`) waits on the M17/print HTML
+      renderer — those leaf routes still serve from Next during migration (same
+      documented parity gap as the invoice/payment PDFs). The **M32 stay-tab**
+      `room_charge` target returns `TAB_NOT_SUPPORTED` until M32 is ported (the
+      charge-to-member path is fully live). The sale response returns the
+      `receiptUrl` hint the terminal expects.
+
+### Phase 13+ — Port remaining modules (one vertical per module, same recipe)
 For each module: entities → service (port `src/lib/**` logic) → controller →
 Flyway (only if new columns) → contract tests → flip the FE proxy route →
 delete the old `route.ts` and the module's `src/lib` server logic.

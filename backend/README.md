@@ -64,7 +64,10 @@ com.rentmanager
                     #   suppliers, append-only movements (purchase/sale/consume/
                     #   maintenance_use/adjustment/transfer — the only way on-hand
                     #   changes), stocktakes (variance → adjustment), valuation.
-                    #   POS (M14) enters via StockService.applyStockSale; publishes
+                    #   + M14 POS (inventory.pos): cash-drawer sessions (open/close
+                    #   variance), sales that decrement stock and settle cash/qr/
+                    #   card (inventory::spi PosLedgerPort → finance) or charge to a
+                    #   member's room (billing.createOneTimeInvoice). Publishes
                     #   inventory::spi MaintenanceCostPort for M19 (dependency
                     #   inversion, no-op until maintenance is ported)
 ```

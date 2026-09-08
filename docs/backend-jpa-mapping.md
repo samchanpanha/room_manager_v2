@@ -127,4 +127,20 @@ Floor, Room, Bed, AuditLog, Tenant`.
   never depends on maintenance; the POS sale leg (M14) enters through
   `StockService.applyStockSale`.
 
+- Phase 12 (POS M14, `inventory.pos`): `PosSession, PosSale, PosSaleItem`
+  (`V11__pos_tenant.sql`); `PosProduct` stays global (catalog name + barcode
+  unique, no tenant column, like `Supplier`). Money is minor units, sale-line
+  quantities are milli; `PosSale.code` is a year-scoped `POSSALE`
+  `NumberSequence` (`SAL-YYYY-####`). A sale creates the `PosSale` + cascaded
+  `PosSaleItem`s (with price/stock-link snapshots), decrements each linked stock
+  item through `StockService.applyStockSale` (an M15 `sale` movement), then
+  either posts DR drawer (1100/1200 by method) / CR 4900 via the inverted
+  `inventory.spi.PosLedgerPort` (finance's `PosLedgerAdapter`) for cash/qr/card,
+  or issues a one-time member invoice via `BillingQueryApi.createOneTimeInvoice`
+  (posts 1300/4900) for `room_charge`. Session close recomputes expected cash =
+  opening float + Σ net cash sales and stores the counted-vs-expected variance.
+  `EAN-13` barcode check-digit + `PosMath` line/variance rounding mirror the Next
+  `Math.round` half-up. Receipt/label/photo (M17) and the M32 stay-tab target are
+  deferred; the charge-to-member path is live.
+
 Remaining models follow the same recipe as their modules are ported.

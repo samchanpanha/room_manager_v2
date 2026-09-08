@@ -48,6 +48,7 @@ export const MIGRATED_PREFIXES: string[] = [
   "/api/qrpay",
   "/api/webhooks/payments",
   "/api/stock",
+  "/api/pos",
   "/api/health"
 ];
 
