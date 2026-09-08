@@ -1,0 +1,35 @@
+#!/bin/sh
+# ----------------------------------------------------------------------------
+# Apache Maven Wrapper (only-script distribution).
+# Downloads Maven (version pinned in .mvn/wrapper/maven-wrapper.properties) into
+# ~/.m2/wrapper on first run, then delegates. Requires network access to Maven
+# Central — this sandbox blocks it, so run this on your dev box / CI.
+# ----------------------------------------------------------------------------
+set -e
+
+wrapper_props=".mvn/wrapper/maven-wrapper.properties"
+if [ ! -f "$wrapper_props" ]; then
+  echo "Cannot find $wrapper_props" >&2
+  exit 1
+fi
+
+# shellcheck disable=SC1090
+distributionUrl=$(grep '^distributionUrl=' "$wrapper_props" | cut -d= -f2-)
+version=$(echo "$distributionUrl" | sed -E 's#.*apache-maven-([0-9.]+)-bin.zip#\1#')
+dest="${HOME}/.m2/wrapper/dists/apache-maven-${version}"
+mvn_bin="${dest}/apache-maven-${version}/bin/mvn"
+
+if [ ! -x "$mvn_bin" ]; then
+  echo "Downloading Maven ${version} ..."
+  mkdir -p "$dest"
+  tmp="${dest}/maven.zip"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL -o "$tmp" "$distributionUrl"
+  else
+    wget -q -O "$tmp" "$distributionUrl"
+  fi
+  unzip -q "$tmp" -d "$dest"
+  rm -f "$tmp"
+fi
+
+exec "$mvn_bin" "$@"

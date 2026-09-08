@@ -1,0 +1,11 @@
+-- V1 — Baseline (no-op).
+--
+-- The base schema (86 tables) is owned by Prisma. We adopt it as-is:
+-- `flyway.baseline-on-migrate=true` with `baseline-version=0` marks the
+-- pre-existing schema as the starting point, so Flyway does NOT try to create
+-- the tables that Prisma already manages. This file exists only to give Flyway
+-- a versioned starting point after the baseline.
+--
+-- IMPORTANT: never add destructive DDL here. All backend-owned changes are
+-- additive and live in later, higher-numbered migrations.
+SELECT 1;

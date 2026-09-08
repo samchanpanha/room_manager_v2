@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth/session";
 import { can, hasModuleAccess } from "@/lib/rbac/can";
 import { getOwnerLinkForUser } from "@/lib/owners";
+import { BACKEND_ENABLED } from "@/lib/backend/config";
+import { api as backend, BackendError, type PropertyRow } from "@/lib/backend/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -12,43 +14,109 @@ import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Frontend/backend split: when BACKEND_ORIGIN is set, this page sources its data
+ * from the Spring Boot backend (RBDC scope + occupancy stats resolved
+ * server-side in PropertyService). Otherwise it falls back to the legacy direct
+ * Prisma path below, so the app runs unchanged until the backend is wired.
+ */
+async function loadFromBackend(): Promise<
+  { rows: PropertyRow[] } | { forbidden: true }
+> {
+  try {
+    const rows = await backend.properties.list();
+    return { rows };
+  } catch (e) {
+    if (e instanceof BackendError && (e.status === 401 || e.status === 403)) {
+      return { forbidden: true };
+    }
+    throw e;
+  }
+}
+
 export default async function PropertiesPage() {
   const user = await getAuthUser();
   if (!user || !hasModuleAccess(user, "read", "M04")) {
     return <EmptyState title="No access" hint="Your roles do not include read on Properties & Rooms (M04)." />;
   }
 
-  const [allProperties, rooms, ownerLink] = await Promise.all([
-    prisma.property.findMany({
-      include: { _count: { select: { buildings: true, assignedUsers: true } } },
-      orderBy: { createdAt: "asc" }
-    }),
-    prisma.room.findMany({
-      select: { status: true, floor: { select: { building: { select: { propertyId: true } } } } }
-    }),
-    getOwnerLinkForUser(user)
-  ]);
+  // ---- Data source: backend (split) or legacy Prisma (monolith) -----------
+  let rows: {
+    id: string;
+    code: string;
+    name: string;
+    address: string | null;
+    buildingCount: number;
+    roomsTotal: number;
+    roomsOccupied: number;
+    assignedUsers: number | null;
+  }[];
 
-  // Data scoping: GLOBAL sees all · PROPERTY sees assigned · owner-link sees owned buildings' properties.
-  const readsAllProperties = can(user, "read", "M04"); // true only for GLOBAL-scope grants
-  let properties = allProperties;
-  if (ownerLink && !readsAllProperties) {
-    const ownedProps = new Set(
-      (await prisma.building.findMany({ where: { id: { in: ownerLink.ownedBuildingIds } }, select: { propertyId: true } })).map((b) => b.propertyId)
-    );
-    properties = allProperties.filter((p) => ownedProps.has(p.id));
-  } else if (!readsAllProperties) {
-    // PROPERTY-scope without owner link
-    properties = allProperties.filter((p) => user.propertyIds.includes(p.id));
-  }
+  if (BACKEND_ENABLED) {
+    const result = await loadFromBackend();
+    if ("forbidden" in result) {
+      return <EmptyState title="No access" hint="Your roles do not include read on Properties & Rooms (M04)." />;
+    }
+    rows = result.rows.map((p) => ({
+      id: p.id,
+      code: p.code,
+      name: p.name,
+      address: p.address,
+      buildingCount: p.buildingCount,
+      roomsTotal: p.roomsTotal,
+      roomsOccupied: p.roomsOccupied,
+      assignedUsers: null // assigned-user counts move to the backend in a later slice
+    }));
+  } else {
+    const [allProperties, rooms, ownerLink] = await Promise.all([
+      prisma.property.findMany({
+        include: { _count: { select: { buildings: true, assignedUsers: true } } },
+        orderBy: { createdAt: "asc" }
+      }),
+      prisma.room.findMany({
+        select: { status: true, floor: { select: { building: { select: { propertyId: true } } } } }
+      }),
+      getOwnerLinkForUser(user)
+    ]);
 
-  const stats = new Map<string, { total: number; occupied: number }>();
-  for (const r of rooms) {
-    const pid = r.floor.building.propertyId;
-    const s = stats.get(pid) ?? { total: 0, occupied: 0 };
-    s.total += 1;
-    if (r.status === "occupied") s.occupied += 1;
-    stats.set(pid, s);
+    const readsAllProperties = can(user, "read", "M04");
+    let properties = allProperties;
+    if (ownerLink && !readsAllProperties) {
+      const ownedProps = new Set(
+        (
+          await prisma.building.findMany({
+            where: { id: { in: ownerLink.ownedBuildingIds } },
+            select: { propertyId: true }
+          })
+        ).map((b) => b.propertyId)
+      );
+      properties = allProperties.filter((p) => ownedProps.has(p.id));
+    } else if (!readsAllProperties) {
+      properties = allProperties.filter((p) => user.propertyIds.includes(p.id));
+    }
+
+    const stats = new Map<string, { total: number; occupied: number }>();
+    for (const r of rooms) {
+      const pid = r.floor.building.propertyId;
+      const s = stats.get(pid) ?? { total: 0, occupied: 0 };
+      s.total += 1;
+      if (r.status === "occupied") s.occupied += 1;
+      stats.set(pid, s);
+    }
+
+    rows = properties.map((p) => {
+      const s = stats.get(p.id) ?? { total: 0, occupied: 0 };
+      return {
+        id: p.id,
+        code: p.code,
+        name: p.name,
+        address: p.address,
+        buildingCount: p._count.buildings,
+        roomsTotal: s.total,
+        roomsOccupied: s.occupied,
+        assignedUsers: p._count.assignedUsers
+      };
+    });
   }
 
   return (
@@ -58,7 +126,7 @@ export default async function PropertiesPage() {
         description="Physical inventory: properties → buildings → floors → rooms → beds"
         actions={can(user, "create", "M04") ? <NewPropertyButton /> : undefined}
       />
-      {properties.length === 0 ? (
+      {rows.length === 0 ? (
         <EmptyState title="No properties yet" hint="Create your first property to start adding buildings and rooms." />
       ) : (
         <Card>
@@ -75,9 +143,8 @@ export default async function PropertiesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {properties.map((p) => {
-                  const s = stats.get(p.id) ?? { total: 0, occupied: 0 };
-                  const pct = s.total > 0 ? Math.round((s.occupied / s.total) * 100) : 0;
+                {rows.map((p) => {
+                  const pct = p.roomsTotal > 0 ? Math.round((p.roomsOccupied / p.roomsTotal) * 100) : 0;
                   return (
                     <TableRow key={p.id}>
                       <TableCell>
@@ -91,14 +158,14 @@ export default async function PropertiesPage() {
                         </Link>
                       </TableCell>
                       <TableCell className="max-w-64 truncate text-muted-foreground">{p.address ?? "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{p._count.buildings}</TableCell>
+                      <TableCell className="text-right tabular-nums">{p.buildingCount}</TableCell>
                       <TableCell className="text-right">
                         <Badge variant={pct > 0 ? "success" : "secondary"}>{pct}%</Badge>
                         <span className="ml-2 text-xs text-muted-foreground">
-                          {s.occupied}/{s.total}
+                          {p.roomsOccupied}/{p.roomsTotal}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{p._count.assignedUsers}</TableCell>
+                      <TableCell className="text-right tabular-nums">{p.assignedUsers ?? "—"}</TableCell>
                     </TableRow>
                   );
                 })}

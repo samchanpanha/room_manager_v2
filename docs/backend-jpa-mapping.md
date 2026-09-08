@@ -1,0 +1,146 @@
+# JPA ↔ Prisma column mapping
+
+The Spring Boot backend binds JPA entities to the **exact tables and columns**
+Prisma already created (see `prisma/migrations/20260906000000_init_postgres`),
+so both stacks read/write the same rows during the migration.
+
+## Naming rules Prisma used (no `@@map` anywhere)
+- **Table names** = the Prisma model name, PascalCase, quoted: `"User"`, `"MemberProfile"`.
+- **Column names** = the Prisma field name, camelCase, quoted: `"passwordHash"`, `"homePropertyId"`, `"createdAt"`.
+- **Primary keys** = `String` cuid values (`@default(cuid())`), generated app-side.
+- **Timestamps** = `TIMESTAMP(3)`; mapped to `java.time.Instant`.
+- **Money** = integer minor units (`Int`); mapped to `int`/`Integer`. Never `float`.
+
+Therefore every JPA entity uses:
+```java
+@Entity @Table(name = "User")            // exact table
+class User {
+  @Id @Column(name = "id") String id;    // cuid
+  @Column(name = "passwordHash") ...      // exact camelCase column
+}
+```
+
+## New, backend-owned columns (Flyway, additive)
+- `Tenant` table (SaaS tenant registry) — `V2__add_tenant.sql`.
+- `tenantId TEXT NOT NULL DEFAULT 'DEFAULT'` on tenant-scoped tables, backfilled
+  to the `DEFAULT` tenant so existing single-tenant data is untouched. `V2`
+  covers the Phase 1–3 tables; `V3__billing_tenant.sql` extends the same pattern
+  to `Invoice`/`InvoiceItem`/`CreditNote` (+ a `(tenantId,memberProfileId,status)`
+  index powering the leasing open-dues gate). `V4__payments_tenant.sql` extends
+  it to `Payment`/`PaymentAllocation`. `V5__deposits_tenant.sql` covers
+  `Deposit`/`DepositTransaction`. `V6__ledger.sql` tenant-scopes
+  `LedgerTransaction`/`LedgerEntry` (but **not** `LedgerAccount` — it is shared
+  reference data) and idempotently seeds the 14 system accounts.
+
+## Auth compatibility (must match byte-for-byte)
+| Concern | Next (TS) | Backend (Java) |
+|---|---|---|
+| Session cookie | `rm_session`, httpOnly, SameSite=Lax | same (`AuthController`) |
+| Session lookup | `Session.tokenHash = sha256(hex cookie token)` | `Tokens.sha256Hex` |
+| Password | `scrypt:salt:hash`, N=16384,r=8,p=1,keyLen=64; salt = hex string bytes | `PasswordHasher` (RFC 7914 scrypt) |
+| TOTP step | password step → `{ totpRequired, challenge }` (5-min HMAC) | `LoginChallenge` |
+| Effective perms | union of role permissions | `PermissionResolver` |
+| `can()` | `src/lib/rbac/can.ts` | `Rbdc.can()` |
+
+## Entities mapped in Phase 1
+`Party, User, Session, Role, Permission, RolePermission, UserRole,
+UserPropertyAssignment, MemberProfile, EmergencyContact, Property, Building,
+Floor, Room, Bed, AuditLog, Tenant`.
+
+## Entities mapped in Phases 2–4
+- Phase 2 (owners M03): `OwnerProfile, OwnerPayoutMethod`.
+- Phase 3 (leasing M05): `Lease, LeaseService`, `NumberSequence` (kernel).
+- Phase 4 (billing M07): `Invoice, InvoiceItem, CreditNote`. Money kept in
+  integer minor units; `amountDueMinor` maintained as `total − paid − credited`
+  (≥0) exactly as `recomputeAmountsTx` (now `Invoice.recompute()`). `CreditNote`
+  is append-only; issued invoices stay immutable (credits adjust
+  `amountCreditedMinor`, never items).
+- Phase 5 (billing M09): `Payment, PaymentAllocation`. `remainingMinor` is the
+  unallocated member credit; `receiptCode`/`gatewayRef`/`idempotencyKey` are
+  unique. Confirmation increments each allocated invoice's `amountPaidMinor` and
+  re-derives status via `Invoice.recompute()`. Year-scoped codes `PMT-YYYY-####`
+  / `RCP-YYYY-####` use per-year `NumberSequence` keys (`PMT:YYYY`, `RCP:YYYY`).
+- Phase 10 (billing M13, `billing.qrpay`): **no new tables** — a QR intent is an
+  M09 `Payment` (`method=qr`) whose `idempotencyKey` (`QR:<invoiceId>:<due>`)
+  makes repeat clicks reuse the same pending row and whose unique `gatewayRef`
+  (`QRPAY-…`) is echoed on the webhook, so confirmation is exactly-once. The
+  webhook resolves a payment by `idempotencyKey → gatewayRef → id` and confirms
+  it as the `payment-gateway` system actor (audit `actorId` null). `SealedSecrets`
+  unseals the `m28.providers` AES-256-GCM blob (byte-compatible with the Next
+  `sealed.ts`) so both stacks read the same DB-sealed `paymentCredentials`.
+- Phase 6 (finance M10): `Deposit, DepositTransaction` (`V5__deposits_tenant.sql`).
+  A deposit is billed as an `isDeposit=true` invoice (period sentinel
+  `2000-01-01`, due at move-in) via `BillingQueryApi.billDepositInvoice`;
+  `held`/`settled` are derived from the invoice's `amountPaidMinor` and the
+  movements' released total. Cross-module cycles are inverted via named-interface
+  SPIs (`leasing::spi`, `billing::spi`) that finance implements.
+- Phase 8 (M06 rent engine): `TaxRule, LateFeeRule` (billing) + `Setting`
+  (kernel), all bound to their Prisma tables. `V7__rent_engine_tenant.sql`
+  tenant-scopes the pricing catalog (TaxRule/LateFeeRule/RentPlan/DiscountRule).
+  `Setting` stays global (JSON blob per `m28.*` group key), read by
+  `kernel.settings.SettingsService`. The engine itself (`billing.engine`) is pure
+  and holds no state.
+- Phase 7 (finance M08 ledger): `LedgerAccount, LedgerTransaction, LedgerEntry`
+  (`V6__ledger.sql`). `LedgerAccount` is shared reference data (no `tenantId`);
+  the books (`LedgerTransaction`/`LedgerEntry`) carry `tenantId`. Entries map via
+  `@OneToMany @JoinColumn(transactionId)` (the entity's own `transactionId`
+  column is read-only to avoid a double mapping). The ledger is append-only —
+  corrections are reversals with a `reversalOf` back-link. Finance's
+  `LedgerPostingAdapter` implements `billing.spi.LedgerPostingPort` (`@Primary`,
+  replacing the no-op) so invoice/payment/deposit events post balanced entries.
+- Phase 8 (utilities M11): `Meter, MeterReading, Tariff, UtilityCharge`
+  (`V8__utilities_tenant.sql`). Readings store integer **milli-units**
+  (`value × 1000`); `Tariff.tiers` is the first `jsonb` column mapped — a Jackson
+  `JsonNode` field with `@JdbcTypeCode(SqlTypes.JSON)` (mapping a `String` would
+  double-encode). `UtilityCharge.readingId` is unique (one charge per reading);
+  charges are `pending` until billed. Utilities implements the billing-owned
+  `billing.spi.UtilityBillingPort` via `UtilityBillingAdapter` (`@Primary`,
+  replacing `NoopUtilityBilling`), so generation folds pending charges into the
+  next invoice as `utility` lines and void reverts them — no billing→utilities
+  dependency.
+
+- Phase 9 (services M12): `ServiceCatalog, ServiceAssignment, ServiceUsage,
+  ParkingSlot, WifiAccount` (`V9__services_tenant.sql`). `ServiceUsage.qtyMilli`
+  is milli-units (×1000); the one-time line amount is `round(unitPrice × qty /
+  1000)`. `parkingSlotId`/`wifiAccountId` on an assignment are unique (one slot /
+  account per assignment). fixed_monthly assignments store a `snapshotId` into a
+  standalone `LeaseService` row created through `LeasingQueryApi` (leasing owns
+  that entity). Three dependency-inverted seams: per-use rides
+  `billing.spi.ServiceUsageBillingPort` (adapter `@Primary`), lease-end rides
+  `leasing.spi.ServiceReleasePort`, fixed_monthly rides the LeaseService window
+  the rent engine already prorates.
+
+- Phase 11 (inventory M15): `StockItem, StockMovement, Stocktake, StocktakeLine`
+  (`V10__inventory_tenant.sql`); `StockCategory` and `Supplier` stay shared (no
+  tenant column — categories self-scope via a nullable `propertyId`, Supplier is
+  a global name-unique directory). Quantities are integer milli (1 unit = 1000)
+  and cost is minor×1000. On-hand (`StockItem.qtyMilli`/`avgCostMilli`) is
+  read-only from CRUD and only ever changes through an append-only
+  `StockMovement`: purchase blends the moving average and every out/adjustment/
+  transfer leg snapshots `qtyAfterMilli`/`avgCostAfterMilli` and the signed
+  `valueMilli` (qty·avg/1000 to stay inside Int32). `StockMovement.valueMilli`
+  matches the Next `Math.round` half-up-toward-+∞ rounding. `Stocktake.code` is a
+  year-scoped `STOCKTAKE` `NumberSequence` (`STK-YYYY-####`); creating one posts
+  an `adjustment` movement per variance ≠ 0 in one transaction and stores the
+  Σ valuation delta. The maintenance material-cost line (M19) is inverted via the
+  published `inventory.spi.MaintenanceCostPort` (no-op until M19), so inventory
+  never depends on maintenance; the POS sale leg (M14) enters through
+  `StockService.applyStockSale`.
+
+- Phase 12 (POS M14, `inventory.pos`): `PosSession, PosSale, PosSaleItem`
+  (`V11__pos_tenant.sql`); `PosProduct` stays global (catalog name + barcode
+  unique, no tenant column, like `Supplier`). Money is minor units, sale-line
+  quantities are milli; `PosSale.code` is a year-scoped `POSSALE`
+  `NumberSequence` (`SAL-YYYY-####`). A sale creates the `PosSale` + cascaded
+  `PosSaleItem`s (with price/stock-link snapshots), decrements each linked stock
+  item through `StockService.applyStockSale` (an M15 `sale` movement), then
+  either posts DR drawer (1100/1200 by method) / CR 4900 via the inverted
+  `inventory.spi.PosLedgerPort` (finance's `PosLedgerAdapter`) for cash/qr/card,
+  or issues a one-time member invoice via `BillingQueryApi.createOneTimeInvoice`
+  (posts 1300/4900) for `room_charge`. Session close recomputes expected cash =
+  opening float + Σ net cash sales and stores the counted-vs-expected variance.
+  `EAN-13` barcode check-digit + `PosMath` line/variance rounding mirror the Next
+  `Math.round` half-up. Receipt/label/photo (M17) and the M32 stay-tab target are
+  deferred; the charge-to-member path is live.
+
+Remaining models follow the same recipe as their modules are ported.
