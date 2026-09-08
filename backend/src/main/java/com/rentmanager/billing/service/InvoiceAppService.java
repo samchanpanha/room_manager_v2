@@ -43,10 +43,12 @@ public class InvoiceAppService {
   private final MemberAccessApi membersApi;
   private final PropertyAccessApi propertiesApi;
   private final LedgerPostingPort ledger;
+  private final com.rentmanager.billing.spi.UtilityBillingPort utilities;
 
   public InvoiceAppService(InvoiceRepository invoices, CreditNoteRepository creditNotes,
       NumberingService numbering, AuditService audit, MemberAccessApi membersApi,
-      PropertyAccessApi propertiesApi, LedgerPostingPort ledger) {
+      PropertyAccessApi propertiesApi, LedgerPostingPort ledger,
+      com.rentmanager.billing.spi.UtilityBillingPort utilities) {
     this.invoices = invoices;
     this.creditNotes = creditNotes;
     this.numbering = numbering;
@@ -54,6 +56,7 @@ public class InvoiceAppService {
     this.membersApi = membersApi;
     this.propertiesApi = propertiesApi;
     this.ledger = ledger;
+    this.utilities = utilities;
   }
 
   public record CreditNoteResult(String code, String invoiceStatus) {}
@@ -214,9 +217,11 @@ public class InvoiceAppService {
     invoice.setAmountDueMinor(0);
     invoices.save(invoice);
 
-    // M08 reversal via SPI. M11/M12 utility/usage re-billing hooks land with
-    // those modules (tracked in docs/backend-split-plan.md).
+    // M08 reversal via SPI.
     ledger.onInvoiceVoided(invoice.getId(), reason);
+    // M11 — release any utility charges billed on this invoice back to pending
+    // so they re-attach to the lease's next generated invoice.
+    utilities.revertForInvoice(invoice.getId());
 
     audit.log(AuditEntry.builder()
         .actorId(user.id()).actorName(user.name())

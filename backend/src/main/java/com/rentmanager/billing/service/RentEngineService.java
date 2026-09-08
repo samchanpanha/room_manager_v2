@@ -46,10 +46,12 @@ public class RentEngineService {
   private final SettingsService settings;
   private final AuditService audit;
   private final LedgerPostingPort ledger;
+  private final com.rentmanager.billing.spi.UtilityBillingPort utilities;
 
   public RentEngineService(InvoiceRepository invoices, TaxRuleRepository taxRules,
       LateFeeRuleRepository lateFeeRules, NumberingService numbering, SettingsService settings,
-      AuditService audit, LedgerPostingPort ledger) {
+      AuditService audit, LedgerPostingPort ledger,
+      com.rentmanager.billing.spi.UtilityBillingPort utilities) {
     this.invoices = invoices;
     this.taxRules = taxRules;
     this.lateFeeRules = lateFeeRules;
@@ -57,6 +59,7 @@ public class RentEngineService {
     this.settings = settings;
     this.audit = audit;
     this.ledger = ledger;
+    this.utilities = utilities;
   }
 
   // ---- generation --------------------------------------------------------
@@ -116,10 +119,16 @@ public class RentEngineService {
           .map(s -> new RentEngine.ServiceInput(s.name(), s.amountMinor(), s.pricingModel(),
               s.activeFrom(), s.activeThrough()))
           .toList();
+      // M11 — fold this lease's pending utility charges in as one-time lines.
+      List<com.rentmanager.billing.spi.UtilityBillingPort.PendingCharge> pendingUtils =
+          utilities.pendingForLease(lease.leaseId());
+      List<RentEngine.OneTimeLine> oneTimeLines = pendingUtils.stream()
+          .map(c -> new RentEngine.OneTimeLine(c.kind(), c.name(), c.amountMinor()))
+          .toList();
       RentEngine.CompositionResult comp = RentEngine.composeInvoice(new RentEngine.CompositionInput(
           new RentEngine.LeaseInput(lease.rentMinor(), lease.billingCycleDay(),
               Proration.Basis.parse(lease.prorationBasis()), svcs),
-          periodStart, periodEnd, taxBps, 0, List.of(),
+          periodStart, periodEnd, taxBps, 0, oneTimeLines,
           RentEngine.formatPeriodLabel(periodStart, periodEnd)));
 
       int year = periodStart.atZone(ZoneOffset.UTC).getYear();
@@ -141,6 +150,13 @@ public class RentEngineService {
       }
       invoice.recompute();
       invoices.save(invoice);
+
+      // M11 — flip the folded-in utility charges pending → billed against this invoice.
+      if (!pendingUtils.isEmpty()) {
+        utilities.markBilled(pendingUtils.stream()
+            .map(com.rentmanager.billing.spi.UtilityBillingPort.PendingCharge::chargeId).toList(),
+            invoice.getId());
+      }
 
       // M08 accrual posting — DR receivable / CR revenue by kind (+ tax → 2300).
       ledger.onInvoiceIssued(invoice.getId(), invoice.getPropertyId(),

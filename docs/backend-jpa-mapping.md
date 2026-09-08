@@ -80,5 +80,15 @@ Floor, Room, Bed, AuditLog, Tenant`.
   corrections are reversals with a `reversalOf` back-link. Finance's
   `LedgerPostingAdapter` implements `billing.spi.LedgerPostingPort` (`@Primary`,
   replacing the no-op) so invoice/payment/deposit events post balanced entries.
+- Phase 8 (utilities M11): `Meter, MeterReading, Tariff, UtilityCharge`
+  (`V8__utilities_tenant.sql`). Readings store integer **milli-units**
+  (`value × 1000`); `Tariff.tiers` is the first `jsonb` column mapped — a Jackson
+  `JsonNode` field with `@JdbcTypeCode(SqlTypes.JSON)` (mapping a `String` would
+  double-encode). `UtilityCharge.readingId` is unique (one charge per reading);
+  charges are `pending` until billed. Utilities implements the billing-owned
+  `billing.spi.UtilityBillingPort` via `UtilityBillingAdapter` (`@Primary`,
+  replacing `NoopUtilityBilling`), so generation folds pending charges into the
+  next invoice as `utility` lines and void reverts them — no billing→utilities
+  dependency.
 
 Remaining models follow the same recipe as their modules are ported.

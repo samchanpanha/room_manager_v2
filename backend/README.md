@@ -41,12 +41,17 @@ com.rentmanager
 │                   #   invoices/items/credit notes, payments/allocations, and the
 │                   #   daily late-fee/dunning job (RentEngineService)
 │                   #   (+ BillingQueryApi for leasing/finance;
-│                   #    billing::spi LedgerPostingPort → M08, DepositAdvancePort → finance)
-└── finance         # M10 deposits (installment billing, hold/settle lifecycle,
-                    #   deduction/refund) + M08 double-entry ledger sub-module
-                    #   (finance.ledger: chart of accounts, postings, journal,
-                    #   trial balance, member statement). Implements leasing/billing
-                    #   SPIs incl. LedgerPostingPort (dependency inversion)
+│                   #    billing::spi LedgerPostingPort → M08, DepositAdvancePort → finance,
+│                   #    UtilityBillingPort → M11)
+├── finance         # M10 deposits (installment billing, hold/settle lifecycle,
+│                   #   deduction/refund) + M08 double-entry ledger sub-module
+│                   #   (finance.ledger: chart of accounts, postings, journal,
+│                   #   trial balance, member statement). Implements leasing/billing
+│                   #   SPIs incl. LedgerPostingPort (dependency inversion)
+└── utilities       # M11: meters, readings (manual/estimate/CSV), tariffs (tiers),
+                    #   consumption charge engine. Implements billing::spi
+                    #   UtilityBillingPort so generation folds pending charges into
+                    #   the next invoice as `utility` lines (dependency inversion)
 ```
 
 Cross-module calls go through APIs published in a module's **base package**

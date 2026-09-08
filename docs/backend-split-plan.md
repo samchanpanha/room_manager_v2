@@ -114,7 +114,7 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 | `leasing` | **M05 leases + M06 generation job** (M32 short stays later) | **2 (impl)** |
 | `billing` | **M06 rent engine, M07 invoices, M09 payments** (M13 QR pay later) | **3 (impl)** |
 | `finance` | **M10 deposits + M08 double-entry ledger** (M20 expenses/P&L later) | **3 (impl)** |
-| `utilities` | M11 utilities/meters, M12 services | 4 |
+| `utilities` | **M11 utilities/meters/tariffs/charges** (M12 services later) | **4 (impl)** |
 | `operations` | M16 room moves, M18 inspections, M19 maintenance, M22 complaints | 4 |
 | `inventory` | M14 POS, M15 stock, M29 purchase orders | 5 |
 | `workforce` | M23 attendance | 5 |
@@ -363,9 +363,37 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 - [x] **Closes the loop M07/M09 left open**: invoices are now machine-generated
       for active leases, late fees auto-apply, and the `issued → overdue` +
       dunning transitions are driven by the daily job.
-- [ ] Deferred: M11/M12 utility/service one-time lines on the generated invoice
-      (the engine already accepts them; wiring lands with those modules), and
-      invoice-PDF filing (M17).
+- [x] Utility one-time lines are now wired (see Phase 8); service (M12) usage
+      lines still deferred. Invoice-PDF filing (M17) deferred.
+
+### Phase 8 — Utilities (M11, new `utilities` module) — DONE (this PR)
+- [x] `UtilityRules` (pure) ports `src/lib/utilities/machines.ts`: milli-unit
+      parse/format, flat + progressive **tiered pricing** (last bracket must be
+      infinite), estimate = avg of last 3, **spike** = consumption > 2× the
+      recent average, and the tariff-selection ordering. Parity test
+      `UtilityRulesTest` mirrors `tests/utilities.test.ts` case-for-case.
+- [x] `UtilityService` ports `src/lib/utilities/service.ts`: create meter
+      (unique code, room→property scope), record reading (manual / estimate /
+      CSV) with forward-only + first-reading-baseline rules, per-meter-type
+      **tariff resolution** (property-specific beats org-default, then latest
+      `effectiveFrom`), and pending **UtilityCharge** creation for the room's
+      active lease.
+- [x] JPA entities `Meter`, `MeterReading`, `Tariff` (tiers as `jsonb` via a
+      Jackson `JsonNode` + `@JdbcTypeCode(SqlTypes.JSON)`), `UtilityCharge` bound
+      to the existing Prisma tables.
+- [x] REST at the Next paths: `GET/POST /api/meters`, `GET /api/meters/{id}`,
+      `POST /api/meters/{id}/readings`, `POST /api/meters/{id}/readings/import`,
+      `GET/POST /api/tariffs` (RBDC `M11`; org-default tariff needs GLOBAL).
+- [x] **Closes the M06 deferral**: billing declares a `UtilityBillingPort` SPI
+      (billing owns it; `NoopUtilityBilling` is the default). The utilities
+      module's `@Primary` `UtilityBillingAdapter` supersedes it, so generation
+      folds a lease's pending charges in as `utility` one-time lines and flips
+      them `pending → billed`; voiding an invoice reverts them. Dependency is
+      inverted — billing never imports utilities, keeping the graph acyclic
+      (`utilities` → `properties`, `leasing`, `billing::spi`).
+- [x] Flyway `V8` tenant-scopes Meter, MeterReading, Tariff, UtilityCharge.
+- [x] FE seam: `/api/meters` + `/api/tariffs` added to `MIGRATED_PREFIXES`.
+- [ ] Deferred: M12 services/usage one-time lines (same SPI approach).
 
 ### Phase 9+ — Port remaining modules (one vertical per module, same recipe)
 For each module: entities → service (port `src/lib/**` logic) → controller →

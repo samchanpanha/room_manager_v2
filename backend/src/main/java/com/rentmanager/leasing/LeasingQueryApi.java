@@ -43,4 +43,17 @@ public class LeasingQueryApi {
     String s = get(leaseId).status();
     return "notice".equals(s) || "completed".equals(s) || "terminated".equals(s);
   }
+
+  /** The active lease for a room, if any — used by utilities (M11) to attach a
+   *  computed charge to the resident's account. Returns null when the room is
+   *  vacant. */
+  @Transactional(readOnly = true)
+  public LeaseInfo activeLeaseForRoom(String roomId) {
+    return leases.findByRoomIdAndStatusAndTenantId(roomId, "active", TenantContext.get())
+        .stream().findFirst()
+        .map(l -> new LeaseInfo(l.getId(), l.getCode(), l.getStatus(), l.getPropertyId(),
+            l.getMemberProfileId(), l.getDepositTotalMinor(), l.getDepositInstallments(),
+            l.getStartDate()))
+        .orElse(null);
+  }
 }
