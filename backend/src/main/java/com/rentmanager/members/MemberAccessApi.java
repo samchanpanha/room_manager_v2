@@ -41,6 +41,18 @@ public class MemberAccessApi {
         party == null ? null : party.getName(), m.getHomePropertyId());
   }
 
+  /**
+   * The member profile id owned by a party (the logged-in user's party), or
+   * {@code null} when the party has no member profile. Used for ownership
+   * checks on self-service endpoints (M13 pay-my-own-invoice, M02 read-my-QR).
+   */
+  @Transactional(readOnly = true)
+  public String memberIdForParty(String partyId) {
+    if (partyId == null) return null;
+    return members.findByPartyIdAndTenantId(partyId, TenantContext.get())
+        .map(MemberProfile::getId).orElse(null);
+  }
+
   /** Resolve a member's party + display name (for statement access control). */
   @Transactional(readOnly = true)
   public MemberIdentity identity(String memberProfileId) {
@@ -48,6 +60,22 @@ public class MemberAccessApi {
         .orElseThrow(() -> ApiException.notFound("Member not found"));
     Party party = parties.findById(m.getPartyId()).orElse(null);
     return new MemberIdentity(m.getId(), m.getPartyId(), party == null ? null : party.getName());
+  }
+
+  /**
+   * Like {@link #identity} but returns {@code null} instead of throwing when the
+   * member does not exist — used by the public M13 poster flow, where a stale
+   * token must yield a clean 404 rather than an error (mirrors the nullable
+   * {@code memberDuesForToken} lookup in qrpay/service.ts).
+   */
+  @Transactional(readOnly = true)
+  public MemberIdentity identityOrNull(String memberProfileId) {
+    return members.findByIdAndTenantId(memberProfileId, TenantContext.get())
+        .map(m -> {
+          Party party = parties.findById(m.getPartyId()).orElse(null);
+          return new MemberIdentity(m.getId(), m.getPartyId(), party == null ? null : party.getName());
+        })
+        .orElse(null);
   }
 
   /** Transition a member's status (used by lease activation / ending effects). */

@@ -63,6 +63,10 @@ public class PaymentAppService {
     this.deposits = deposits;
   }
 
+  /** System/gateway actor for webhook + poster-flow attribution (FK-safe: id null). */
+  public static final String GATEWAY_ACTOR_ID = null;
+  public static final String GATEWAY_ACTOR_NAME = "payment-gateway";
+
   public record ConfirmResult(boolean ignored, String receiptCode, String paymentStatus) {}
 
   private static int toMinor(Double major) {
@@ -112,17 +116,6 @@ public class PaymentAppService {
     if (!PaymentMachine.isMethod(req.method())) {
       throw new ApiException(400, "INVALID_METHOD", "Unknown payment method");
     }
-    String tenantId = TenantContext.get();
-
-    // Idempotency (§9.6): a repeat key returns the original payment untouched.
-    if (req.idempotencyKey() != null) {
-      var dup = payments.findByIdempotencyKeyAndTenantId(req.idempotencyKey(), tenantId);
-      if (dup.isPresent()) {
-        Payment p = dup.get();
-        return new CreatePaymentResult(p.getId(), p.getCode(), p.allocatedMinor(),
-            p.getRemainingMinor(), true);
-      }
-    }
 
     MemberAccessApi.MemberInfo member = membersApi.get(req.memberProfileId());
     if (!Rbdc.can(user, "create", "M09")
@@ -131,19 +124,71 @@ public class PaymentAppService {
       throw ApiException.forbidden("M09", "create");
     }
 
+    List<Allocation> explicit = null;
+    if (req.allocations() != null && !req.allocations().isEmpty()) {
+      explicit = new ArrayList<>();
+      for (AllocationInput a : req.allocations()) {
+        explicit.add(new Allocation(a.invoiceId(), toMinor(a.amount())));
+      }
+    }
+    return recordCore(member, req.method(), amountMinor, explicit,
+        req.idempotencyKey(), req.gatewayRef(), user.id(), user.name());
+  }
+
+  /**
+   * System/gateway payment record (M13 QR pay) — same rules as {@link #create}
+   * but authorization is handled upstream (the M13 route authorizes members to
+   * pay their own invoice, staff via M13:create, and the public poster flow via
+   * a signed member token). Mirrors {@code createPayment(actor, input)} in
+   * payments/service.tsx with a nullable audit actor for the gateway. Amounts
+   * are integer minor units; a single explicit allocation to the target invoice.
+   */
+  @Transactional
+  public CreatePaymentResult recordGatewayPayment(String memberProfileId, String method,
+      int amountMinor, List<Allocation> explicit, String idempotencyKey, String gatewayRef,
+      String actorId, String actorName) {
+    if (amountMinor <= 0) {
+      throw new ApiException(400, "INVALID_AMOUNT", "Payment amount must be positive");
+    }
+    if (!PaymentMachine.isMethod(method)) {
+      throw new ApiException(400, "INVALID_METHOD", "Unknown payment method");
+    }
+    MemberAccessApi.MemberInfo member = membersApi.get(memberProfileId);
+    return recordCore(member, method, amountMinor, explicit,
+        idempotencyKey, gatewayRef, actorId, actorName);
+  }
+
+  /**
+   * Shared record core (pending). Idempotent on {@code idempotencyKey} (§9.6):
+   * a repeat key returns the original payment untouched. Allocations may be
+   * explicit (already in minor units) or are applied oldest-first. Nothing
+   * touches invoices or the ledger until confirmation. {@code actorId} is null
+   * for the gateway (FK-safe audit attribution).
+   */
+  private CreatePaymentResult recordCore(MemberAccessApi.MemberInfo member, String method,
+      int amountMinor, List<Allocation> explicit, String idempotencyKey, String gatewayRef,
+      String actorId, String actorName) {
+    String tenantId = TenantContext.get();
+
+    // Idempotency (§9.6): a repeat key returns the original payment untouched.
+    if (idempotencyKey != null) {
+      var dup = payments.findByIdempotencyKeyAndTenantId(idempotencyKey, tenantId);
+      if (dup.isPresent()) {
+        Payment p = dup.get();
+        return new CreatePaymentResult(p.getId(), p.getCode(), p.allocatedMinor(),
+            p.getRemainingMinor(), true);
+      }
+    }
+
     List<Invoice> open = invoices.findOpenForMember(tenantId, member.id());
     Map<String, Invoice> openById = new HashMap<>();
     for (Invoice i : open) openById.put(i.getId(), i);
 
     List<Allocation> allocations;
-    if (req.allocations() != null && !req.allocations().isEmpty()) {
-      allocations = new ArrayList<>();
-      for (AllocationInput a : req.allocations()) {
-        allocations.add(new Allocation(a.invoiceId(), toMinor(a.amount())));
-      }
-      String err = PaymentAllocator.validateExplicit(allocations, amountMinor);
+    if (explicit != null && !explicit.isEmpty()) {
+      String err = PaymentAllocator.validateExplicit(explicit, amountMinor);
       if (err != null) throw new ApiException(400, "INVALID_ALLOCATIONS", err);
-      for (Allocation a : allocations) {
+      for (Allocation a : explicit) {
         Invoice inv = openById.get(a.invoiceId());
         if (inv == null) {
           throw new ApiException(400, "INVALID_ALLOCATIONS",
@@ -154,6 +199,7 @@ public class PaymentAppService {
               "Allocation exceeds " + inv.getCode() + " outstanding due");
         }
       }
+      allocations = explicit;
     } else {
       List<OpenInvoice> candidates = open.stream()
           .map(i -> new OpenInvoice(i.getId(), i.getAmountDueMinor(),
@@ -169,20 +215,20 @@ public class PaymentAppService {
 
     int year = currentYear();
     String code = numbering.next("PMT:" + year, n -> "PMT-" + year + "-" + String.format("%04d", n));
-    Payment payment = new Payment(code, member.id(), propertyId, req.method(), amountMinor, tenantId);
+    Payment payment = new Payment(code, member.id(), propertyId, method, amountMinor, tenantId);
     payment.setRemainingMinor(amountMinor - allocatedMinor);
-    payment.setGatewayRef(req.gatewayRef());
-    payment.setIdempotencyKey(req.idempotencyKey());
-    payment.setCreatedById(user.id());
+    payment.setGatewayRef(gatewayRef);
+    payment.setIdempotencyKey(idempotencyKey);
+    payment.setCreatedById(actorId);
     for (Allocation a : allocations) {
       payment.getAllocations().add(new PaymentAllocation(a.invoiceId(), a.amountMinor(), tenantId));
     }
     payments.save(payment);
 
     audit.log(AuditEntry.builder()
-        .actorId(user.id()).actorName(user.name())
+        .actorId(actorId).actorName(actorName)
         .module("M09").action("create").entityType("payment").entityId(payment.getId())
-        .summary("Payment " + code + " recorded: " + money(amountMinor) + " via " + req.method()
+        .summary("Payment " + code + " recorded: " + money(amountMinor) + " via " + method
             + " (" + money(allocatedMinor) + " allocated, " + money(amountMinor - allocatedMinor) + " credit)")
         .build());
     return new CreatePaymentResult(payment.getId(), code, allocatedMinor,
@@ -195,6 +241,12 @@ public class PaymentAppService {
   public ConfirmResult confirm(AuthPrincipal user, String id) {
     Payment payment = load(id);
     requireUpdate(user, payment);
+    return confirmCore(payment, user.id(), user.name());
+  }
+
+  /** Confirm core shared by the staff action and the webhook (§9.6 idempotent). */
+  private ConfirmResult confirmCore(Payment payment, String actorId, String actorName) {
+    String id = payment.getId();
     if ("confirmed".equals(payment.getStatus())) {
       return new ConfirmResult(true, payment.getReceiptCode(), "confirmed"); // idempotent (§9.6)
     }
@@ -233,7 +285,7 @@ public class PaymentAppService {
         payment.getMemberProfileId(), payment.getMethod(), payment.getAmountMinor(), receiptCode);
 
     audit.log(AuditEntry.builder()
-        .actorId(user.id()).actorName(user.name())
+        .actorId(actorId).actorName(actorName)
         .module("M09").action("update").entityType("payment").entityId(id)
         .summary("Payment " + payment.getCode() + " confirmed — receipt " + receiptCode
             + " (" + money(payment.getAmountMinor()) + " via " + payment.getMethod() + ")")
@@ -251,6 +303,11 @@ public class PaymentAppService {
     }
     Payment payment = load(id);
     requireUpdate(user, payment);
+    return failCore(payment, reason, user.id(), user.name());
+  }
+
+  /** Fail core shared by the staff action and the webhook. */
+  private ConfirmResult failCore(Payment payment, String reason, String actorId, String actorName) {
     if (!PaymentMachine.canTransition(payment.getStatus(), "failed")) {
       throw new ApiException(422, "INVALID_TRANSITION",
           "Cannot fail a " + payment.getStatus() + " payment");
@@ -261,11 +318,56 @@ public class PaymentAppService {
     payments.save(payment);
 
     audit.log(AuditEntry.builder()
-        .actorId(user.id()).actorName(user.name())
-        .module("M09").action("update").entityType("payment").entityId(id)
+        .actorId(actorId).actorName(actorName)
+        .module("M09").action("update").entityType("payment").entityId(payment.getId())
         .summary("Payment " + payment.getCode() + " marked failed: " + reason)
         .build());
     return new ConfirmResult(false, null, "failed");
+  }
+
+  // ---- webhook (gateway, §9.6 / M13) --------------------------------------
+
+  /** Result of a signed payment webhook: idempotent replays report ignored. */
+  public record WebhookResult(boolean ignored, String receiptCode, String paymentStatus) {}
+
+  /**
+   * Signed webhook intake (M13 / §9.6): find the payment by idempotencyKey →
+   * gatewayRef → explicit id, then confirm or fail it as a system actor
+   * (audit actorId null, name "payment-gateway"). Duplicate notifications for an
+   * already-confirmed payment are ignored — no double-post, no re-issued
+   * receipt. Ports {@code handlePaymentWebhook} in payments/service.tsx.
+   */
+  @Transactional
+  public WebhookResult handleWebhook(String paymentId, String gatewayRef, String idempotencyKey,
+      String status, String reason) {
+    String tenantId = TenantContext.get();
+    Payment payment = null;
+    if (idempotencyKey != null) {
+      payment = payments.findByIdempotencyKeyAndTenantId(idempotencyKey, tenantId).orElse(null);
+    }
+    if (payment == null && gatewayRef != null) {
+      payment = payments.findByGatewayRefAndTenantId(gatewayRef, tenantId).orElse(null);
+    }
+    if (payment == null && paymentId != null) {
+      payment = payments.findByIdAndTenantId(paymentId, tenantId).orElse(null);
+    }
+    if (payment == null) {
+      throw new ApiException(404, "NOT_FOUND", "No payment matches the webhook payload");
+    }
+    if ("confirmed".equals(status)) {
+      // Idempotent (§9.6 / M13 acceptance): a duplicate confirm reports ignored,
+      // never double-posts and never re-issues a receipt.
+      ConfirmResult r = confirmCore(payment, GATEWAY_ACTOR_ID, GATEWAY_ACTOR_NAME);
+      return new WebhookResult(r.ignored(), r.receiptCode(), r.paymentStatus());
+    }
+    if ("failed".equals(status)) {
+      // Mirrors failPayment: a non-transitionable payment yields INVALID_TRANSITION.
+      ConfirmResult r = failCore(payment,
+          reason == null || reason.isBlank() ? "gateway reported failure" : reason,
+          GATEWAY_ACTOR_ID, GATEWAY_ACTOR_NAME);
+      return new WebhookResult(false, r.receiptCode(), r.paymentStatus());
+    }
+    throw new ApiException(400, "INVALID_STATUS", "Webhook status must be confirmed | failed");
   }
 
   // ---- refund -------------------------------------------------------------

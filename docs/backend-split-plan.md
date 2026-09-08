@@ -112,7 +112,7 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 | `properties` | **M04** properties/buildings/floors/rooms/beds | **1 (impl)** |
 | `owners` | **M03** (M24 statements later) | **2 (impl)** |
 | `leasing` | **M05 leases + M06 generation job** (M32 short stays later) | **2 (impl)** |
-| `billing` | **M06 rent engine, M07 invoices, M09 payments** (M13 QR pay later) | **3 (impl)** |
+| `billing` | **M06 rent engine, M07 invoices, M09 payments, M13 QR pay** (`billing.qrpay`) | **4 (impl)** |
 | `finance` | **M10 deposits + M08 double-entry ledger** (M20 expenses/P&L later) | **3 (impl)** |
 | `utilities` | **M11 utilities/meters/tariffs/charges** | **4 (impl)** |
 | `services` | **M12 catalog/assignments/usages, parking, WiFi** | **4 (impl)** |
@@ -428,7 +428,52 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
       the Next handler until the documents/storage module (M17) is ported — so
       `/api/services` (catalog GET/POST) is intentionally **not** proxied yet.
 
-### Phase 10+ — Port remaining modules (one vertical per module, same recipe)
+### Phase 10 — QR payments (M13, `billing.qrpay` sub-package) — DONE (this PR)
+- [x] M13 lands **inside the `billing` module** (its `package-info` already
+      earmarked it) — no new tables: a QR intent is just an M09 `Payment` with
+      `method=qr`, one explicit allocation to the invoice, a deterministic
+      `idempotencyKey` (`QR:<invoiceId>:<due>`, skipping past non-pending
+      attempts with `:rN`) and a random `gatewayRef` (`QRPAY-…`). Repeat clicks
+      reuse the same pending payment, so the QR is stable and confirmation stays
+      exactly-once (§M13 acceptance).
+- [x] `PaymentAppService` refactored to expose system/gateway entry points
+      alongside the RBDC-guarded staff ones: `recordGatewayPayment(...)` (shared
+      `recordCore`, idempotent on key), `handleWebhook(paymentId|gatewayRef|
+      idempotencyKey, status, reason)` → find → `confirmCore`/`failCore` as the
+      `payment-gateway` actor (audit `actorId` null, FK-safe). A duplicate
+      **confirm** replays as `{ignored:true}` with no double-post / no re-issued
+      receipt; a **fail** on a settled payment yields `INVALID_TRANSITION`
+      (mirrors `failPayment` in payments/service.tsx).
+- [x] `billing.qrpay`: `QrProvider` adapter + `DevMockQrProvider` (devmock deep
+      link, `parseWebhook`), `QrProviderRegistry` (DevMock-first fallback,
+      bean-collected so real providers just register), `QrCodeRenderer` (ZXing
+      `core` → `BufferedImage`/`ImageIO` PNG data URL, `margin:1 width:240`
+      matching `QRCode.toDataURL`), `MemberQrTokens` (HMAC-SHA256 signed member
+      tokens keyed by `qrpay:<PAYMENT_WEBHOOK_SECRET>`), and `QrPaymentService`
+      (`createInvoiceQr`, `memberDuesForToken`).
+- [x] Kernel additions: `SealedSecrets` (AES-256-GCM unseal, byte-compatible
+      with `src/lib/crypto/sealed.ts`) and `SettingsService.org()` /
+      `.providerSecret("paymentCredentials")` (DB-sealed value wins over the env
+      fallback). `platform.web.RateLimiter` ports `src/lib/ratelimit.ts`.
+- [x] REST at the Next paths: `POST /api/invoices/{id}/qr` (own invoice OR
+      `M13:create` in the invoice's property scope), `GET /api/members/{id}/qr`
+      (own OR `M02:read` in scope), and the public poster flow
+      `POST /api/qrpay/{dues,pay,status}` (signed member token, rate-limited
+      30/10/120 per min; `pay` uses the gateway actor and always the invoice's
+      outstanding due) + `POST /api/webhooks/payments` (shared-secret header,
+      provider-normalized or generic §9.6 payload, idempotent).
+- [x] No Flyway change (rides the existing `Payment` table; `gatewayRef` /
+      `idempotencyKey` already `@unique`).
+- [x] `QrPaymentRulesTest` mirrors `src/lib/qrpay/*`: devmock encode/parse,
+      registry fallback, member-token sign/verify round-trip + cross-key reject.
+- [x] FE seam: `/api/qrpay` + `/api/webhooks/payments` added to
+      `MIGRATED_PREFIXES` (the `/api/invoices/*` and `/api/members/*` QR
+      sub-routes were already proxied by their parent prefixes).
+- [ ] Deferred: the printable-receipt QR embed and the `/pay` portal page still
+      render on the Next side until M17 storage / the portal UI is ported; the
+      backend already returns the PNG data URL they need.
+
+### Phase 11+ — Port remaining modules (one vertical per module, same recipe)
 For each module: entities → service (port `src/lib/**` logic) → controller →
 Flyway (only if new columns) → contract tests → flip the FE proxy route →
 delete the old `route.ts` and the module's `src/lib` server logic.

@@ -10,6 +10,8 @@ public interface MemberRepository extends JpaRepository<MemberProfile, String> {
 
   Optional<MemberProfile> findByIdAndTenantId(String id, String tenantId);
 
+  Optional<MemberProfile> findByPartyIdAndTenantId(String partyId, String tenantId);
+
   @Query("""
       select m from MemberProfile m
       where m.tenantId = :tenantId

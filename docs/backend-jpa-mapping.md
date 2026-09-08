@@ -60,6 +60,14 @@ Floor, Room, Bed, AuditLog, Tenant`.
   unique. Confirmation increments each allocated invoice's `amountPaidMinor` and
   re-derives status via `Invoice.recompute()`. Year-scoped codes `PMT-YYYY-####`
   / `RCP-YYYY-####` use per-year `NumberSequence` keys (`PMT:YYYY`, `RCP:YYYY`).
+- Phase 10 (billing M13, `billing.qrpay`): **no new tables** — a QR intent is an
+  M09 `Payment` (`method=qr`) whose `idempotencyKey` (`QR:<invoiceId>:<due>`)
+  makes repeat clicks reuse the same pending row and whose unique `gatewayRef`
+  (`QRPAY-…`) is echoed on the webhook, so confirmation is exactly-once. The
+  webhook resolves a payment by `idempotencyKey → gatewayRef → id` and confirms
+  it as the `payment-gateway` system actor (audit `actorId` null). `SealedSecrets`
+  unseals the `m28.providers` AES-256-GCM blob (byte-compatible with the Next
+  `sealed.ts`) so both stacks read the same DB-sealed `paymentCredentials`.
 - Phase 6 (finance M10): `Deposit, DepositTransaction` (`V5__deposits_tenant.sql`).
   A deposit is billed as an `isDeposit=true` invoice (period sentinel
   `2000-01-01`, due at move-in) via `BillingQueryApi.billDepositInvoice`;

@@ -46,6 +46,14 @@ rentmanager:
     settings-enc-key: ${SETTINGS_ENC_KEY:dev-settings-enc-key-change-me-32b-min}
   tenancy:
     default-tenant: DEFAULT
+  payments:
+    # M13 QR: shared secret for the signed payment webhook + member-QR HMAC
+    # tokens. A DB-sealed m28.providers.paymentCredentials overrides this at
+    # runtime; both stacks must agree (mirrors PAYMENT_WEBHOOK_SECRET).
+    webhook-secret: ${PAYMENT_WEBHOOK_SECRET:dev-webhook-secret-change-me}
+    # Absolute base URL encoded in member pay QRs (scan targets must be
+    # absolute). Mirrors APP_BASE_URL in the Next app.
+    app-base-url: ${APP_BASE_URL:http://localhost:3000}
 
 springdoc:
   swagger-ui:

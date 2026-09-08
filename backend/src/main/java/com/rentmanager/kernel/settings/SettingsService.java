@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,12 +20,20 @@ public class SettingsService {
 
   private static final String BILLING_KEY = "m28.billing";
   private static final String LATE_FEE_KEY = "m28.lateFee";
+  private static final String ORG_KEY = "m28.org";
+  private static final String PROVIDERS_KEY = "m28.providers";
 
   private final SettingRepository settings;
+  private final SealedSecrets sealedSecrets;
+  private final String paymentWebhookSecretEnv;
   private final ObjectMapper mapper = new ObjectMapper();
 
-  public SettingsService(SettingRepository settings) {
+  public SettingsService(SettingRepository settings, SealedSecrets sealedSecrets,
+      @Value("${rentmanager.payments.webhook-secret:dev-webhook-secret-change-me}")
+      String paymentWebhookSecretEnv) {
     this.settings = settings;
+    this.sealedSecrets = sealedSecrets;
+    this.paymentWebhookSecretEnv = paymentWebhookSecretEnv;
   }
 
   /** Billing group: invoice prefix, grace period, dunning ladder. */
@@ -32,6 +41,32 @@ public class SettingsService {
 
   /** Late-fee group: mode + amounts (mode "none" disables late fees). */
   public record LateFeeSettings(String mode, int flatMinor, int monthlyPctBps, int maxMinor) {}
+
+  /** Org group (subset the backend needs): display name for receipts/QR. */
+  public record OrgSettings(String name) {}
+
+  /** Org display name, or the demo default when unset (matches settings.ts). */
+  @Transactional(readOnly = true)
+  public OrgSettings org() {
+    JsonNode n = read(ORG_KEY);
+    return new OrgSettings(text(n, "name", "RentManager Demo"));
+  }
+
+  /**
+   * Plaintext provider secret used by the runtime — the DB-sealed value wins,
+   * falling back to the env default (mirrors {@code getProviderSecret} in
+   * settings.ts). Only {@code paymentCredentials} is needed on the backend.
+   */
+  @Transactional(readOnly = true)
+  public String providerSecret(String name) {
+    JsonNode n = read(PROVIDERS_KEY);
+    if (n != null && n.hasNonNull(name)) {
+      String plain = sealedSecrets.open(n.get(name).asText());
+      if (plain != null && !plain.isEmpty()) return plain;
+    }
+    if ("paymentCredentials".equals(name)) return paymentWebhookSecretEnv;
+    return null;
+  }
 
   @Transactional(readOnly = true)
   public BillingSettings billing() {

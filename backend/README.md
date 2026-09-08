@@ -36,10 +36,13 @@ com.rentmanager
 │                   #    billing.BillingQueryApi.generateForLease per active lease)
 │                   #   (open-dues gate calls billing.BillingQueryApi; bills deposits
 │                   #    via leasing::spi DepositBillingPort, LeasingQueryApi published)
-├── billing         # M06 rent engine + M07 invoices + M09 payments: pure engine
-│                   #   (billing.engine: proration + composition + late-fee/dunning),
-│                   #   invoices/items/credit notes, payments/allocations, and the
-│                   #   daily late-fee/dunning job (RentEngineService)
+├── billing         # M06 rent engine + M07 invoices + M09 payments + M13 QR pay:
+│                   #   pure engine (billing.engine: proration + composition +
+│                   #   late-fee/dunning), invoices/items/credit notes,
+│                   #   payments/allocations, the daily late-fee/dunning job
+│                   #   (RentEngineService), and billing.qrpay (dynamic per-invoice
+│                   #   QR intents, signed member-token poster flow, pluggable
+│                   #   QrProvider adapter (DevMock), idempotent gateway webhook)
 │                   #   (+ BillingQueryApi for leasing/finance;
 │                   #    billing::spi LedgerPostingPort → M08, DepositAdvancePort → finance,
 │                   #    UtilityBillingPort → M11)

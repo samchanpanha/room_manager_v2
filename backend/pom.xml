@@ -87,6 +87,14 @@
       <version>2.6.0</version>
     </dependency>
 
+    <!-- M13 QR payments: encode the QR bitmatrix (rendered to a PNG data URL
+         with java.awt/ImageIO, so no javase extra is needed). -->
+    <dependency>
+      <groupId>com.google.zxing</groupId>
+      <artifactId>core</artifactId>
+      <version>3.5.3</version>
+    </dependency>
+
     <!-- Actuator (health for /api/health parity) -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
