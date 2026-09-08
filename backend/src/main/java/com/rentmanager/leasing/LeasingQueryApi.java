@@ -3,7 +3,10 @@ package com.rentmanager.leasing;
 import com.rentmanager.kernel.tenant.TenantContext;
 import com.rentmanager.leasing.domain.Lease;
 import com.rentmanager.leasing.domain.LeaseRepository;
+import com.rentmanager.leasing.domain.LeaseService;
+import com.rentmanager.leasing.domain.LeaseServiceRepository;
 import com.rentmanager.platform.web.ApiException;
+import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,9 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class LeasingQueryApi {
 
   private final LeaseRepository leases;
+  private final LeaseServiceRepository leaseServices;
 
-  public LeasingQueryApi(LeaseRepository leases) {
+  public LeasingQueryApi(LeaseRepository leases, LeaseServiceRepository leaseServices) {
     this.leases = leases;
+    this.leaseServices = leaseServices;
   }
 
   /** Deposit-relevant snapshot of a lease. */
@@ -55,5 +60,30 @@ public class LeasingQueryApi {
             l.getMemberProfileId(), l.getDepositTotalMinor(), l.getDepositInstallments(),
             l.getStartDate()))
         .orElse(null);
+  }
+
+  // ---- LeaseService snapshots (M12 fixed_monthly billing) -----------------
+  //
+  // The services module (M12) drives fixed_monthly billing by writing a
+  // LeaseService snapshot row (with an [activeFrom, activeThrough) window the
+  // rent engine prorates). These helpers keep LeaseService entity mapping inside
+  // the leasing module; the services module references snapshots only by id.
+
+  /** Create a fixed_monthly billing snapshot on a lease; returns its id. */
+  @Transactional
+  public String createServiceSnapshot(String leaseId, String name, int amountMinor,
+      Instant activeFrom) {
+    String tenantId = TenantContext.get();
+    LeaseService snapshot = new LeaseService(leaseId, name, amountMinor, "fixed_monthly",
+        activeFrom, tenantId);
+    return leaseServices.save(snapshot).getId();
+  }
+
+  /** Close a snapshot's billing window at {@code through} (mid-cycle suspend/end). */
+  @Transactional
+  public void closeServiceSnapshot(String snapshotId, Instant through) {
+    if (snapshotId == null) return;
+    leaseServices.findByIdAndTenantId(snapshotId, TenantContext.get())
+        .ifPresent(s -> { s.setActiveThrough(through); leaseServices.save(s); });
   }
 }

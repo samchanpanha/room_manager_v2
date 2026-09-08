@@ -44,11 +44,13 @@ public class InvoiceAppService {
   private final PropertyAccessApi propertiesApi;
   private final LedgerPostingPort ledger;
   private final com.rentmanager.billing.spi.UtilityBillingPort utilities;
+  private final com.rentmanager.billing.spi.ServiceUsageBillingPort serviceUsages;
 
   public InvoiceAppService(InvoiceRepository invoices, CreditNoteRepository creditNotes,
       NumberingService numbering, AuditService audit, MemberAccessApi membersApi,
       PropertyAccessApi propertiesApi, LedgerPostingPort ledger,
-      com.rentmanager.billing.spi.UtilityBillingPort utilities) {
+      com.rentmanager.billing.spi.UtilityBillingPort utilities,
+      com.rentmanager.billing.spi.ServiceUsageBillingPort serviceUsages) {
     this.invoices = invoices;
     this.creditNotes = creditNotes;
     this.numbering = numbering;
@@ -57,6 +59,7 @@ public class InvoiceAppService {
     this.propertiesApi = propertiesApi;
     this.ledger = ledger;
     this.utilities = utilities;
+    this.serviceUsages = serviceUsages;
   }
 
   public record CreditNoteResult(String code, String invoiceStatus) {}
@@ -219,9 +222,10 @@ public class InvoiceAppService {
 
     // M08 reversal via SPI.
     ledger.onInvoiceVoided(invoice.getId(), reason);
-    // M11 — release any utility charges billed on this invoice back to pending
-    // so they re-attach to the lease's next generated invoice.
+    // M11/M12 — release any utility charges + per-use service entries billed on
+    // this invoice back to pending so they re-attach to the next generated invoice.
     utilities.revertForInvoice(invoice.getId());
+    serviceUsages.revertForInvoice(invoice.getId());
 
     audit.log(AuditEntry.builder()
         .actorId(user.id()).actorName(user.name())

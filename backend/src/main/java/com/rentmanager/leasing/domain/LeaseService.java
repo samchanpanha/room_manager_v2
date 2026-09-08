@@ -45,10 +45,24 @@ public class LeaseService {
     this.tenantId = tenantId;
   }
 
+  /** Full constructor for a standalone snapshot (M12 service assignment). */
+  public LeaseService(String leaseId, String name, int amountMinor, String pricingModel,
+      Instant activeFrom, String tenantId) {
+    this.leaseId = leaseId;
+    this.name = name;
+    this.amountMinor = amountMinor;
+    this.pricingModel = pricingModel;
+    this.activeFrom = activeFrom;
+    this.tenantId = tenantId;
+  }
+
   public String getId() { return id; }
+  public String getLeaseId() { return leaseId; }
   public String getName() { return name; }
   public int getAmountMinor() { return amountMinor; }
   public String getPricingModel() { return pricingModel; }
   public Instant getActiveFrom() { return activeFrom; }
   public Instant getActiveThrough() { return activeThrough; }
+
+  public void setActiveThrough(Instant activeThrough) { this.activeThrough = activeThrough; }
 }

@@ -48,10 +48,15 @@ com.rentmanager
 │                   #   (finance.ledger: chart of accounts, postings, journal,
 │                   #   trial balance, member statement). Implements leasing/billing
 │                   #   SPIs incl. LedgerPostingPort (dependency inversion)
-└── utilities       # M11: meters, readings (manual/estimate/CSV), tariffs (tiers),
-                    #   consumption charge engine. Implements billing::spi
-                    #   UtilityBillingPort so generation folds pending charges into
-                    #   the next invoice as `utility` lines (dependency inversion)
+├── utilities       # M11: meters, readings (manual/estimate/CSV), tariffs (tiers),
+│                   #   consumption charge engine. Implements billing::spi
+│                   #   UtilityBillingPort so generation folds pending charges into
+│                   #   the next invoice as `utility` lines (dependency inversion)
+└── services        # M12: add-on catalog, lease assignments, parking/WiFi,
+                    #   per-use entries. fixed_monthly → LeaseService snapshot
+                    #   (rent engine prorates); implements billing::spi
+                    #   ServiceUsageBillingPort (per-use one-time lines) and
+                    #   leasing::spi ServiceReleasePort (release on lease end)
 ```
 
 Cross-module calls go through APIs published in a module's **base package**

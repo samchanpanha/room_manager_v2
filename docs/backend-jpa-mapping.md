@@ -91,4 +91,15 @@ Floor, Room, Bed, AuditLog, Tenant`.
   next invoice as `utility` lines and void reverts them — no billing→utilities
   dependency.
 
+- Phase 9 (services M12): `ServiceCatalog, ServiceAssignment, ServiceUsage,
+  ParkingSlot, WifiAccount` (`V9__services_tenant.sql`). `ServiceUsage.qtyMilli`
+  is milli-units (×1000); the one-time line amount is `round(unitPrice × qty /
+  1000)`. `parkingSlotId`/`wifiAccountId` on an assignment are unique (one slot /
+  account per assignment). fixed_monthly assignments store a `snapshotId` into a
+  standalone `LeaseService` row created through `LeasingQueryApi` (leasing owns
+  that entity). Three dependency-inverted seams: per-use rides
+  `billing.spi.ServiceUsageBillingPort` (adapter `@Primary`), lease-end rides
+  `leasing.spi.ServiceReleasePort`, fixed_monthly rides the LeaseService window
+  the rent engine already prorates.
+
 Remaining models follow the same recipe as their modules are ported.

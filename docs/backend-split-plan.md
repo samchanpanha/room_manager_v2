@@ -114,7 +114,8 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 | `leasing` | **M05 leases + M06 generation job** (M32 short stays later) | **2 (impl)** |
 | `billing` | **M06 rent engine, M07 invoices, M09 payments** (M13 QR pay later) | **3 (impl)** |
 | `finance` | **M10 deposits + M08 double-entry ledger** (M20 expenses/P&L later) | **3 (impl)** |
-| `utilities` | **M11 utilities/meters/tariffs/charges** (M12 services later) | **4 (impl)** |
+| `utilities` | **M11 utilities/meters/tariffs/charges** | **4 (impl)** |
+| `services` | **M12 catalog/assignments/usages, parking, WiFi** | **4 (impl)** |
 | `operations` | M16 room moves, M18 inspections, M19 maintenance, M22 complaints | 4 |
 | `inventory` | M14 POS, M15 stock, M29 purchase orders | 5 |
 | `workforce` | M23 attendance | 5 |
@@ -393,9 +394,41 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
       (`utilities` → `properties`, `leasing`, `billing::spi`).
 - [x] Flyway `V8` tenant-scopes Meter, MeterReading, Tariff, UtilityCharge.
 - [x] FE seam: `/api/meters` + `/api/tariffs` added to `MIGRATED_PREFIXES`.
-- [ ] Deferred: M12 services/usage one-time lines (same SPI approach).
+- [x] M12 services/usage one-time lines now wired (see Phase 9).
 
-### Phase 9+ — Port remaining modules (one vertical per module, same recipe)
+### Phase 9 — Services (M12, new `services` module) — DONE (this PR)
+- [x] `ServiceAppService` ports `src/lib/services/service.ts`: catalog create
+      (code shape + pricing-model validation), assign to an active lease (parking
+      binds a free same-property slot, WiFi activates a free account,
+      fixed_monthly writes a lease `LeaseService` snapshot), mid-cycle **suspend**
+      (closes the billing window + suspends WiFi → prorated stop), **end** (closes
+      window + releases slot/WiFi), and **per-use** entries.
+- [x] JPA entities `ServiceCatalog`, `ServiceAssignment`, `ServiceUsage`,
+      `ParkingSlot`, `WifiAccount` bound to the existing Prisma tables;
+      `ServiceRules` (pure) + `ServiceRulesTest` mirror the TS quantity/amount math.
+- [x] REST at the Next paths: `GET/POST /api/services` (catalog; create is GLOBAL
+      M12:update), `GET/POST /api/services/assignments`,
+      `POST /api/services/assignments/{id}/suspend`, `GET/POST /api/services/usages`.
+- [x] **Three integration seams, all dependency-inverted (graph stays acyclic):**
+    - *fixed_monthly* → `LeasingQueryApi.createServiceSnapshot/closeServiceSnapshot`
+      writes/updates the lease's `LeaseService` window; the rent engine already
+      prorates it (mid-cycle suspend/end → prorated stop, §M12 acceptance).
+    - *per_use* → billing declares `ServiceUsageBillingPort` (`NoopServiceUsageBilling`
+      default); the services `@Primary` `ServiceUsageBillingAdapter` folds pending
+      usages into the next invoice as one-time `service` lines, flips them
+      `pending → billed`, and reverts on void.
+    - *lease end* → leasing declares `ServiceReleasePort` (`NoopServiceRelease`
+      default); the services `ServiceReleaseAdapter` ends all assignments and
+      releases parking/WiFi when `LeaseAppService.end()` runs.
+- [x] Flyway `V9` tenant-scopes ServiceCatalog, ServiceAssignment, ServiceUsage,
+      ParkingSlot, WifiAccount (LeaseService was already scoped in V2).
+- [x] FE seam: `/api/services/assignments` + `/api/services/usages` added to
+      `MIGRATED_PREFIXES`.
+- [ ] Deferred: the catalog photo endpoints (`/api/services/{id}/image`) stay on
+      the Next handler until the documents/storage module (M17) is ported — so
+      `/api/services` (catalog GET/POST) is intentionally **not** proxied yet.
+
+### Phase 10+ — Port remaining modules (one vertical per module, same recipe)
 For each module: entities → service (port `src/lib/**` logic) → controller →
 Flyway (only if new columns) → contract tests → flip the FE proxy route →
 delete the old `route.ts` and the module's `src/lib` server logic.

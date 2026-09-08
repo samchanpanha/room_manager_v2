@@ -38,10 +38,12 @@ public class LeaseAppService {
   private final AuditService audit;
   private final BillingQueryApi billing;
   private final DepositBillingPort depositBilling;
+  private final com.rentmanager.leasing.spi.ServiceReleasePort serviceRelease;
 
   public LeaseAppService(LeaseRepository leases, RoomAccessApi rooms, MemberAccessApi membersApi,
       NumberingService numbering, AuditService audit, BillingQueryApi billing,
-      DepositBillingPort depositBilling) {
+      DepositBillingPort depositBilling,
+      com.rentmanager.leasing.spi.ServiceReleasePort serviceRelease) {
     this.leases = leases;
     this.rooms = rooms;
     this.membersApi = membersApi;
@@ -49,6 +51,7 @@ public class LeaseAppService {
     this.audit = audit;
     this.billing = billing;
     this.depositBilling = depositBilling;
+    this.serviceRelease = serviceRelease;
   }
 
   public record EffectResult(String status, List<String> notes) {}
@@ -291,6 +294,12 @@ public class LeaseAppService {
     }
     if (lease.getDepositTotalMinor() > 0) {
       notes.add("deposit settlement triggered (M10 acts once ported)");
+    }
+    // M12 — end every service assignment: close billing windows + release the
+    // parking slot / WiFi account (no-op until the services module is ported).
+    int endedServices = serviceRelease.endAssignmentsForLease(leaseId, Instant.now());
+    if (endedServices > 0) {
+      notes.add(endedServices + " service assignment(s) ended + resources released");
     }
 
     audit.log(AuditEntry.builder()

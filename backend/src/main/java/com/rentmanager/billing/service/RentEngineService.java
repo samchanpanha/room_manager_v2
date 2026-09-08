@@ -47,11 +47,13 @@ public class RentEngineService {
   private final AuditService audit;
   private final LedgerPostingPort ledger;
   private final com.rentmanager.billing.spi.UtilityBillingPort utilities;
+  private final com.rentmanager.billing.spi.ServiceUsageBillingPort serviceUsages;
 
   public RentEngineService(InvoiceRepository invoices, TaxRuleRepository taxRules,
       LateFeeRuleRepository lateFeeRules, NumberingService numbering, SettingsService settings,
       AuditService audit, LedgerPostingPort ledger,
-      com.rentmanager.billing.spi.UtilityBillingPort utilities) {
+      com.rentmanager.billing.spi.UtilityBillingPort utilities,
+      com.rentmanager.billing.spi.ServiceUsageBillingPort serviceUsages) {
     this.invoices = invoices;
     this.taxRules = taxRules;
     this.lateFeeRules = lateFeeRules;
@@ -60,6 +62,7 @@ public class RentEngineService {
     this.audit = audit;
     this.ledger = ledger;
     this.utilities = utilities;
+    this.serviceUsages = serviceUsages;
   }
 
   // ---- generation --------------------------------------------------------
@@ -119,12 +122,17 @@ public class RentEngineService {
           .map(s -> new RentEngine.ServiceInput(s.name(), s.amountMinor(), s.pricingModel(),
               s.activeFrom(), s.activeThrough()))
           .toList();
-      // M11 — fold this lease's pending utility charges in as one-time lines.
+      // M11/M12 — fold this lease's pending utility charges and per-use service
+      // entries in as one-time lines.
       List<com.rentmanager.billing.spi.UtilityBillingPort.PendingCharge> pendingUtils =
           utilities.pendingForLease(lease.leaseId());
-      List<RentEngine.OneTimeLine> oneTimeLines = pendingUtils.stream()
-          .map(c -> new RentEngine.OneTimeLine(c.kind(), c.name(), c.amountMinor()))
-          .toList();
+      List<com.rentmanager.billing.spi.ServiceUsageBillingPort.PendingUsage> pendingUsages =
+          serviceUsages.pendingForLease(lease.leaseId());
+      List<RentEngine.OneTimeLine> oneTimeLines = new java.util.ArrayList<>();
+      pendingUtils.forEach(c ->
+          oneTimeLines.add(new RentEngine.OneTimeLine(c.kind(), c.name(), c.amountMinor())));
+      pendingUsages.forEach(u ->
+          oneTimeLines.add(new RentEngine.OneTimeLine(u.kind(), u.name(), u.amountMinor())));
       RentEngine.CompositionResult comp = RentEngine.composeInvoice(new RentEngine.CompositionInput(
           new RentEngine.LeaseInput(lease.rentMinor(), lease.billingCycleDay(),
               Proration.Basis.parse(lease.prorationBasis()), svcs),
@@ -151,10 +159,16 @@ public class RentEngineService {
       invoice.recompute();
       invoices.save(invoice);
 
-      // M11 — flip the folded-in utility charges pending → billed against this invoice.
+      // M11/M12 — flip the folded-in utility charges + per-use entries
+      // pending → billed against this invoice.
       if (!pendingUtils.isEmpty()) {
         utilities.markBilled(pendingUtils.stream()
             .map(com.rentmanager.billing.spi.UtilityBillingPort.PendingCharge::chargeId).toList(),
+            invoice.getId());
+      }
+      if (!pendingUsages.isEmpty()) {
+        serviceUsages.markBilled(pendingUsages.stream()
+            .map(com.rentmanager.billing.spi.ServiceUsageBillingPort.PendingUsage::usageId).toList(),
             invoice.getId());
       }
 
