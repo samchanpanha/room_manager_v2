@@ -110,4 +110,21 @@ Floor, Room, Bed, AuditLog, Tenant`.
   `leasing.spi.ServiceReleasePort`, fixed_monthly rides the LeaseService window
   the rent engine already prorates.
 
+- Phase 11 (inventory M15): `StockItem, StockMovement, Stocktake, StocktakeLine`
+  (`V10__inventory_tenant.sql`); `StockCategory` and `Supplier` stay shared (no
+  tenant column — categories self-scope via a nullable `propertyId`, Supplier is
+  a global name-unique directory). Quantities are integer milli (1 unit = 1000)
+  and cost is minor×1000. On-hand (`StockItem.qtyMilli`/`avgCostMilli`) is
+  read-only from CRUD and only ever changes through an append-only
+  `StockMovement`: purchase blends the moving average and every out/adjustment/
+  transfer leg snapshots `qtyAfterMilli`/`avgCostAfterMilli` and the signed
+  `valueMilli` (qty·avg/1000 to stay inside Int32). `StockMovement.valueMilli`
+  matches the Next `Math.round` half-up-toward-+∞ rounding. `Stocktake.code` is a
+  year-scoped `STOCKTAKE` `NumberSequence` (`STK-YYYY-####`); creating one posts
+  an `adjustment` movement per variance ≠ 0 in one transaction and stores the
+  Σ valuation delta. The maintenance material-cost line (M19) is inverted via the
+  published `inventory.spi.MaintenanceCostPort` (no-op until M19), so inventory
+  never depends on maintenance; the POS sale leg (M14) enters through
+  `StockService.applyStockSale`.
+
 Remaining models follow the same recipe as their modules are ported.

@@ -30,4 +30,15 @@ public class PropertyAccessApi {
         .orElseThrow(() -> ApiException.notFound("Property " + propertyId + " not found"));
     return new PropertyInfo(p.getId(), p.getCode(), p.getName());
   }
+
+  /**
+   * All property ids in the current tenant — used by modules that hold a GLOBAL
+   * RBDC grant and need to widen a property-scoped query to every property
+   * (e.g. the M15 category/valuation lists for an Admin).
+   */
+  @Transactional(readOnly = true)
+  public java.util.List<String> allPropertyIds() {
+    return properties.findByTenantIdOrderByCode(TenantContext.get()).stream()
+        .map(Property::getId).toList();
+  }
 }

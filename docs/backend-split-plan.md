@@ -117,7 +117,7 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
 | `utilities` | **M11 utilities/meters/tariffs/charges** | **4 (impl)** |
 | `services` | **M12 catalog/assignments/usages, parking, WiFi** | **4 (impl)** |
 | `operations` | M16 room moves, M18 inspections, M19 maintenance, M22 complaints | 4 |
-| `inventory` | M14 POS, M15 stock, M29 purchase orders | 5 |
+| `inventory` | **M15 stock/movements/stocktakes/suppliers/categories** (M14 POS, M29 purchase orders later) | **4 (impl)** |
 | `workforce` | M23 attendance | 5 |
 | `documents` | M17 documents/storage | 5 |
 | `portal` | M25 tenant portal, M21 telegram, M33 alerts | 6 |
@@ -473,7 +473,56 @@ and Next.js proxies un-migrated paths to the old handlers until they're ported.
       render on the Next side until M17 storage / the portal UI is ported; the
       backend already returns the PNG data URL they need.
 
-### Phase 11+ — Port remaining modules (one vertical per module, same recipe)
+### Phase 11 — Stock / Inventory (M15, new `inventory` module) — DONE (this PR)
+- [x] New `inventory` module (`allowedDependencies = { platform, kernel,
+      properties }`), mirroring the M11/M12 recipe. Entities bound to the existing
+      Prisma tables: `StockItem` (moving-average `qtyMilli`/`avgCostMilli`),
+      `StockCategory` (two-level, nullable `propertyId` = shared), `Supplier`
+      (global, name-unique — no tenant column), append-only `StockMovement`,
+      `Stocktake` (`STK-YYYY-NNNN`) + `StocktakeLine`. `InventoryRepositories`
+      holds the six Spring Data interfaces (tenant-scoped finders + the
+      `name_propertyId` uniqueness lookup).
+- [x] `StockMath` ports `src/lib/operations/stock-math.ts` (movingAverage,
+      valuationMilli, isLowStock, stocktakeVariance) with JS `Math.round`
+      half-up-toward-+∞ semantics via `floorDiv((2n+d)/2d)` and overflow-checked
+      milli² math.
+- [x] `StockService` ports `stock-service.ts` + the routes: item CRUD (metadata
+      only — on-hand is read-only), and the **movement engine** `applyMovement`
+      (the single write path for on-hand). Purchase blends the moving average
+      (pack buys multiply qty and divide the per-unit cost); consumption / sale /
+      maintenance_use / adjustment / transfer carry stock out at the current
+      average; `INSUFFICIENT_STOCK` guards non-purchase/adjustment outflows.
+      Transfer runs two legs in one `@Transactional` (the in-leg reuses the out
+      leg's average). Stocktake writes an `adjustment` movement per variance ≠ 0
+      and snapshots the valuation delta. Each write audits via
+      `M15`/`stock.*`; the valuation report values on-hand at moving average.
+- [x] RBDC exactly as the routes: reads gate on `hasModuleAccess(read, M15)` then
+      the widest-scope property filter (GLOBAL → every property); item/movement/
+      stocktake writes need `M15:create` (item PATCH: `M15:update`) in the item's
+      property scope; suppliers + shared categories are GLOBAL `M15` grants.
+- [x] REST at the Next paths: `GET/POST/PATCH /api/stock/items` (GET = portfolio
+      valuation), `GET /api/stock/items/{id}/movements`, `POST /api/stock/{
+      purchase,consume,transfer}`, `GET/POST /api/stock/stocktakes`,
+      `GET /api/stock/valuation`, `GET/POST /api/stock/{categories,suppliers}`.
+      Wire fields stay major-unit (`qty`, `unitCost`, `minQty`, `counted`); the
+      controllers convert to milli/minor.
+- [x] SPI seam: `inventory.spi.MaintenanceCostPort` (published named interface)
+      lets maintenance (M19) attach a `material` cost line when a part is consumed
+      — dependency-inverted so inventory never depends on maintenance. A
+      `NoopMaintenanceCost` bean is active until M19 registers the real one; the
+      `maintenance_use` movement is still recorded meanwhile.
+- [x] Flyway `V10__inventory_tenant.sql` tenant-scopes `StockItem`,
+      `StockMovement`, `Stocktake`, `StocktakeLine` (backfill DEFAULT → NOT NULL
+      + default + index, same template as V2–V9). `StockCategory`/`Supplier` stay
+      shared (no tenant column), matching the Prisma schema.
+- [x] `StockRulesTest` mirrors the math (moving average / valuation / low-stock /
+      variance + rounding ties). `/api/stock` added to `MIGRATED_PREFIXES`.
+- [ ] Deferred: `consumeForTicket` is implemented but its route
+      (`/api/maintenance/tickets/[id]/consume-part`) and the real
+      `MaintenanceCostPort` land with M19; the stock-item image endpoints wait on
+      M17 object storage (same as M12).
+
+### Phase 12+ — Port remaining modules (one vertical per module, same recipe)
 For each module: entities → service (port `src/lib/**` logic) → controller →
 Flyway (only if new columns) → contract tests → flip the FE proxy route →
 delete the old `route.ts` and the module's `src/lib` server logic.

@@ -55,11 +55,18 @@ com.rentmanager
 │                   #   consumption charge engine. Implements billing::spi
 │                   #   UtilityBillingPort so generation folds pending charges into
 │                   #   the next invoice as `utility` lines (dependency inversion)
-└── services        # M12: add-on catalog, lease assignments, parking/WiFi,
-                    #   per-use entries. fixed_monthly → LeaseService snapshot
-                    #   (rent engine prorates); implements billing::spi
-                    #   ServiceUsageBillingPort (per-use one-time lines) and
-                    #   leasing::spi ServiceReleasePort (release on lease end)
+├── services        # M12: add-on catalog, lease assignments, parking/WiFi,
+│                   #   per-use entries. fixed_monthly → LeaseService snapshot
+│                   #   (rent engine prorates); implements billing::spi
+│                   #   ServiceUsageBillingPort (per-use one-time lines) and
+│                   #   leasing::spi ServiceReleasePort (release on lease end)
+└── inventory       # M15: stock items (moving-average cost), two-level categories,
+                    #   suppliers, append-only movements (purchase/sale/consume/
+                    #   maintenance_use/adjustment/transfer — the only way on-hand
+                    #   changes), stocktakes (variance → adjustment), valuation.
+                    #   POS (M14) enters via StockService.applyStockSale; publishes
+                    #   inventory::spi MaintenanceCostPort for M19 (dependency
+                    #   inversion, no-op until maintenance is ported)
 ```
 
 Cross-module calls go through APIs published in a module's **base package**
