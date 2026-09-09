@@ -14,6 +14,7 @@ export const MODULE_GUIDE: ModuleGuideEntry[] = [
   { key: "M02", name: "Members", purpose: "Tenant/resident profiles with stay, contact and billing details.", tips: ["Members are property-scoped — staff only see their own buildings."] },
   { key: "M03", name: "Owners", purpose: "Landlords and building ownership, plus their bank pay-out details.", tips: ["Owners only ever see their own statements (OWN scope)."] },
   { key: "M04", name: "Properties & Rooms", purpose: "The building/room tree that everything else hangs off.", tips: ["Rooms carry status and move history; archiving soft-deletes."] },
+  { key: "M05", name: "Leases & Contracts", purpose: "Member occupancy leases and owner building contracts.", tips: ["New leases start as draft; activation applies occupancy effects (room occupied, member active, first invoice scheduled).", "Draft leases can be created for any member; activation requires KYC verification.", "Assign optional monthly add-on services directly during lease creation."] },
   { key: "M06", name: "Rent Engine", purpose: "Monthly rent run that bills amounts per lease.", tips: ["Preview the run before posting — posting is written to the audit trail."] },
   { key: "M07", name: "Invoices", purpose: "Per-member invoices for rent, utilities and extras.", tips: ["Invoices are property-scoped; members/owners see their own."] },
   { key: "M08", name: "Ledger", purpose: "Double-entry accounts: every money event posts balanced lines.", tips: ["Only Admin/Accountant open the ledger; corrections are reversing entries."] },

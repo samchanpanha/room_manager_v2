@@ -20,9 +20,9 @@ export default async function NewLeasePage() {
     );
   }
 
-  // Candidates: verified/active members (KYC done), not blacklisted.
+  // Candidates: all non-blacklisted members (prospect, verified, active, notice).
   const members = await prisma.memberProfile.findMany({
-    where: { blacklisted: false, status: { in: ["verified", "active"] } },
+    where: { blacklisted: false, status: { not: "moved_out" } },
     include: { party: true },
     orderBy: { createdAt: "asc" }
   });
@@ -43,7 +43,10 @@ export default async function NewLeasePage() {
   const roomViews: Array<{
     id: string;
     label: string;
+    number: string;
     floorId: string;
+    buildingId: string;
+    propertyId: string;
     status: string;
     capacity: number;
     basePriceMinor: number;
@@ -61,7 +64,10 @@ export default async function NewLeasePage() {
     roomViews.push({
       id: r.id,
       label: `${r.floor.building.property.code}/${r.floor.building.name}/${r.number}`,
+      number: r.number,
       floorId: r.floor.id,
+      buildingId: r.floor.buildingId,
+      propertyId: r.floor.building.propertyId,
       status: r.status,
       capacity: r.capacity,
       basePriceMinor: r.basePriceMinor,
@@ -80,15 +86,41 @@ export default async function NewLeasePage() {
     });
   }
 
+  const [catalog, parkingSlots, wifiAccounts] = await Promise.all([
+    prisma.serviceCatalog.findMany({ where: { isActive: true }, orderBy: { code: "asc" } }),
+    prisma.parkingSlot.findMany({ where: { status: "free" }, orderBy: { code: "asc" } }),
+    prisma.wifiAccount.findMany({ where: { status: "free" }, orderBy: { ssid: "asc" } })
+  ]);
+
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="New member lease" description="M05 — creates a draft; activation applies occupancy effects" />
       <NewLeaseForm
-        members={members.map((m) => ({ id: m.id, label: `${m.party.name} (${m.status})` }))}
+        members={members.map((m) => ({ id: m.id, label: `${m.party.name} (${m.status})`, status: m.status, name: m.party.name }))}
         properties={[...properties.values()]}
         buildings={[...buildings.values()]}
         floors={[...floors.values()]}
         rooms={roomViews}
+        catalog={catalog.map((c) => ({
+          id: c.id,
+          code: c.code,
+          name: c.name,
+          pricingModel: c.pricingModel,
+          unitPriceMinor: c.unitPriceMinor,
+          unitLabel: c.unitLabel
+        }))}
+        parkingSlots={parkingSlots.map((s) => ({
+          id: s.id,
+          code: s.code,
+          propertyId: s.propertyId,
+          monthlyFeeMinor: s.monthlyFeeMinor
+        }))}
+        wifiAccounts={wifiAccounts.map((w) => ({
+          id: w.id,
+          ssid: w.ssid,
+          propertyId: w.propertyId,
+          speedLabel: w.speedLabel
+        }))}
       />
     </div>
   );

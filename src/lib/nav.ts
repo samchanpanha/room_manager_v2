@@ -24,7 +24,7 @@ export const NAV: NavGroup[] = [
       { label: "Members", href: "/members", module: "M02" },
       { label: "Owners", href: "/owners", module: "M03" },
       { label: "Owner Portal", href: "/owners/portal", module: "OWNER_PORTAL" },
-      { label: "Leases", module: "M05", phase: 5 }
+      { label: "Leases", href: "/leases", module: "M05" }
     ]
   },
   {

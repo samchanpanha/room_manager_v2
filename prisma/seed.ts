@@ -548,8 +548,7 @@ async function seedLeases(): Promise<void> {
       depositTotalMinor: 50000,
       depositInstallments: 2,
       noticeDays: 30,
-      nextBillingDate: new Date(Date.UTC(2026, 8, 1)),
-      services: { create: [{ name: "WiFi", amountMinor: 1500, pricingModel: "fixed_monthly" }] }
+      nextBillingDate: new Date(Date.UTC(2026, 8, 1))
     },
     update: {}
   });
@@ -655,7 +654,8 @@ async function seedUtilitiesServices(): Promise<void> {
     data: [
       { code: "WIFI", name: "WiFi", pricingModel: "fixed_monthly", unitPriceMinor: 1500 },
       { code: "PARK", name: "Parking", pricingModel: "fixed_monthly", unitPriceMinor: 3000 },
-      { code: "LAUNDRY", name: "Laundry", pricingModel: "per_use", unitPriceMinor: 200, unitLabel: "kg" }
+      { code: "LAUNDRY", name: "Laundry (per kg)", pricingModel: "per_use", unitPriceMinor: 200, unitLabel: "kg" },
+      { code: "LAUNDRY-M", name: "Monthly Laundry Plan", pricingModel: "fixed_monthly", unitPriceMinor: 2500 }
     ]
   });
   await db.parkingSlot.createMany({
@@ -670,7 +670,25 @@ async function seedUtilitiesServices(): Promise<void> {
       { ssid: "demo-wifi-102", propertyId: property.id, speedLabel: "100 Mbps" }
     ]
   });
-  console.log("  utilities/services: 2 tariffs · 4 meters · 3 catalog services · 2 slots · 2 WiFi accounts");
+
+  // Assign sample WiFi service to Chan Ling's lease (LSE-0001)
+  const lse1 = await db.lease.findUnique({ where: { code: "LSE-0001" } });
+  if (lse1) {
+    const wifiCatalog = await db.serviceCatalog.findUnique({ where: { code: "WIFI" } });
+    const wifi101 = await db.wifiAccount.findUnique({ where: { ssid: "demo-wifi-101" } });
+
+    if (wifiCatalog && wifi101) {
+      const wSnap = await db.leaseService.create({
+        data: { leaseId: lse1.id, name: "WiFi", amountMinor: 1500, pricingModel: "fixed_monthly", activeFrom: lse1.startDate }
+      });
+      await db.serviceAssignment.create({
+        data: { serviceId: wifiCatalog.id, leaseId: lse1.id, snapshotId: wSnap.id, startDate: lse1.startDate, wifiAccountId: wifi101.id }
+      });
+      await db.wifiAccount.update({ where: { id: wifi101.id }, data: { status: "assigned" } });
+    }
+  }
+
+  console.log("  utilities/services: 2 tariffs · 4 meters · 4 catalog services · 2 slots · 2 WiFi accounts · sample WiFi assigned to LSE-0001");
 }
 
 

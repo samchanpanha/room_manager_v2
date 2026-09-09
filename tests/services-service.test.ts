@@ -39,21 +39,42 @@ beforeAll(async () => {
   await prisma.parkingSlot.updateMany({ data: { status: "free" } });
   await prisma.wifiAccount.updateMany({ data: { status: "free" } });
   await prisma.auditLog.deleteMany({ where: { module: "M12" } });
-  await prisma.domainEvent.deleteMany({ where: { type: { startsWith: "service." } } });
-
+  await prisma.serviceCatalog.deleteMany({ where: { code: "CLEAN" } });
+  await prisma.serviceCatalog.updateMany({ where: { code: "WIFI" }, data: { name: "WiFi" } });
+  await prisma.serviceCatalog.updateMany({ where: { code: "PARK" }, data: { name: "Parking" } });
   const catalog = await prisma.serviceCatalog.findMany();
   wifi = catalog.find((c) => c.code === "WIFI")!.id;
   parking = catalog.find((c) => c.code === "PARK")!.id;
   laundry = catalog.find((c) => c.code === "LAUNDRY")!.id;
 
-  // Activate LSE-0002 (starts Oct 1 — pull the start back so the Sep cycle
-  // generates invoices for it) and make sure the member is verified.
-  const lease = await prisma.lease.findUniqueOrThrow({ where: { code: "LSE-0002" } });
-  lease2 = lease.id;
-  await prisma.memberProfile.update({ where: { id: lease.memberProfileId }, data: { status: "verified" } });
-  await prisma.lease.update({ where: { id: lease.id }, data: { startDate: new Date("2026-08-20") } });
-  const activated = await activateLease(lease.id);
-  if (!activated.ok) throw new Error(`LSE-0002 activation failed: ${JSON.stringify(activated)}`);
+  const party = await prisma.party.create({
+    data: { name: "Services Test Member", email: `svc-tester-${Date.now()}@example.test`, type: "individual" }
+  });
+  const member = await prisma.memberProfile.create({
+    data: { partyId: party.id, status: "verified" }
+  });
+  const room = await prisma.room.findFirstOrThrow({
+    where: { status: { in: ["vacant", "cleaning", "occupied"] } },
+    include: { floor: { include: { building: true } } }
+  });
+  await prisma.room.update({ where: { id: room.id }, data: { status: "vacant" } });
+
+  const testLease = await prisma.lease.create({
+    data: {
+      code: `LSE-SVC-${Date.now()}`,
+      memberProfileId: member.id,
+      roomId: room.id,
+      propertyId: room.floor.building.propertyId,
+      startDate: new Date("2026-08-20"),
+      rentAmountMinor: 40000,
+      billingCycleDay: 1,
+      prorationBasis: "calendar",
+      status: "draft"
+    }
+  });
+  lease2 = testLease.id;
+  const activated = await activateLease(testLease.id);
+  if (!activated.ok) throw new Error(`test lease activation failed: ${JSON.stringify(activated)}`);
 });
 
 afterAll(async () => {

@@ -81,7 +81,8 @@ export async function memberActiveLease(memberId: string) {
     where: { memberProfileId: memberId, status: { in: ["active", "notice"] } },
     orderBy: { createdAt: "desc" },
     include: {
-      room: { include: { floor: { include: { building: { include: { property: true } } } } } }
+      room: { include: { floor: { include: { building: { include: { property: true } } } } } },
+      services: true
     }
   });
 }

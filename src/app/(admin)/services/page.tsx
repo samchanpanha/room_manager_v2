@@ -25,7 +25,7 @@ export default async function ServicesPage() {
   const canAssign = can(user, "create", "M12");
   const canSuspend = can(user, "update", "M12");
 
-  const [catalog, assignments, usages, slots, wifi] = await Promise.all([
+  const [catalog, assignments, usages, slots, wifi, activeLeases] = await Promise.all([
     prisma.serviceCatalog.findMany({ orderBy: { code: "asc" } }),
     prisma.serviceAssignment.findMany({
       include: {
@@ -43,11 +43,27 @@ export default async function ServicesPage() {
       take: 100
     }),
     prisma.parkingSlot.findMany({ include: { property: true }, orderBy: { code: "asc" } }),
-    prisma.wifiAccount.findMany({ include: { property: true }, orderBy: { ssid: "asc" } })
+    prisma.wifiAccount.findMany({ include: { property: true }, orderBy: { ssid: "asc" } }),
+    prisma.lease.findMany({
+      where: { status: "active" },
+      include: {
+        member: { include: { party: true } },
+        room: { include: { floor: { include: { building: { include: { property: true } } } } } }
+      },
+      orderBy: { code: "asc" }
+    })
   ]);
 
   const visibleAssignments = assignments.filter((a) => inScope(a.lease.propertyId));
   const visibleUsages = usages.filter((u) => inScope(u.lease.propertyId));
+  const visibleLeases = activeLeases.filter((l) => inScope(l.propertyId)).map((l) => ({
+    id: l.id,
+    code: l.code,
+    label: `${l.code} — ${l.member.party.name} (Room ${l.room.number} · ${l.room.floor.building.property.code})`,
+    memberName: l.member.party.name,
+    roomNumber: l.room.number,
+    propertyCode: l.room.floor.building.property.code
+  }));
   const pendingUsageMinor = visibleUsages
     .filter((u) => u.status === "pending")
     .reduce((s, u) => s + Math.round((u.unitPriceMinor * u.qtyMilli) / 1000), 0);
@@ -70,6 +86,7 @@ export default async function ServicesPage() {
           catalog={catalog.filter((c) => c.isActive).map((c) => ({ id: c.id, name: `${c.name} (${c.pricingModel})`, pricingModel: c.pricingModel }))}
           slots={slots.filter((s) => s.status === "free").map((s) => ({ code: s.code, label: `${s.code} — ${formatMinor(s.monthlyFeeMinor)}/mo` }))}
           wifi={wifi.filter((w) => w.status === "free").map((w) => ({ ssid: w.ssid, label: w.ssid }))}
+          leases={visibleLeases}
           suspendTarget={null}
           usageTarget={null}
         />

@@ -14,18 +14,28 @@ interface CatalogRef {
   pricingModel: string;
 }
 
+interface LeaseRef {
+  id: string;
+  code: string;
+  label: string;
+  memberName: string;
+  roomNumber: string;
+  propertyCode: string;
+}
+
 interface Props {
   /** When provided (create-capable user), renders the "Assign service" button + dialog. */
   catalog: CatalogRef[];
   slots: { code: string; label: string }[];
   wifi: { ssid: string; label: string }[];
+  leases?: LeaseRef[];
   /** Row-level suspend target. */
   suspendTarget: { id: string } | null;
   /** Row-level record-usage target (per_use assignments only). */
   usageTarget: { leaseId: string; serviceId: string; unitLabel: string } | null;
 }
 
-export function ServiceActions({ catalog, slots, wifi, suspendTarget, usageTarget }: Props) {
+export function ServiceActions({ catalog, slots, wifi, leases = [], suspendTarget, usageTarget }: Props) {
   const router = useRouter();
   const { push } = useToast();
   const [busy, setBusy] = useState(false);
@@ -87,6 +97,7 @@ export function ServiceActions({ catalog, slots, wifi, suspendTarget, usageTarge
           catalog={catalog}
           slots={slots}
           wifi={wifi}
+          leases={leases}
           busy={busy}
           onCancel={() => setAssignOpen(false)}
           onSubmit={(leaseId, body) =>
@@ -146,6 +157,7 @@ function AssignForm({
   catalog,
   slots,
   wifi,
+  leases = [],
   busy,
   selected,
   onCancel,
@@ -154,11 +166,26 @@ function AssignForm({
   catalog: CatalogRef[];
   slots: { code: string; label: string }[];
   wifi: { ssid: string; label: string }[];
+  leases?: LeaseRef[];
   busy: boolean;
   selected: CatalogRef | undefined;
   onCancel: () => void;
   onSubmit: (leaseId: string, body: Record<string, unknown>) => Promise<boolean>;
 }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedLeaseId, setSelectedLeaseId] = useState(leases[0]?.id ?? "");
+
+  const filteredLeases = leases.filter((l) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      l.code.toLowerCase().includes(q) ||
+      l.memberName.toLowerCase().includes(q) ||
+      l.roomNumber.toLowerCase().includes(q) ||
+      l.label.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <form
       onSubmit={(e) => {
@@ -166,7 +193,8 @@ function AssignForm({
         const fd = new FormData(e.currentTarget);
         const slot = String(fd.get("parkingSlotCode") ?? "");
         const ssid = String(fd.get("wifiSsid") ?? "");
-        void onSubmit(String(fd.get("leaseId")), {
+        const leaseId = selectedLeaseId || String(fd.get("leaseId"));
+        void onSubmit(leaseId, {
           serviceId: String(fd.get("serviceId")),
           parkingSlotCode: slot || undefined,
           wifiSsid: ssid || undefined,
@@ -175,10 +203,36 @@ function AssignForm({
       }}
       className="space-y-4"
     >
-      <div className="space-y-1.5">
-        <Label htmlFor="sa-lease">Lease ID</Label>
-        <Input id="sa-lease" name="leaseId" placeholder="cuid of an active lease (copy from the leases page)" required />
+      <div className="space-y-2">
+        <Label htmlFor="sa-lease"><Tx>Active Lease / Room / Member</Tx></Label>
+        {leases.length > 0 ? (
+          <div className="space-y-1.5">
+            <Input
+              type="text"
+              placeholder="Search member, room number (e.g. A1-01), or lease code..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="text-xs"
+            />
+            <Select
+              id="sa-lease"
+              value={selectedLeaseId}
+              onChange={(e) => setSelectedLeaseId(e.target.value)}
+              required
+            >
+              <option value="">— Select active lease ({filteredLeases.length} matches) —</option>
+              {filteredLeases.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        ) : (
+          <Input id="sa-lease" name="leaseId" placeholder="cuid of an active lease" required />
+        )}
       </div>
+
       <div className="space-y-1.5">
         <Label htmlFor="sa-service">Service</Label>
         <Select id="sa-service" name="serviceId" defaultValue={selected?.id}>
@@ -189,6 +243,7 @@ function AssignForm({
           ))}
         </Select>
       </div>
+
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="sa-slot">Parking slot (optional)</Label>

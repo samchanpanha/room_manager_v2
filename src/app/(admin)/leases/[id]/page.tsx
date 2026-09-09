@@ -47,6 +47,12 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
   const money = (minor: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(minor / 100);
 
+  const [catalog, parkingSlots, wifiAccounts] = await Promise.all([
+    prisma.serviceCatalog.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    prisma.parkingSlot.findMany({ where: { propertyId: lease.propertyId, status: "free" }, orderBy: { code: "asc" } }),
+    prisma.wifiAccount.findMany({ where: { propertyId: lease.propertyId, status: "free" }, orderBy: { ssid: "asc" } })
+  ]);
+
   return (
     <div>
       <div className="mb-4 text-sm text-muted-foreground">
@@ -78,6 +84,33 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
           contractFiled={Boolean(contractDoc)}
         />
       </div>
+
+      {lease.status === "draft" ? (
+        <div className={`mb-4 rounded-md border p-3.5 text-sm flex flex-wrap items-center justify-between gap-2 ${
+          lease.member.status === "prospect"
+            ? "border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200"
+            : "border-blue-500/30 bg-blue-500/10 text-blue-900 dark:text-blue-200"
+        }`}>
+          <div>
+            <span className="font-semibold">
+              {lease.member.status === "prospect" ? "⚠️ KYC Verification Required Before Activation" : "ℹ️ Draft Lease Ready"}
+            </span>
+            <p className="mt-0.5 text-xs opacity-90">
+              {lease.member.status === "prospect"
+                ? `Member ${lease.member.party.name} is currently in prospect status. Complete KYC verification on the member profile before activating this lease.`
+                : "Activating this lease will flip the room to Occupied, flip the member to Active, schedule the 1st monthly invoice, and generate deposit billing."}
+            </p>
+          </div>
+          {lease.member.status === "prospect" ? (
+            <Link
+              href={`/members/${lease.memberProfileId}`}
+              className="rounded bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400"
+            >
+              Verify Member KYC →
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -132,6 +165,16 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
           status={lease.status}
           services={lease.services.map((sv) => ({ id: sv.id, name: sv.name, amountMinor: sv.amountMinor, pricingModel: sv.pricingModel }))}
           canUpdate={canUpdate}
+          catalog={catalog.map((c) => ({
+            id: c.id,
+            code: c.code,
+            name: c.name,
+            pricingModel: c.pricingModel,
+            unitPriceMinor: c.unitPriceMinor,
+            unitLabel: c.unitLabel
+          }))}
+          parkingSlots={parkingSlots.map((s) => ({ id: s.id, code: s.code, monthlyFeeMinor: s.monthlyFeeMinor }))}
+          wifiAccounts={wifiAccounts.map((w) => ({ id: w.id, ssid: w.ssid, speedLabel: w.speedLabel }))}
         />
       </div>
 

@@ -87,6 +87,19 @@ export default async function PortalDashboardPage() {
                 {tUi("since")} {lease.startDate.toISOString().slice(0, 10)}
                 {lease.endDate ? ` · ${tUi("until")} ${lease.endDate.toISOString().slice(0, 10)}` : ""}
               </p>
+              {lease.services && lease.services.length > 0 ? (
+                <div className="pt-1">
+                  <p className="text-xs font-medium text-foreground">{tUi("Optional Services")}:</p>
+                  <ul className="space-y-0.5 pt-0.5 text-xs text-muted-foreground">
+                    {lease.services.map((s) => (
+                      <li key={s.id} className="flex justify-between">
+                        <span>{s.name} ({tUi(s.pricingModel.replaceAll("_", " "))})</span>
+                        <span className="tabular-nums font-medium text-foreground">{money(s.amountMinor)}/mo</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </>
           ) : (
             <p className="text-muted-foreground">{tUi("No active lease — contact reception.")}</p>

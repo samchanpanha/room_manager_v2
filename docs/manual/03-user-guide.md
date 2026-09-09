@@ -286,22 +286,23 @@ draft → active → notice → terminated | completed
 - **terminated / completed** flips room → *cleaning*, member → *moved_out*, and triggers the **deposit settlement** flow.
 
 ### Where to find it
-Leases are reached at the **`/leases`** pages (list, **`/leases/new`**, and
-**`/leases/[id]`**), typically opened from a member's profile or the relevant
-record (the sidebar "Leases" label is present but the list is opened from those
-contexts). Owners' management agreements live under **Owners → Owner contracts**
-(**`/owner-contracts`**).
+Leases are reached from the sidebar navigation under **Portfolio → Leases** (**`/leases`**),
+the new lease form (**`/leases/new`**), and lease details (**`/leases/[id]`**).
+Owners' management agreements live under **Owners → Owner contracts** (**`/owner-contracts`**).
 
-### Step-by-step — create a member lease
-1. Open **Leases → New** (**`/leases/new`**), or start from a member/room.
-2. Select the **member** and the **room/bed**.
-3. Set **start / end dates**, **rent amount**, **cycle day** (day of month billed),
-   **proration basis** (calendar = real month length, or 30-day).
-4. Set **deposit terms** (total + number of installments).
-5. Set **notice days**, **auto-renew** and any **escalation** rule.
-6. **Add services** (WiFi, parking, laundry — see Services).
-7. Save as **draft**, review, then **Activate**.
-8. A **contract PDF** is generated server-side and auto-filed to documents.
+### Step-by-step — create and activate a member lease
+1. Navigate to **Portfolio → Leases** and click **+ New lease** (**`/leases/new`**), or start from a member or room.
+2. Select the **Member** (eligible members including prospects, verified, and active members).
+   - *Note:* A draft lease can be created for a prospect; KYC verification on the member's profile is required before activation.
+3. Select the **Premises & Room/Bed** (pick directly from the room list or filter by Property → Building → Floor).
+4. Set **Start / End dates**, **Rent amount**, **Cycle day** (billing day 1–28), and **Proration basis** (calendar or 30-day).
+5. Set **Deposit terms** (total deposit amount and installment count).
+6. Set **Notice days**, **Auto-renew**, and optional **Escalation % / year**.
+7. **Add optional monthly services** (WiFi, Parking slot binding, Laundry plan, or custom services).
+8. Click **Create draft lease**. The room transitions to *Reserved* status.
+9. Review terms on the lease details page (**`/leases/[id]`**), ensure member KYC is verified, and click **Activate lease**.
+   - Activation flips the room to *Occupied*, flips the member to *Active*, schedules the first monthly billing run, and issues the deposit invoice.
+10. A legally binding **contract PDF** is automatically generated server-side and filed in the document registry.
 
 ### Occupancy rules (enforced & tested)
 - **One active lease per bed.** Capacity cannot be exceeded.
