@@ -1517,3 +1517,46 @@ they fell back to English by design.
 - `tsc --noEmit`: 735 diagnostics before **and** after the change (all
   pre-existing `TS7006` implicit-any noise from the un-generated Prisma client
   in this environment) — zero new errors.
+
+## Strangler-fig slice — Spring Boot backend — auth vertical (`backend/`) — 2026-09-12
+
+First runnable slice of the Java modular monolith (see
+`docs/reality-check-vs-plan.md`). The postgres-backed auth primitives in
+`com.rentmanager.auth` are wire-compatible with the Next handlers
+`src/app/api/auth/login`, `/auth/logout` and `/api/account`, and the existing
+members slice now finally exercises its Hibernate queries against the real
+Prisma schema.
+
+**Why this session landed a naming-strategy fix**: Hibernate's default
+camelCase→underscore physical naming mangles the Prisma-owned schema
+(`"UserRole"` → `user_role`, columns `"tenantId"` → `tenant_id`), so any
+JPA query against Postgres failed with `relation … does not exist` / type
+errors. `application.yml` now keeps logical names (`PhysicalNamingStrategyStandardImpl`)
+and quotes every identifier (`globally_quoted_identifiers: true`), so Hibernate
+emits `"UserRole"`/`"userId"` exactly. This also surfaced and fixed three latent
+issues previously invisible on Postgres: untyped-param inference inside
+`MemberProfileRepository.search` (`lower(bytea)` → explicit `cast(:q as string)`),
+the `MemberApiIT` `it-other-tenant` FK (row was previously left over from an older
+test version), and permission-id collisions with the RBDC seed.
+
+**Delivered this session (all under `backend/`)**
+- `AuthApiIT` (10 tests, `@Tag("integration")`, Postgres `rentmanager_test`):
+  login success with real Node-scrypt hashes + `rm_session` cookie +
+  `M27` audit `Signed in (AGENT)`; wrong password / unknown email → 401;
+  disabled → 403; TOTP → `{totpRequired, challenge}` with no session;
+  sliding-window rate limit (10/60s) → 429; account PATCH (validation,
+  trim, `M01` audit, updatedAt bump); logout revocation + cookie clear +
+  subsequent 401; anonymous logout; malformed/empty-JSON parity.
+- Login/account parity fixes discovered by the tests: rate-limiter window
+  predicate inverted (buckets never grew → fixed), and validation ordering
+  (Next parses the body before the session check, so 400 beats 401).
+- `AccountController` audit module corrected `M27` → `M01` (matches
+  `src/app/api/account/route.ts`).
+
+**Verification**
+- `./mvnw test` → 6/6 (PasswordHasherTest 5 + ModularityTests 1) ✅
+- `./mvnw -Pintegration test` (after `npm run test:pg:reset`) → 23/23 ✅
+  (AuthApiIT 10 + MemberApiIT 8 + PasswordHasherTest 5)
+- Next-side `npm test`: 494 pass / 3 fail — the 3 failures are pre-existing
+  M25 portal-OTP mail-delivery tests, unrelated to this slice (no tracked
+  files outside `backend/` were touched).

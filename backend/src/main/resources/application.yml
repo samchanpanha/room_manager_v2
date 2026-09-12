@@ -1,0 +1,30 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: rentmanager-backend
+  datasource:
+    url: jdbc:postgresql://localhost:5432/rentmanager
+    username: ${DB_USER:rentmanager}
+    password: ${DB_PASSWORD:rentmanager}
+  jpa:
+    hibernate:
+      ddl-auto: none
+      # The schema is Prisma-owned with quoted PascalCase/camelCase names
+      # ("UserRole", "userId"). Keep logical names as-is and quote every
+      # identifier so Hibernate emits "UserRole"/"userId" on Postgres.
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+        globally_quoted_identifiers: true
+  flyway:
+    enabled: false
+
+logging:
+  level:
+    com.rentmanager: DEBUG
+    org.springframework.security: DEBUG
