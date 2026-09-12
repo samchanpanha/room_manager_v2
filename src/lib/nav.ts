@@ -82,6 +82,7 @@ export const NAV: NavGroup[] = [
   {
     label: "nav.admin",
     items: [
+      { label: "Organizations", href: "/organizations", module: "M01" },
       { label: "Users", href: "/users", module: "M01" },
       { label: "Roles & Permissions", href: "/roles", module: "M01" },
       { label: "Audit Log", href: "/audit", module: "M01" },

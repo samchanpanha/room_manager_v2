@@ -31,7 +31,8 @@ const PARTS = [
   { file: "10-troubleshooting.md", g: 4 },
   { file: "11-faq.md", g: 4 },
   { file: "12-glossary.md", g: 4 },
-  { file: "13-golden-paths.md", g: 4 }
+  { file: "13-golden-paths.md", g: 4 },
+  { file: "14-move-out-settlement-guide.md", g: 1 }
 ];
 
 const fileSlug = (f) => f.replace(/\.md$/, "");

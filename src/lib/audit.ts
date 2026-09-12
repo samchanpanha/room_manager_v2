@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { prisma } from "@/lib/db";
 
 export interface AuditInput {
+  tenantId?: string | null;
   actorId?: string | null;
   actorName: string;
   module: string;
@@ -105,6 +106,7 @@ export async function logAudit(input: AuditInput): Promise<void> {
     await tx.auditLog.create({
       data: {
         ...fields,
+        tenantId: input.tenantId ?? "DEFAULT",
         createdAt,
         prevHash: last?.hash ?? null,
         hash: rowHash(last?.hash ?? null, { ...fields, createdAt })

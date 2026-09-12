@@ -15,11 +15,18 @@ export default async function PosProductsPage() {
   const scopes = [...new Set(user.propertyIds)];
   const posGrants = user.permissions.filter((p) => p.module === "M14" && p.action === "read");
   const global = posGrants.some((g) => g.scope === "GLOBAL");
-  const visibleProps = global ? (await prisma.property.findMany({ select: { id: true } })).map((p) => p.id) : scopes;
+  const visibleProps = global ? (await prisma.property.findMany({ where: { tenantId: user.tenantId }, select: { id: true } })).map((p) => p.id) : scopes;
 
   const [products, stockItems, categories, legacyCats] = await Promise.all([
-    prisma.posProduct.findMany({ include: { stockItem: true }, orderBy: { name: "asc" } }),
-    prisma.stockItem.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    prisma.posProduct.findMany({
+      where: visibleProps.length > 0 ? { OR: [{ stockItemId: null }, { stockItem: { propertyId: { in: visibleProps } } }] } : { stockItemId: null },
+      include: { stockItem: true },
+      orderBy: { name: "asc" }
+    }),
+    prisma.stockItem.findMany({
+      where: visibleProps.length > 0 ? { isActive: true, propertyId: { in: visibleProps } } : { id: { in: [] } },
+      orderBy: { name: "asc" }
+    }),
     prisma.stockCategory.findMany({
       where: visibleProps.length > 0 ? { OR: [{ propertyId: null }, { propertyId: { in: visibleProps } }] } : { propertyId: null },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }]

@@ -38,8 +38,8 @@ async function seedSettings(): Promise<void> {
   ];
   for (const [key, value] of settings) {
     await db.setting.upsert({
-      where: { key },
-      create: { key, value: JSON.stringify(value), updatedBy: "seed" },
+      where: { tenantId_key: { tenantId: "DEFAULT", key } },
+      create: { tenantId: "DEFAULT", key, value: JSON.stringify(value), updatedBy: "seed" },
       update: {}
     });
   }
@@ -879,8 +879,8 @@ async function seedExpenses(): Promise<void> {
     });
   }
   await db.setting.upsert({
-    where: { key: "expenses.approvalThresholdMinor" },
-    create: { key: "expenses.approvalThresholdMinor", value: "50000" },
+    where: { tenantId_key: { tenantId: "DEFAULT", key: "expenses.approvalThresholdMinor" } },
+    create: { tenantId: "DEFAULT", key: "expenses.approvalThresholdMinor", value: "50000" },
     update: {}
   });
 }
@@ -902,8 +902,8 @@ async function seedStatements(): Promise<void> {
     data: { chargeTo: "owner_maintenance" }
   });
   await db.setting.upsert({
-    where: { key: "statements.generationDay" },
-    create: { key: "statements.generationDay", value: "5" },
+    where: { tenantId_key: { tenantId: "DEFAULT", key: "statements.generationDay" } },
+    create: { tenantId: "DEFAULT", key: "statements.generationDay", value: "5" },
     update: {}
   });
 }
@@ -967,8 +967,23 @@ async function seedStay(): Promise<void> {
   }
 }
 
+async function seedTenants(): Promise<void> {
+  await db.tenant.upsert({
+    where: { id: "DEFAULT" },
+    create: {
+      id: "DEFAULT",
+      slug: "default",
+      name: "Default Organization",
+      contactEmail: "admin@demo.test",
+      status: "active"
+    },
+    update: {}
+  });
+}
+
 async function main(): Promise<void> {
   const cellsUsed = Object.values(MATRIX).reduce((n, m) => n + Object.keys(m).length, 0);
+  await seedTenants();
   await seedSettings();
   await seedInspectionTemplates();
   await seedPermissions();

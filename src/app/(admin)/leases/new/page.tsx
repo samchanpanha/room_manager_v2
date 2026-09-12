@@ -22,13 +22,20 @@ export default async function NewLeasePage() {
 
   // Candidates: all non-blacklisted members (prospect, verified, active, notice).
   const members = await prisma.memberProfile.findMany({
-    where: { blacklisted: false, status: { not: "moved_out" } },
+    where: {
+      party: { tenantId: user.tenantId },
+      blacklisted: false,
+      status: { not: "moved_out" }
+    },
     include: { party: true },
     orderBy: { createdAt: "asc" }
   });
 
   const rooms = await prisma.room.findMany({
-    where: { status: { in: ["vacant", "reserved", "occupied"] } },
+    where: {
+      floor: { building: { property: { tenantId: user.tenantId } } },
+      status: { in: ["vacant", "reserved", "occupied"] }
+    },
     include: {
       floor: { include: { building: { include: { property: true } } } },
       beds: true,
@@ -88,8 +95,8 @@ export default async function NewLeasePage() {
 
   const [catalog, parkingSlots, wifiAccounts] = await Promise.all([
     prisma.serviceCatalog.findMany({ where: { isActive: true }, orderBy: { code: "asc" } }),
-    prisma.parkingSlot.findMany({ where: { status: "free" }, orderBy: { code: "asc" } }),
-    prisma.wifiAccount.findMany({ where: { status: "free" }, orderBy: { ssid: "asc" } })
+    prisma.parkingSlot.findMany({ where: { status: "free", property: { tenantId: user.tenantId } }, orderBy: { code: "asc" } }),
+    prisma.wifiAccount.findMany({ where: { status: "free", property: { tenantId: user.tenantId } }, orderBy: { ssid: "asc" } })
   ]);
 
   return (

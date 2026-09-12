@@ -12,6 +12,7 @@ import { MEMBER_STATUSES } from "@/lib/members/lifecycle";
 import { formatDate, titleCase } from "@/lib/utils";
 import { formatMinor } from "@/lib/money";
 import { Tx } from "@/components/i18n-text";
+import { ExportButton } from "@/components/export-button";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,7 @@ export default async function MembersPage({
   const scopeWhere = readScopeWhere(user.permissions, user.propertyIds);
   const where: Record<string, unknown> = {
     ...scopeWhere,
+    party: { tenantId: user.tenantId },
     ...(sp.status ? { status: sp.status } : {}),
     ...(sp.propertyId ? { homePropertyId: sp.propertyId } : {}),
     ...(sp.q
@@ -58,10 +60,10 @@ export default async function MembersPage({
       include: { party: true, homeProperty: true },
       orderBy: { createdAt: "desc" }
     }),
-    prisma.property.findMany({ orderBy: { code: "asc" } }),
+    prisma.property.findMany({ where: { tenantId: user.tenantId }, orderBy: { code: "asc" } }),
     prisma.invoice.groupBy({
       by: ["memberProfileId"],
-      where: { status: { in: ["issued", "partial_paid", "overdue"] }, amountDueMinor: { gt: 0 } },
+      where: { property: { tenantId: user.tenantId }, status: { in: ["issued", "partial_paid", "overdue"] }, amountDueMinor: { gt: 0 } },
       _sum: { amountDueMinor: true }
     })
   ]);
@@ -73,11 +75,14 @@ export default async function MembersPage({
         title="Members"
         description="Tenant lifecycle: prospect → verified → active → notice → moved_out"
         actions={
-          can(user, "create", "M02") ? (
-            <Link href="/members/new" className={buttonClassName()}>
-              <Tx>+ Onboard member</Tx>
-            </Link>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            <ExportButton entity="members" propertyId={sp.propertyId} status={sp.status} />
+            {can(user, "create", "M02") && (
+              <Link href="/members/new" className={buttonClassName()}>
+                <Tx>+ Onboard member</Tx>
+              </Link>
+            )}
+          </div>
         }
       />
 

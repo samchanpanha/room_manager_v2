@@ -44,16 +44,16 @@ beforeAll(async () => {
   await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "deposit_tx_no_update" ON "DepositTransaction"`);
   await prisma.paymentAllocation.deleteMany();
   await prisma.payment.deleteMany();
-  await prisma.$executeRawUnsafe(`CREATE TRIGGER "payment_no_delete" BEFORE DELETE ON "Payment" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Payments are append-only: refund or fail instead')`);
-  await prisma.$executeRawUnsafe(`CREATE TRIGGER "payment_allocation_no_delete" BEFORE DELETE ON "PaymentAllocation" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Payment allocations are append-only')`);
-  await prisma.$executeRawUnsafe(`CREATE TRIGGER "payment_allocation_no_update" BEFORE UPDATE ON "PaymentAllocation" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Payment allocations are immutable')`);
-  await prisma.$executeRawUnsafe(`CREATE TRIGGER "deposit_tx_no_update" BEFORE UPDATE ON "DepositTransaction" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Deposit movements are append-only')`);
-  await prisma.$executeRawUnsafe(`CREATE TRIGGER "deposit_tx_no_delete" BEFORE DELETE ON "DepositTransaction" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Deposit movements are append-only')`);
   // Deposits (and their invoice link) may exist when this suite runs late —
   // they Restrict-delete the deposit invoices below.
   await prisma.deposit.updateMany({ data: { invoiceId: null } });
   await prisma.depositTransaction.deleteMany();
   await prisma.deposit.deleteMany();
+  await prisma.$executeRawUnsafe(`CREATE TRIGGER "payment_no_delete" BEFORE DELETE ON "Payment" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Payments are append-only: refund or fail instead')`);
+  await prisma.$executeRawUnsafe(`CREATE TRIGGER "payment_allocation_no_delete" BEFORE DELETE ON "PaymentAllocation" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Payment allocations are append-only')`);
+  await prisma.$executeRawUnsafe(`CREATE TRIGGER "payment_allocation_no_update" BEFORE UPDATE ON "PaymentAllocation" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Payment allocations are immutable')`);
+  await prisma.$executeRawUnsafe(`CREATE TRIGGER "deposit_tx_no_update" BEFORE UPDATE ON "DepositTransaction" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Deposit movements are append-only')`);
+  await prisma.$executeRawUnsafe(`CREATE TRIGGER "deposit_tx_no_delete" BEFORE DELETE ON "DepositTransaction" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Deposit movements are append-only')`);
   await prisma.creditNote.deleteMany();
   await prisma.invoiceItem.deleteMany();
   await prisma.invoice.deleteMany();
@@ -67,6 +67,7 @@ beforeAll(async () => {
   });
   await prisma.documentRegistry.deleteMany({ where: { entity: { in: ["INVOICE", "PAYMENT"] } } });
   await prisma.auditLog.deleteMany({ where: { module: { in: ["M07", "M09"] } } });
+  await prisma.lease.updateMany({ where: { code: "LSE-0001" }, data: { status: "active" } });
   await prisma.domainEvent.deleteMany({
     where: { type: { in: ["invoice.issued", "invoice.late_fee_applied", "invoice.dunning_reminder", "invoice.voided", "credit_note.issued", "payment.recorded", "payment.confirmed", "payment.failed", "payment.refunded"] } }
   });

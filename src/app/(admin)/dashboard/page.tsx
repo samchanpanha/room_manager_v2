@@ -30,19 +30,20 @@ function greeting(): string {
 
 export default async function DashboardPage() {
   const dashUser = await getAuthUser();
+  const tenantId = dashUser?.tenantId ?? "DEFAULT";
   const dashScope = dashUser ? await reportScope(dashUser) : { allowed: false, global: true, propertyIds: [] };
   const kpis = dashUser && dashScope.allowed ? await getDashboardKpis(dashScope) : null;
   const [propertyCount, buildingCount, roomCount, bedCount, userCount, memberCount, rooms, recentAudit, settings, flags] = await Promise.all([
-    prisma.property.count(),
-    prisma.building.count(),
-    prisma.room.count(),
-    prisma.bed.count(),
-    prisma.user.count(),
-    prisma.memberProfile.count(),
-    prisma.room.findMany({ select: { status: true, basePriceMinor: true } }),
-    prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
-    getSettings(),
-    getFeatureFlags()
+    prisma.property.count({ where: { tenantId } }),
+    prisma.building.count({ where: { property: { tenantId } } }),
+    prisma.room.count({ where: { floor: { building: { property: { tenantId } } } } }),
+    prisma.bed.count({ where: { room: { floor: { building: { property: { tenantId } } } } } }),
+    prisma.user.count({ where: { tenantId } }),
+    prisma.memberProfile.count({ where: { party: { tenantId } } }),
+    prisma.room.findMany({ where: { floor: { building: { property: { tenantId } } } }, select: { status: true, basePriceMinor: true } }),
+    prisma.auditLog.findMany({ where: { tenantId }, orderBy: { createdAt: "desc" }, take: 8 }),
+    getSettings(tenantId),
+    getFeatureFlags(tenantId)
   ]);
 
   const byStatus = Object.fromEntries(ROOM_STATUSES.map((s) => [s, rooms.filter((r) => r.status === s).length])) as Record<string, number>;
@@ -59,6 +60,8 @@ export default async function DashboardPage() {
     (i) => i.href && (!i.module || (dashUser && can(dashUser, "read", i.module) && flags[i.module] !== false))
   );
 
+  const orgDisplayName = dashUser?.tenantName || settings.org.name;
+
   return (
     <div data-tour="dashboard">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
@@ -67,7 +70,7 @@ export default async function DashboardPage() {
             {greeting()}, {dashUser?.name.split(" ")[0] ?? "there"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {`${settings.org.name} · ${settings.locale.currency} · ${settings.locale.timezone}`} <Tx>— open a module below or from the menu; each page opens in its own tab.
+            {`${orgDisplayName} · ${settings.locale.currency} · ${settings.locale.timezone}`} <Tx>— open a module below or from the menu; each page opens in its own tab.
           </Tx></p>
         </div>
         <Link href="/reports" className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">

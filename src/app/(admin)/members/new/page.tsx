@@ -21,7 +21,7 @@ export default async function NewMemberPage() {
   }
 
   const [properties, docTypes] = await Promise.all([
-    prisma.property.findMany({ orderBy: { code: "asc" } }),
+    prisma.property.findMany({ where: { tenantId: user.tenantId }, orderBy: { code: "asc" } }),
     prisma.docType.findMany({ orderBy: { sortOrder: "asc" } })
   ]);
 

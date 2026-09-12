@@ -21,8 +21,8 @@ export default async function RentEnginePage() {
   const [lateFee, tax, dunning, generation, plans] = await Promise.all([
     prisma.lateFeeRule.findFirst({ where: { isActive: true } }),
     prisma.taxRule.findFirst({ where: { isActive: true, isDefault: true } }),
-    prisma.setting.findUnique({ where: { key: "billing.dunning" } }),
-    prisma.setting.findUnique({ where: { key: "billing.generation" } }),
+    prisma.setting.findUnique({ where: { tenantId_key: { tenantId: user.tenantId, key: "billing.dunning" } } }).then(async (r) => r || (user.tenantId !== "DEFAULT" ? prisma.setting.findUnique({ where: { tenantId_key: { tenantId: "DEFAULT", key: "billing.dunning" } } }) : null)),
+    prisma.setting.findUnique({ where: { tenantId_key: { tenantId: user.tenantId, key: "billing.generation" } } }).then(async (r) => r || (user.tenantId !== "DEFAULT" ? prisma.setting.findUnique({ where: { tenantId_key: { tenantId: "DEFAULT", key: "billing.generation" } } }) : null)),
     prisma.rentPlan.findMany({ where: { isActive: true }, orderBy: { name: "asc" } })
   ]);
 

@@ -16,7 +16,7 @@ export default async function PoPage() {
     return <EmptyState title="No access" hint="Your roles do not include read on Purchase Orders (M29)." />;
   }
 
-  const properties = await prisma.property.findMany({ where: { status: "active" }, orderBy: { code: "asc" }, select: { id: true, code: true, name: true } });
+  const properties = await prisma.property.findMany({ where: { status: "active", tenantId: user.tenantId }, orderBy: { code: "asc" }, select: { id: true, code: true, name: true } });
   const visible = properties.filter((p) => can(user, "read", "M29", { propertyId: p.id }));
   const firstAssigned = user.propertyIds.length > 0 ? properties.find((p) => p.id === user.propertyIds[0]) ?? visible[0] : visible[0];
 

@@ -21,7 +21,7 @@ export default async function NewOwnerPage() {
   }
 
   const buildings = await prisma.building.findMany({
-    where: { ownerId: null },
+    where: { ownerId: null, property: { tenantId: user.tenantId } },
     include: { property: true },
     orderBy: { name: "asc" }
   });

@@ -195,9 +195,23 @@ const GROUPS: Record<SettingsGroupName, GroupDefLike> = { org: ORG, locale: LOCA
 
 export type SettingsGroupName = "org" | "locale" | "billing" | "lateFee" | "retention" | "features" | "reports" | "templates" | "printer" | "telegram" | "menu" | "units" | "table" | "alerts";
 
-async function readGroup<T extends object>(def: GroupDefLike): Promise<T> {
-  const row = await prisma.setting.findUnique({ where: { key: def.key } });
-  if (!row) return { ...def.defaults } as T;
+async function readGroup<T extends object>(def: GroupDefLike, tenantId: string = "DEFAULT"): Promise<T> {
+  const row = await prisma.setting.findUnique({
+    where: { tenantId_key: { tenantId, key: def.key } }
+  });
+  if (!row) {
+    if (def.key === "m28.org" && tenantId && tenantId !== "DEFAULT") {
+      try {
+        const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+        if (tenant) {
+          return { ...def.defaults, name: tenant.name, email: tenant.contactEmail ?? "" } as T;
+        }
+      } catch {
+        // ignore fallback errors
+      }
+    }
+    return { ...def.defaults } as T;
+  }
   try {
     return { ...def.defaults, ...(JSON.parse(row.value) as object) } as T;
   } catch {
@@ -205,14 +219,39 @@ async function readGroup<T extends object>(def: GroupDefLike): Promise<T> {
   }
 }
 
-async function writeGroup<T extends object>(def: GroupDefLike, value: T, actor: ActorRef, ip: string | null, summary: string): Promise<void> {
-  const before = await readGroup(def);
+async function writeGroup<T extends object>(
+  def: GroupDefLike,
+  value: T,
+  actor: ActorRef,
+  ip: string | null,
+  summary: string,
+  tenantId: string = "DEFAULT"
+): Promise<void> {
+  const before = await readGroup(def, tenantId);
   await prisma.setting.upsert({
-    where: { key: def.key },
-    create: { key: def.key, value: JSON.stringify(value), updatedBy: actor.id ?? actor.name },
+    where: { tenantId_key: { tenantId, key: def.key } },
+    create: { tenantId, key: def.key, value: JSON.stringify(value), updatedBy: actor.id ?? actor.name },
     update: { value: JSON.stringify(value), updatedBy: actor.id ?? actor.name }
   });
+
+  // If organization profile is updated, keep the Tenant metadata in sync
+  if (def.key === "m28.org" && tenantId && tenantId !== "DEFAULT") {
+    try {
+      const orgVal = value as OrgSettings;
+      await prisma.tenant.update({
+        where: { id: tenantId },
+        data: {
+          name: orgVal.name,
+          contactEmail: orgVal.email ? orgVal.email.trim().toLowerCase() : null
+        }
+      });
+    } catch {
+      // ignore sync errors if tenant record doesn't exist
+    }
+  }
+
   await logAudit({
+    tenantId,
     actorId: actor.id ?? null,
     actorName: actor.name,
     module: "M28",
@@ -237,7 +276,7 @@ function describeReportPatch(next: ReportSettings): string {
   return parts.join(" · ");
 }
 
-export async function getSettings(): Promise<{
+export async function getSettings(tenantId: string = "DEFAULT"): Promise<{
   org: OrgSettings;
   locale: LocaleSettings;
   billing: BillingSettings;
@@ -255,21 +294,21 @@ export async function getSettings(): Promise<{
   providers: { paymentCredentials: { configured: boolean; last4: string | null }; telegramBotToken: { configured: boolean; last4: string | null } };
 }> {
   const [org, locale, billing, lateFee, retention, features, reportsRaw, templates, printer, telegram, menu, units, table, rentAlerts, providers] = await Promise.all([
-    readGroup<OrgSettings>(ORG),
-    readGroup<LocaleSettings>(LOCALE),
-    readGroup<BillingSettings>(BILLING),
-    readGroup<LateFeeSettings>(LATE_FEE),
-    readGroup<RetentionSettings>(RETENTION),
-    readGroup<FeatureFlags>(FEATURES),
-    readGroup<ReportSettings>(REPORTS),
-    readGroup<TemplateSettings>(TEMPLATES),
-    readGroup<PrinterSettings>(PRINTER),
-    readGroup<TelegramBotSettings>(TELEGRAM_BOT),
-    readGroup<MenuSettings>(MENU),
-    readGroup<UnitsSettings>(UNITS),
-    readGroup<TableSettings>(TABLE),
-    readGroup<RentAlertSettings>(RENT_ALERTS),
-    readGroup<Record<string, string>>(PROVIDERS)
+    readGroup<OrgSettings>(ORG, tenantId),
+    readGroup<LocaleSettings>(LOCALE, tenantId),
+    readGroup<BillingSettings>(BILLING, tenantId),
+    readGroup<LateFeeSettings>(LATE_FEE, tenantId),
+    readGroup<RetentionSettings>(RETENTION, tenantId),
+    readGroup<FeatureFlags>(FEATURES, tenantId),
+    readGroup<ReportSettings>(REPORTS, tenantId),
+    readGroup<TemplateSettings>(TEMPLATES, tenantId),
+    readGroup<PrinterSettings>(PRINTER, tenantId),
+    readGroup<TelegramBotSettings>(TELEGRAM_BOT, tenantId),
+    readGroup<MenuSettings>(MENU, tenantId),
+    readGroup<UnitsSettings>(UNITS, tenantId),
+    readGroup<TableSettings>(TABLE, tenantId),
+    readGroup<RentAlertSettings>(RENT_ALERTS, tenantId),
+    readGroup<Record<string, string>>(PROVIDERS, tenantId)
   ]);
   // Report config is coerced on every read: unknown report/column keys and
   // malformed rows degrade to "no configuration" instead of breaking M26.
@@ -300,10 +339,11 @@ export async function updateSettings(
   group: SettingsGroupName,
   patch: Record<string, unknown>,
   actor: ActorRef,
-  ip: string | null
+  ip: string | null,
+  tenantId: string = "DEFAULT"
 ): Promise<void> {
   const def = GROUPS[group];
-  const current = await readGroup<Record<string, unknown>>(def);
+  const current = await readGroup<Record<string, unknown>>(def, tenantId);
   if (group === "templates") {
     const next: TemplateSettings = { ...(current as TemplateSettings) };
     for (const [k, v] of Object.entries(patch)) {
@@ -312,13 +352,13 @@ export async function updateSettings(
         else next[k] = v.slice(0, 300);
       }
     }
-    await writeGroup(def, next, actor, ip, `Notification templates updated (${Object.keys(patch).join(", ") || "none"})`);
+    await writeGroup(def, next, actor, ip, `Notification templates updated (${Object.keys(patch).join(", ") || "none"})`, tenantId);
     return;
   }
   if (group === "features") {
     const next: FeatureFlags = { ...DEFAULT_FEATURE_FLAGS, ...(current as FeatureFlags), ...(patch as FeatureFlags) };
     for (const k of Object.keys(next)) if (typeof next[k] !== "boolean") delete next[k];
-    await writeGroup(def, next, actor, ip, `Feature flags updated (${Object.keys(patch).join(", ") || "none"})`);
+    await writeGroup(def, next, actor, ip, `Feature flags updated (${Object.keys(patch).join(", ") || "none"})`, tenantId);
     return;
   }
   if (group === "locale" && patch.locale !== undefined && !isLocale(patch.locale)) {
@@ -328,11 +368,11 @@ export async function updateSettings(
     // Only registered report keys/columns survive; everything else is dropped
     // (settings are forward-only and must never break the Reports console).
     const next = normalizeReportSettings({ ...normalizeReportSettings(current), ...patch });
-    await writeGroup(def, next, actor, ip, `Reports configuration updated (${describeReportPatch(next)})`);
+    await writeGroup(def, next, actor, ip, `Reports configuration updated (${describeReportPatch(next)})`, tenantId);
     return;
   }
   const next = { ...current, ...patch };
-  await writeGroup(def, next, actor, ip, `Settings group "${group}" updated (${Object.keys(patch).join(", ")})`);
+  await writeGroup(def, next, actor, ip, `Settings group "${group}" updated (${Object.keys(patch).join(", ")})`, tenantId);
 }
 
 /// Secret-typed provider settings: `m28.providers` holds sealed values only.
@@ -340,17 +380,19 @@ export async function setProviderSecret(
   name: "paymentCredentials" | "telegramBotToken",
   plaintext: string,
   actor: ActorRef,
-  ip: string | null
+  ip: string | null,
+  tenantId: string = "DEFAULT"
 ): Promise<void> {
-  const providers = await readGroup<Record<string, string>>(PROVIDERS);
+  const providers = await readGroup<Record<string, string>>(PROVIDERS, tenantId);
   const before = { [name]: maskSecret(providers[name] ?? null) };
   providers[name] = seal(plaintext);
   await prisma.setting.upsert({
-    where: { key: PROVIDERS.key },
-    create: { key: PROVIDERS.key, value: JSON.stringify(providers), updatedBy: actor.id ?? actor.name },
+    where: { tenantId_key: { tenantId, key: PROVIDERS.key } },
+    create: { tenantId, key: PROVIDERS.key, value: JSON.stringify(providers), updatedBy: actor.id ?? actor.name },
     update: { value: JSON.stringify(providers), updatedBy: actor.id ?? actor.name }
   });
   await logAudit({
+    tenantId,
     actorId: actor.id ?? null,
     actorName: actor.name,
     module: "M28",
@@ -366,8 +408,8 @@ export async function setProviderSecret(
 
 /// Plaintext accessor used by the runtime (Telegram sender, payment provider).
 /// DB value (sealed) wins over the env fallback.
-export async function getProviderSecret(name: "paymentCredentials" | "telegramBotToken"): Promise<string | null> {
-  const row = await prisma.setting.findUnique({ where: { key: PROVIDERS.key } });
+export async function getProviderSecret(name: "paymentCredentials" | "telegramBotToken", tenantId: string = "DEFAULT"): Promise<string | null> {
+  const row = await prisma.setting.findUnique({ where: { tenantId_key: { tenantId, key: PROVIDERS.key } } });
   if (row) {
     try {
       const providers = JSON.parse(row.value) as Record<string, string>;
@@ -379,6 +421,21 @@ export async function getProviderSecret(name: "paymentCredentials" | "telegramBo
       // fall through to env
     }
   }
+  // Fallback to DEFAULT workspace secret before falling back to env var
+  if (tenantId !== "DEFAULT") {
+    const defaultRow = await prisma.setting.findUnique({ where: { tenantId_key: { tenantId: "DEFAULT", key: PROVIDERS.key } } });
+    if (defaultRow) {
+      try {
+        const providers = JSON.parse(defaultRow.value) as Record<string, string>;
+        if (providers[name]) {
+          const plain = open(providers[name]);
+          if (plain !== null) return plain;
+        }
+      } catch {
+        // fall through to env
+      }
+    }
+  }
   if (name === "telegramBotToken") return env.TELEGRAM_BOT_TOKEN;
   if (name === "paymentCredentials") return env.PAYMENT_WEBHOOK_SECRET;
   return null;
@@ -386,18 +443,28 @@ export async function getProviderSecret(name: "paymentCredentials" | "telegramBo
 
 /// §M28 notification templates: the override for an event with {var}
 /// placeholders filled from `vars`, or null when no override is configured.
-export async function getTemplateOverride(event: string, vars: Record<string, string | number>): Promise<string | null> {
-  const templates = await readGroup<TemplateSettings>(TEMPLATES);
+export async function getTemplateOverride(event: string, vars: Record<string, string | number>, tenantId: string = "DEFAULT"): Promise<string | null> {
+  const templates = await readGroup<TemplateSettings>(TEMPLATES, tenantId);
   const tpl = templates[event];
-  if (!tpl) return null;
+  if (!tpl) {
+    // If not found in this workspace, try DEFAULT workspace
+    if (tenantId !== "DEFAULT") {
+      const defaultTemplates = await readGroup<TemplateSettings>(TEMPLATES, "DEFAULT");
+      const defTpl = defaultTemplates[event];
+      if (defTpl) {
+        return defTpl.replace(/\{(\w+)\}/g, (m, key: string) => (key in vars ? String(vars[key]) : m));
+      }
+    }
+    return null;
+  }
   return tpl.replace(/\{(\w+)\}/g, (m, key: string) => (key in vars ? String(vars[key]) : m));
 }
 
-export async function isModuleEnabled(moduleKey: string): Promise<boolean> {
-  const flags = await readGroup<FeatureFlags>(FEATURES);
+export async function isModuleEnabled(moduleKey: string, tenantId: string = "DEFAULT"): Promise<boolean> {
+  const flags = await readGroup<FeatureFlags>(FEATURES, tenantId);
   return flags[moduleKey] !== false;
 }
 
-export async function getFeatureFlags(): Promise<FeatureFlags> {
-  return readGroup<FeatureFlags>(FEATURES);
+export async function getFeatureFlags(tenantId: string = "DEFAULT"): Promise<FeatureFlags> {
+  return readGroup<FeatureFlags>(FEATURES, tenantId);
 }

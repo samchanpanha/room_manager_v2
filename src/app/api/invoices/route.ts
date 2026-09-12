@@ -12,6 +12,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const status = url.searchParams.get("status") ?? undefined;
   const propertyId = url.searchParams.get("propertyId") ?? undefined;
+  const memberProfileId = url.searchParams.get("memberProfileId") ?? undefined;
 
   const scope = await visibleInvoicePropertyIds(user, user.permissions);
   if (scope !== "ALL" && scope.length === 0) return ok({ invoices: [] });
@@ -30,6 +31,7 @@ export async function GET(req: Request) {
     where: {
       ...(status ? { status } : {}),
       ...(propertyId ? { propertyId } : {}),
+      ...(memberProfileId ? { memberProfileId } : {}),
       ...(scope === "ALL" ? {} : scopeArms.length > 0 ? { OR: scopeArms } : { id: { in: [] } })
     },
     include: { member: { include: { party: true } }, property: true, lease: true },
@@ -41,6 +43,7 @@ export async function GET(req: Request) {
       id: i.id,
       code: i.code,
       status: i.status,
+      isDeposit: i.isDeposit,
       member: i.member.party.name,
       propertyCode: i.property.code,
       leaseCode: i.lease?.code ?? null,

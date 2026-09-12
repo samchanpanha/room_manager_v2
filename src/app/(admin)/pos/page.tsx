@@ -16,7 +16,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
 
   const posGrants = user.permissions.filter((p) => p.module === "M14" && p.action === "read");
   const global = posGrants.some((g) => g.scope === "GLOBAL");
-  const visibleProps = global ? (await prisma.property.findMany({ select: { id: true } })).map((p) => p.id) : scopes;
+  const visibleProps = global ? (await prisma.property.findMany({ where: { tenantId: user.tenantId }, select: { id: true } })).map((p) => p.id) : scopes;
 
   // The till operates on ONE property at a time: default to the first property
   // in scope (GLOBAL roles have no assignments, so fall back to any visible
@@ -28,7 +28,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
     orderBy: { code: "asc" }
   })) as Array<{ id: string; code: string; name: string }>;
   const selectedProperty = properties.find((p) => p.id === sp.propertyId) ?? properties[0] ?? null;
-  const propertyScope = selectedProperty ? { propertyId: selectedProperty.id } : visibleProps.length > 0 ? { propertyId: { in: visibleProps } } : {};
+  const propertyScope = selectedProperty ? { propertyId: selectedProperty.id } : visibleProps.length > 0 ? { propertyId: { in: visibleProps } } : { propertyId: "__none__" };
 
   const sessions = await prisma.posSession.findMany({
     where: propertyScope,
@@ -55,7 +55,12 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
     .concat(categoryLabels)
     .filter((v, i, arr) => arr.indexOf(v) === i)
     .sort((a, b) => a.localeCompare(b));
-  const members = await prisma.memberProfile.findMany({ where: { status: { in: ["active", "verified", "notice"] } }, include: { party: true }, orderBy: { id: "asc" }, take: 100 });
+  const members = await prisma.memberProfile.findMany({
+    where: { party: { tenantId: user.tenantId }, status: { in: ["active", "verified", "notice"] } },
+    include: { party: true },
+    orderBy: { id: "asc" },
+    take: 100
+  });
   const visibleMembers = members.filter((m) => !m.homePropertyId || scopes.length === 0 || scopes.includes(m.homePropertyId));
 
   const canWrite = can(user, "create", "M14");

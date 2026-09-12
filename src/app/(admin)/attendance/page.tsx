@@ -21,7 +21,7 @@ export default async function AttendancePage() {
   // GLOBAL readers see every property; otherwise their assignments (§5 scope).
   const globalRead = can(user, "read", "M23");
   const properties = await prisma.property.findMany({
-    where: globalRead ? { status: "active" } : { id: { in: user.propertyIds.length > 0 ? user.propertyIds : ["—"] } },
+    where: globalRead ? { status: "active", tenantId: user.tenantId } : { id: { in: user.propertyIds.length > 0 ? user.propertyIds : ["—"] } },
     select: { id: true, code: true, name: true },
     orderBy: { code: "asc" }
   });
@@ -56,7 +56,7 @@ export default async function AttendancePage() {
 
   const canUpdate = can(user, "update", "M23");
   const staff = canUpdate
-    ? await prisma.user.findMany({ where: { status: "active" }, select: { id: true, name: true, email: true }, orderBy: { name: "asc" } })
+    ? await prisma.user.findMany({ where: { status: "active", tenantId: user.tenantId }, select: { id: true, name: true, email: true }, orderBy: { name: "asc" } })
     : [];
   const firstProp = propIds[0] ?? null;
   void MIN;

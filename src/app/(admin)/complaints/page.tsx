@@ -31,6 +31,7 @@ export default async function ComplaintsPage() {
   const isGlobal = grants.some((g) => g.scope === "GLOBAL");
 
   const complaints = await prisma.complaint.findMany({
+    where: { property: { tenantId: user.tenantId } },
     include: { member: { include: { party: true } }, comments: { orderBy: { createdAt: "asc" } }, ticket: { select: { code: true } } },
     orderBy: { createdAt: "desc" },
     take: 200
@@ -40,7 +41,7 @@ export default async function ComplaintsPage() {
     return ownMemberId != null && c.memberProfileId === ownMemberId;
   });
 
-  const members = await prisma.memberProfile.findMany({ include: { party: true }, orderBy: { id: "asc" } });
+  const members = await prisma.memberProfile.findMany({ where: { party: { tenantId: user.tenantId } }, include: { party: true }, orderBy: { id: "asc" } });
   const visibleMembers = members.filter((m) => isGlobal || (m.homePropertyId && user.propertyIds.includes(m.homePropertyId)) || m.id === ownMemberId);
 
   return (

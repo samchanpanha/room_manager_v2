@@ -30,7 +30,11 @@ let runnable = false;
 const THRESHOLD_KEY = "expenses.approvalThresholdMinor";
 
 async function setThreshold(value: string): Promise<void> {
-  await prisma.setting.upsert({ where: { key: THRESHOLD_KEY }, create: { key: THRESHOLD_KEY, value }, update: { value } });
+  await prisma.setting.upsert({
+    where: { tenantId_key: { tenantId: "DEFAULT", key: THRESHOLD_KEY } },
+    create: { tenantId: "DEFAULT", key: THRESHOLD_KEY, value },
+    update: { value }
+  });
 }
 
 const accountDelta = async (code: string) => {
@@ -215,7 +219,7 @@ describe("M20 expenses flow", () => {
     expect(r.ok).toBe(true);
     if (!r.ok || !r.data) return;
     const seeded = await prisma.recurringExpense.findFirstOrThrow({ where: { propertyId, vendorName: "Orange Fibre" } });
-    const thresholdBefore = await prisma.setting.findUniqueOrThrow({ where: { key: THRESHOLD_KEY } });
+    const thresholdBefore = await prisma.setting.findUniqueOrThrow({ where: { tenantId_key: { tenantId: "DEFAULT", key: THRESHOLD_KEY } } });
     await setThreshold("99999999"); // force auto-approval on materialization
     const first = await runRecurring(r.data.id, actor);
     expect(first.ok).toBe(true);

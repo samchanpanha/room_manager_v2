@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/misc";
 import { requireMember, memberOpenInvoices } from "@/lib/portal";
 import { getT } from "@/lib/locale-server";
+import { PayAllPanel } from "./pay-all-panel";
 
 const money = (minor: number) => `$${(minor / 100).toFixed(2)}`;
 
@@ -18,10 +19,23 @@ const STATUS_VARIANT: Record<string, "success" | "warning" | "destructive" | "se
 export default async function PortalInvoicesPage() {
   const [{ member }, { tUi }] = await Promise.all([requireMember(), getT()]);
   const invoices = await memberOpenInvoices(member.id);
+  const totalDueMinor = invoices.reduce((s, i) => s + i.amountDueMinor, 0);
 
   return (
     <div className="space-y-4">
       <h1 className="text-lg font-semibold tracking-tight">{tUi("Rent & invoices")}</h1>
+      {invoices.length > 0 ? (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">
+              {tUi("Total outstanding")} · {money(totalDueMinor)} · {invoices.length} {tUi("open invoice(s)")}
+            </p>
+            <div className="mt-2">
+              <PayAllPanel totalMinor={totalDueMinor} />
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
       {invoices.length === 0 ? (
         <EmptyState title="Nothing due" hint="Open invoices appear here when they are issued." />
       ) : (

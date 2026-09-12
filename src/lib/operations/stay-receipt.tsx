@@ -18,7 +18,8 @@ export async function buildStayReceiptBytes(bookingId: string, copies = 1): Prom
     }
   });
   if (!booking) throw new Error("Booking not found");
-  const { org, printer, locale } = await getSettings();
+  const tenantId = booking.room.floor.building.property.tenantId ?? "DEFAULT";
+  const { org, printer, locale } = await getSettings(tenantId);
   const payMethods = new Set<string>();
   let paidMinor = 0;
   let depositAppliedMinor = 0;

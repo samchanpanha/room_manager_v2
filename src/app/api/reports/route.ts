@@ -16,7 +16,7 @@ export async function GET() {
   if (!hasModuleAccess(user, "read", "M26")) return fail(403, "FORBIDDEN", "Missing permission M26:read");
   const scope = await reportScope(user);
   if (!scope.allowed) return fail(403, "FORBIDDEN", "No reporting scope");
-  const { reports: reportSettings } = await getSettings();
+  const { reports: reportSettings } = await getSettings(user.tenantId);
   const allowed = new Set(resolveReportKeys(visibleReportKeys(user), reportSettings, user.id));
   return ok({
     scope: { global: scope.global, propertyIds: scope.propertyIds, ownerOnly: Boolean(scope.ownerProfileId) },

@@ -25,7 +25,8 @@ export const PART_LABELS = {
   "10-troubleshooting": "Troubleshooting",
   "11-faq": "FAQ",
   "12-glossary": "Glossary",
-  "13-golden-paths": "Golden Paths & Scenarios"
+  "13-golden-paths": "Golden Paths & Scenarios",
+  "14-move-out-settlement-guide": "Move-Out Settlement Guide"
 };
 
 export const UI = {

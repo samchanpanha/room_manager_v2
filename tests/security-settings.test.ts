@@ -203,7 +203,7 @@ describe("M28 settings (audited, forward-only, sealed secrets)", () => {
     const settings = await getSettings();
     expect(settings.providers.telegramBotToken).toEqual({ configured: true, last4: "7654" });
 
-    const raw = await prisma.setting.findUniqueOrThrow({ where: { key: "m28.providers" } });
+    const raw = await prisma.setting.findUniqueOrThrow({ where: { tenantId_key: { tenantId: "DEFAULT", key: "m28.providers" } } });
     expect(raw.value).not.toContain(secretValue); // never plaintext at rest
 
     const audit = await prisma.auditLog.findFirstOrThrow({
@@ -213,7 +213,7 @@ describe("M28 settings (audited, forward-only, sealed secrets)", () => {
     expect(audit.summary).not.toContain(secretValue);
     expect(JSON.stringify(audit.after ?? "")).not.toContain(secretValue);
 
-    await prisma.setting.delete({ where: { key: "m28.providers" } });
+    await prisma.setting.delete({ where: { tenantId_key: { tenantId: "DEFAULT", key: "m28.providers" } } });
     expect(await getProviderSecret("telegramBotToken")).toBe(process.env.TELEGRAM_BOT_TOKEN ?? "dev-telegram-token"); // env fallback
   });
 });
@@ -464,8 +464,8 @@ describe("M28 settings → engine wiring (settings actually drive behaviour)", (
 
   it("the legacy org.profile key no longer feeds M28 reads (single source of truth)", async () => {
     await prisma.setting.upsert({
-      where: { key: "org.profile" },
-      create: { key: "org.profile", value: JSON.stringify({ name: "LEGACY NAME" }), updatedBy: "test" },
+      where: { tenantId_key: { tenantId: "DEFAULT", key: "org.profile" } },
+      create: { tenantId: "DEFAULT", key: "org.profile", value: JSON.stringify({ name: "LEGACY NAME" }), updatedBy: "test" },
       update: { value: JSON.stringify({ name: "LEGACY NAME" }) }
     });
     expect((await getSettings()).org.name).not.toBe("LEGACY NAME"); // m28.org wins

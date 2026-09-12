@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -36,6 +36,25 @@ interface ItemRow {
   severity?: string;
   note?: string;
 }
+
+interface TemplateOption {
+  id: string;
+  name: string;
+  roomType: string;
+  sections: Array<{ title: string; items: string[] }>;
+}
+
+const STANDARD_LIBRARY: Record<string, string[]> = {
+  "Door & locks": ["Door closes and locks", "Keys / access cards handed over", "Door peephole intact", "Deadbolt functional"],
+  "Walls & ceiling": ["Walls clean, no holes", "Ceiling no leaks / stains", "Paint condition acceptable", "Baseboards intact"],
+  "Windows": ["Windows open/close smoothly", "Screens intact", "Locks work properly", "Curtains/blinds clean and intact"],
+  "Electrical": ["Lights work", "Outlets work", "Breaker panel labeled", "Switches functional"],
+  "Water & fixtures": ["No leaks under sinks", "Toilet flush + seal", "Shower pressure & drain", "Water heater works", "Faucets working"],
+  "Furniture & floor": ["Floor clean, no damage", "Furniture inventory complete", "Bed/mattress condition", "Desk & chair condition"],
+  "Safety": ["Smoke detector works", "Extinguisher present & charged", "Escape route unobstructed"],
+  "Appliances & AC": ["A/C cools and drains", "Remote controller working", "Mini-fridge clean and cools", "Microwave works"],
+  "Metering": ["Electric meter reading recorded", "Water meter reading recorded"]
+};
 
 export function InspectionActions({ mode, leases = [], inspection, findings = [], canUpdate, canApproveDeduction }: Props) {
   const router = useRouter();
@@ -168,9 +187,71 @@ function CompleteDialog({ busy, onDone }: { busy: boolean; onDone: (items: ItemR
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<ItemRow[]>([]);
   const [note, setNote] = useState("");
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [selectedLibrarySection, setSelectedLibrarySection] = useState<string>("Door & locks");
+
+  // Load available templates from DB
+  useEffect(() => {
+    if (open) {
+      void fetch("/api/inspections/templates")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.templates && Array.isArray(data.templates)) {
+            const list: TemplateOption[] = data.templates.map(
+              (t: { id: string; name: string; roomType: string; sections: unknown }) => ({
+                id: t.id,
+                name: t.name,
+                roomType: t.roomType,
+                sections: typeof t.sections === "string" ? JSON.parse(t.sections) : (t.sections as Array<{ title: string; items: string[] }>) || []
+              })
+            );
+            setTemplates(list);
+            setSelectedTemplateId((prev) => prev || (list[0]?.id ?? ""));
+          }
+        })
+        .catch(() => undefined);
+    }
+  }, [open]);
 
   function update(ix: number, patch: Partial<ItemRow>) {
     setRows((r) => r.map((row, i) => (i === ix ? { ...row, ...patch } : row)));
+  }
+
+  // Load chosen template into checklist
+  function loadFromTemplate() {
+    const tpl = templates.find((t) => t.id === selectedTemplateId);
+    if (!tpl || !tpl.sections) return;
+
+    const newItems: ItemRow[] = [];
+    for (const sec of tpl.sections) {
+      for (const it of sec.items || []) {
+        newItems.push({
+          section: sec.title || "General",
+          item: it,
+          result: "pass"
+        });
+      }
+    }
+
+    if (newItems.length > 0) {
+      setRows(newItems);
+    }
+  }
+
+  // Add all items from a library section
+  function addFromLibrarySection(secName: string) {
+    const items = STANDARD_LIBRARY[secName] || [];
+    const newItems: ItemRow[] = items.map((it) => ({
+      section: secName,
+      item: it,
+      result: "pass"
+    }));
+    setRows((prev) => [...prev, ...newItems]);
+  }
+
+  function markAll(res: "pass" | "fail" | "na") {
+    setRows((r) => r.map((row) => ({ ...row, result: res })));
   }
 
   return (
@@ -185,82 +266,207 @@ function CompleteDialog({ busy, onDone }: { busy: boolean; onDone: (items: ItemR
         description="Capture each item (pass / fail / NA). Failed items become findings — mark severity and add a note."
         wide
       >
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setRows((r) => [...r, { section: "General", item: "", result: "pass" }])}
-            >
-              + Add checklist item
-            </Button>
-            {rows.length === 0 ? <p className="text-xs text-muted-foreground"><Tx>Add the checklist items you are capturing (mobile-friendly one-per-row).</Tx></p> : null}
-            {rows.map((row, ix) => (
-              <div key={ix} className="grid gap-2 rounded-md border p-2 sm:grid-cols-12">
-                <Input
-                  className="sm:col-span-4"
-                  placeholder="Section"
-                  value={row.section}
-                  onChange={(e) => update(ix, { section: e.target.value })}
-                />
-                <Input
-                  className="sm:col-span-4"
-                  placeholder="Item (e.g. Door locks)"
-                  value={row.item}
-                  onChange={(e) => update(ix, { item: e.target.value })}
-                  required
-                />
-                <Select className="sm:col-span-2" value={row.result} onChange={(e) => update(ix, { result: e.target.value as ItemRow["result"] })}>
-                  <option value="pass"><Tx>pass</Tx></option>
-                  <option value="fail"><Tx>fail</Tx></option>
-                  <option value="na"><Tx>n/a</Tx></option>
+        <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
+          {/* Top Template / Library Selector Bar */}
+          <div className="rounded-lg border bg-muted/40 p-3.5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                <Tx>Load Checklist Template / Preset</Tx>
+              </span>
+              <div className="flex gap-1.5">
+                <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => markAll("pass")}>
+                  <Tx>✓ Mark All Pass</Tx>
+                </Button>
+                <Button type="button" variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => setRows([])}>
+                  <Tx>Clear</Tx>
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-12 items-center">
+              <div className="sm:col-span-8 flex gap-2">
+                <Select
+                  value={selectedTemplateId}
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  className="h-8 text-xs"
+                >
+                  {templates.length === 0 ? (
+                    <option value="">Default Standard Condition Template</option>
+                  ) : (
+                    templates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({t.roomType}) — {t.sections.reduce((s, sec) => s + (sec.items?.length || 0), 0)} items
+                      </option>
+                    ))
+                  )}
                 </Select>
-                {row.result === "fail" ? (
-                  <Select className="sm:col-span-2" value={row.severity ?? "minor"} onChange={(e) => update(ix, { severity: e.target.value })}>
-                    <option value="minor"><Tx>minor</Tx></option>
-                    <option value="major"><Tx>major</Tx></option>
-                    <option value="critical"><Tx>critical</Tx></option>
-                  </Select>
-                ) : (
-                  <div className="sm:col-span-2" />
-                )}
-                {row.result === "fail" ? (
-                  <Textarea
-                    className="sm:col-span-12"
-                    rows={2}
-                    maxLength={500}
-                    placeholder="Finding note (what exactly is damaged)"
-                    value={row.note ?? ""}
-                    onChange={(e) => update(ix, { note: e.target.value })}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 text-xs shrink-0"
+                  onClick={loadFromTemplate}
+                  disabled={templates.length === 0 && !selectedTemplateId}
+                >
+                  <Tx>📋 Load Template</Tx>
+                </Button>
+              </div>
+
+              <div className="sm:col-span-4 flex gap-1.5">
+                <Select
+                  value={selectedLibrarySection}
+                  onChange={(e) => setSelectedLibrarySection(e.target.value)}
+                  className="h-8 text-xs"
+                >
+                  {Object.keys(STANDARD_LIBRARY).map((sec) => (
+                    <option key={sec} value={sec}>
+                      + {sec}
+                    </option>
+                  ))}
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs shrink-0"
+                  onClick={() => addFromLibrarySection(selectedLibrarySection)}
+                >
+                  <Tx>Add</Tx>
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Checklist Items Table / List */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground">
+                <Tx>Checklist Items</Tx> ({rows.length})
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setRows((r) => [...r, { section: "General", item: "", result: "pass" }])}
+              >
+                + <Tx>Add custom row</Tx>
+              </Button>
+            </div>
+
+            {rows.length === 0 ? (
+              <div className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
+                <p><Tx>No checklist items loaded yet. Select a template above or add items from the library.</Tx></p>
+              </div>
+            ) : null}
+
+            {rows.map((row, ix) => (
+              <div key={ix} className={`grid gap-2 rounded-md border p-2.5 sm:grid-cols-12 items-center ${row.result === "fail" ? "border-destructive/40 bg-destructive/5" : "bg-card"}`}>
+                <div className="sm:col-span-3">
+                  <Input
+                    className="h-8 text-xs font-medium"
+                    placeholder="Section"
+                    value={row.section}
+                    onChange={(e) => update(ix, { section: e.target.value })}
                   />
-                ) : null}
-                <div className="sm:col-span-12 text-right">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setRows((r) => r.filter((_, i) => i !== ix))}>
-                    Remove
+                </div>
+
+                <div className="sm:col-span-5">
+                  <Input
+                    className="h-8 text-xs"
+                    placeholder="Item (e.g. Door locks)"
+                    value={row.item}
+                    onChange={(e) => update(ix, { item: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <Select
+                    className="h-8 text-xs font-semibold"
+                    value={row.result}
+                    onChange={(e) => update(ix, { result: e.target.value as ItemRow["result"] })}
+                  >
+                    <option value="pass">✓ PASS</option>
+                    <option value="fail">✗ FAIL</option>
+                    <option value="na">— N/A</option>
+                  </Select>
+                </div>
+
+                <div className="sm:col-span-2 flex items-center justify-between gap-1">
+                  {row.result === "fail" ? (
+                    <Select
+                      className="h-8 text-xs border-destructive text-destructive font-medium"
+                      value={row.severity ?? "minor"}
+                      onChange={(e) => update(ix, { severity: e.target.value })}
+                    >
+                      <option value="minor">minor</option>
+                      <option value="major">major</option>
+                      <option value="critical">critical</option>
+                    </Select>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground pl-1">ok</span>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive shrink-0"
+                    onClick={() => setRows((r) => r.filter((_, i) => i !== ix))}
+                  >
+                    ✕
                   </Button>
                 </div>
+
+                {row.result === "fail" ? (
+                  <div className="sm:col-span-12 pt-1">
+                    <Textarea
+                      className="text-xs"
+                      rows={2}
+                      maxLength={500}
+                      placeholder="Finding note — describe the damage/defect (e.g. Lock cylinder jammed, needs replacement)"
+                      value={row.note ?? ""}
+                      onChange={(e) => update(ix, { note: e.target.value })}
+                      required
+                    />
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="insp-summary">Summary note</Label>
-            <Textarea id="insp-summary" rows={2} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} placeholder="optional" />
+
+          <div className="space-y-1.5 pt-2 border-t">
+            <Label htmlFor="insp-summary"><Tx>Inspection Summary Note</Tx></Label>
+            <Textarea
+              id="insp-summary"
+              rows={2}
+              maxLength={500}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. Move-out condition verified in good standing; minor wear noted."
+            />
           </div>
-          <div className="flex justify-end gap-2">
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Keep as draft
+              <Tx>Keep as draft</Tx>
             </Button>
             <Button
               disabled={busy || rows.length === 0 || rows.some((r) => !r.item.trim())}
               onClick={() =>
                 void onDone(
-                  rows.map((r) => ({ ...r, section: r.section.trim() || "General", item: r.item.trim(), note: r.note?.trim() || undefined, severity: r.result === "fail" ? (r.severity ?? "minor") : undefined })),
+                  rows.map((r) => ({
+                    ...r,
+                    section: r.section.trim() || "General",
+                    item: r.item.trim(),
+                    note: r.note?.trim() || undefined,
+                    severity: r.result === "fail" ? (r.severity ?? "minor") : undefined
+                  })),
                   note
                 ).then(() => setOpen(false))
               }
             >
-              Complete inspection
+              <Tx>Complete inspection</Tx> ({rows.length} <Tx>items</Tx>)
             </Button>
           </div>
         </div>

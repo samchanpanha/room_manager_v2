@@ -28,6 +28,7 @@ function asUser(roles: string[], propertyIds: string[] = [], isSuperAdmin = fals
     name: "Test",
     email: "t@t",
     partyId: null,
+    tenantId: "DEFAULT",
     roles,
     sessionId: "s",
     isSuperAdmin,

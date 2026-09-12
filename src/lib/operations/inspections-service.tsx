@@ -191,7 +191,8 @@ export async function fileInspectionPdf(inspectionId: string): Promise<void> {
     }
   });
   if (!inspection) throw new Error("Inspection not found");
-  const { org } = await getSettings();
+  const tenantId = inspection.property.tenantId ?? "DEFAULT";
+  const { org } = await getSettings(tenantId);
 
   const parsed = (() => {
     try {

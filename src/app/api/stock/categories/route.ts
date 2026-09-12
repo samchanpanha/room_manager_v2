@@ -17,7 +17,7 @@ export async function GET() {
   if (!user) return fail(401, "UNAUTHENTICATED", "Sign in required");
   if (!hasModuleAccess(user, "read", "M15")) return fail(403, "FORBIDDEN", "Missing permission M15:read");
   const grants = user.permissions.filter((p) => p.module === "M15" && p.action === "read");
-  const scoped = [...new Set(grants.some((g) => g.scope === "GLOBAL") ? (await prisma.property.findMany({ select: { id: true } })).map((p) => p.id) : user.propertyIds)];
+  const scoped = [...new Set(grants.some((g) => g.scope === "GLOBAL") ? (await prisma.property.findMany({ where: { tenantId: user.tenantId }, select: { id: true } })).map((p) => p.id) : user.propertyIds)];
   const categories = await prisma.stockCategory.findMany({
     where: { OR: [{ propertyId: null }, { propertyId: { in: scoped } }] },
     select: { id: true, name: true, parentId: true, propertyId: true, sortOrder: true, isActive: true, _count: { select: { stockItems: true, products: true, children: true } } },

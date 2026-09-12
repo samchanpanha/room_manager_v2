@@ -17,24 +17,24 @@ export default async function StockPage() {
   const scopes = [...new Set(user.propertyIds)];
   const grants = user.permissions.filter((p) => p.module === "M15" && p.action === "read");
   const global = grants.some((g) => g.scope === "GLOBAL");
-  const visibleProps = global ? (await prisma.property.findMany({ select: { id: true } })).map((p) => p.id) : scopes;
+  const visibleProps = global ? (await prisma.property.findMany({ where: { tenantId: user.tenantId }, select: { id: true } })).map((p) => p.id) : scopes;
 
   const [items, suppliers, properties, movements, stocktakes, categories, settings] = await Promise.all([
     prisma.stockItem.findMany({
-      where: visibleProps.length > 0 ? { propertyId: { in: visibleProps } } : {},
+      where: visibleProps.length > 0 ? { propertyId: { in: visibleProps } } : { id: { in: [] } },
       include: { supplier: true, property: true },
       orderBy: { name: "asc" }
     }),
     prisma.supplier.findMany({ orderBy: { name: "asc" } }),
-    prisma.property.findMany({ select: { id: true, code: true }, orderBy: { code: "asc" } }),
+    prisma.property.findMany({ where: { tenantId: user.tenantId }, select: { id: true, code: true }, orderBy: { code: "asc" } }),
     prisma.stockMovement.findMany({
-      where: visibleProps.length > 0 ? { stockItem: { propertyId: { in: visibleProps } } } : {},
+      where: visibleProps.length > 0 ? { stockItem: { propertyId: { in: visibleProps } } } : { id: { in: [] } },
       include: { stockItem: true, sale: true },
       orderBy: { createdAt: "desc" },
       take: 25
     }),
     prisma.stocktake.findMany({
-      where: visibleProps.length > 0 ? { propertyId: { in: visibleProps } } : {},
+      where: visibleProps.length > 0 ? { propertyId: { in: visibleProps } } : { id: { in: [] } },
       include: { lines: { include: { stockItem: true } } },
       orderBy: { createdAt: "desc" },
       take: 5
@@ -52,11 +52,15 @@ export default async function StockPage() {
       },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }]
     }),
-    getSettings()
+    getSettings(user.tenantId)
   ]);
 
   const canWrite = can(user, "create", "M15") || can(user, "update", "M15");
-  const tickets = await prisma.maintenanceTicket.findMany({ where: { status: { in: ["open", "assigned", "in_progress"] } }, orderBy: { code: "asc" }, take: 30 });
+  const tickets = await prisma.maintenanceTicket.findMany({
+    where: { property: { tenantId: user.tenantId }, status: { in: ["open", "assigned", "in_progress"] } },
+    orderBy: { code: "asc" },
+    take: 30
+  });
   const canWriteTickets = can(user, "update", "M19");
 
   return (

@@ -44,7 +44,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ key: string }> 
 
   // Optional org configuration applies to exports exactly as it does on screen:
   // develop/assign gating first, then the design (title/description/columns).
-  const { reports: reportSettings } = await getSettings();
+  const { reports: reportSettings } = await getSettings(user.tenantId);
   if (!resolveReportKeys([key], reportSettings, user.id).includes(key)) {
     return fail(403, "FORBIDDEN", "This report is not enabled or assigned for your account");
   }

@@ -30,7 +30,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const g = await authorize("read", "M05", { propertyId: lease.propertyId });
   if (g.response) return g.response;
 
-  const { locale } = await getSettings();
+  const tenantId = lease.room.floor.building.property.tenantId ?? g.user.tenantId;
+  const { locale } = await getSettings(tenantId);
   const currency = locale.currency ?? "USD";
 
   const data = {

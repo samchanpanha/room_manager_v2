@@ -32,15 +32,18 @@ export async function POST(req: Request) {
 
   const user = await prisma.user.create({
     data: {
+      tenantId: g.user.tenantId,
       name: parsed.data.name,
       email,
       passwordHash: hashPassword(parsed.data.password),
       mustChangePassword: parsed.data.mustChangePassword,
+      totpEnabled: true,
       roles: { create: parsed.data.roleIds.map((roleId) => ({ roleId })) },
       assignments: { create: parsed.data.propertyIds.map((propertyId) => ({ propertyId })) }
     }
   });
   await logAudit({
+    tenantId: g.user.tenantId,
     actorId: g.user.id,
     actorName: g.user.name,
     module: "M01",

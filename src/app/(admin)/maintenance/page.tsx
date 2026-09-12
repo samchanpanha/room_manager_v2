@@ -39,6 +39,7 @@ export default async function MaintenancePage() {
       : [];
 
   const tickets = await prisma.maintenanceTicket.findMany({
+    where: { property: { tenantId: user.tenantId } },
     include: { room: true, member: { include: { party: true } }, costs: true },
     orderBy: { createdAt: "desc" },
     take: 200
@@ -49,12 +50,16 @@ export default async function MaintenancePage() {
   });
 
   const activeLeases = await prisma.lease.findMany({
-    where: { status: "active" },
+    where: { status: "active", property: { tenantId: user.tenantId } },
     include: { member: { include: { party: true } }, room: true },
     orderBy: { code: "asc" }
   });
   const visibleLeases = activeLeases.filter((l) => isGlobal || user.propertyIds.includes(l.propertyId) || l.memberProfileId === ownMemberId);
-  const rooms = await prisma.room.findMany({ include: { floor: { include: { building: { include: { property: true } } } } }, orderBy: { number: "asc" } });
+  const rooms = await prisma.room.findMany({
+    where: { floor: { building: { property: { tenantId: user.tenantId } } } },
+    include: { floor: { include: { building: { include: { property: true } } } } },
+    orderBy: { number: "asc" }
+  });
   const visibleRooms = rooms.filter((r) => isGlobal || user.propertyIds.includes(r.floor.building.propertyId));
 
   return (

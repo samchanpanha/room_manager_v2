@@ -20,8 +20,8 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
   if (!user) notFound();
 
   const ownerLink = await getOwnerLinkForUser(user);
-  let property = await prisma.property.findUnique({
-    where: { id },
+  let property = await prisma.property.findFirst({
+    where: { id, tenantId: user.tenantId },
     include: {
       buildings: {
         orderBy: { createdAt: "asc" },

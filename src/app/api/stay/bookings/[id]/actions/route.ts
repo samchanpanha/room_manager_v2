@@ -50,7 +50,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       const r = await checkOutBooking(id, { payMethod: parsed.data.payMethod, depositMethod: parsed.data.depositMethod, extendTo: parsed.data.extendTo ? new Date(parsed.data.extendTo) : undefined }, actor, ip);
       if (!r.ok) return fail(400, r.code, r.message);
       // §M28 printer flow: tell the UI how to print the checkout receipt.
-      const { printer } = await getSettings();
+      const { printer } = await getSettings(user.tenantId);
       fileStayReceipt(id).catch(() => undefined);
       return ok({
         ...r.data,

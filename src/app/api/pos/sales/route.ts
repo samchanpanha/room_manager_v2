@@ -76,7 +76,7 @@ export async function POST(req: Request) {
   }
 
   // §M28 printer flow: tell the POS terminal how to print after the sale.
-  const { printer } = await getSettings();
+  const { printer } = await getSettings(user.tenantId);
   const productIds = parsed.data.lines.map((l) => l.productId);
   const hasBarcoded = productIds.length > 0
     ? await prisma.posProduct.findFirst({ where: { id: { in: productIds }, barcode: { not: null } }, select: { id: true } })

@@ -3,10 +3,14 @@ import { getAuthUser } from "@/lib/auth/session";
 import { can, hasModuleAccess } from "@/lib/rbac/can";
 import { prisma } from "@/lib/db";
 import { confirmPayment } from "@/lib/payments/service";
+import { completeUrgentSettlementAfterPayment } from "@/lib/leases/urgent-settlement";
+
+const URGENT_QR_PREFIX = "URGENT:";
 
 /// Manual confirmation (cash collected at the desk, cheque cleared, …).
 /// PROPERTY-scoped staff may confirm only payments on their properties;
 /// refunds remain Accountant+ only. Idempotent — double confirms are no-ops.
+/// Confirming a QR-first urgent-settlement payment also closes the lease.
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const user = await getAuthUser();
@@ -23,6 +27,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (!result.ok) {
     const status = result.code === "NOT_FOUND" ? 404 : result.code === "INVALID_TRANSITION" ? 422 : 400;
     return fail(status, result.code, result.message);
+  }
+  if (payment.gatewayRef?.startsWith(URGENT_QR_PREFIX)) {
+    await completeUrgentSettlementAfterPayment(id, { id: user.id, name: user.name }, clientIp(req)).catch(() => undefined);
   }
   return ok(result);
 }

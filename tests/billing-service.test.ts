@@ -47,6 +47,10 @@ beforeAll(async () => {
   // stale copy (InvoiceItems cascade with their invoice; credit notes first).
   await prisma.creditNote.deleteMany();
   await prisma.invoiceItem.deleteMany();
+  await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "payment_allocation_no_delete" ON "PaymentAllocation"`);
+  await prisma.paymentAllocation.deleteMany();
+  await prisma.$executeRawUnsafe(`CREATE TRIGGER "payment_allocation_no_delete" BEFORE DELETE ON "PaymentAllocation" FOR EACH ROW EXECUTE FUNCTION reject_append_only('Payment allocations are append-only')`);
+  await prisma.deposit.updateMany({ data: { invoiceId: null } });
   await prisma.invoice.deleteMany();
   await prisma.numberSequence.deleteMany({
     where: { OR: [{ key: { startsWith: "INV:" } }, { key: "CREDITNOTE" }] }
@@ -55,6 +59,7 @@ beforeAll(async () => {
   await prisma.auditLog.deleteMany({
     where: { entityType: { in: ["invoice", "invoice_status", "invoice_late_fee", "invoice_dunning", "credit_note"] } }
   });
+  await prisma.lease.updateMany({ where: { code: "LSE-0001" }, data: { status: "active" } });
   await prisma.domainEvent.deleteMany({
     where: {
       type: {

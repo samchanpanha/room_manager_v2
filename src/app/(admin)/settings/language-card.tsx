@@ -16,7 +16,7 @@ import { Tx } from "@/components/i18n-text";
 ///   2. the PER-BROWSER choice (`rm-locale` cookie) — what this device shows,
 ///      set by the header switcher or by "Apply to my browser" below.
 /// Resolution is cookie → org default → English (src/lib/locale-server.ts).
-export function LanguageCard({ orgDefault, canWrite }: { orgDefault: string; canWrite: boolean }) {
+export function LanguageCard({ orgDefault, canWrite, tenantId }: { orgDefault: string; canWrite: boolean; tenantId?: string }) {
   const router = useRouter();
   const { push } = useToast();
   const { locale, tUi } = useT();
@@ -31,7 +31,7 @@ export function LanguageCard({ orgDefault, canWrite }: { orgDefault: string; can
     const res = await fetch("/api/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ group: "locale", patch: { locale: selected } })
+      body: JSON.stringify({ group: "locale", patch: { locale: selected }, tenantId })
     });
     const data = (await res.json().catch(() => ({}))) as { message?: string };
     setBusy(false);

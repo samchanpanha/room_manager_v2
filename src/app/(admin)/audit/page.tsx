@@ -30,6 +30,7 @@ export default async function AuditPage({
   const page = Math.max(1, Number(sp.page ?? "1") || 1);
 
   const where: Prisma.AuditLogWhereInput = {
+    tenantId: user.tenantId,
     ...(sp.module ? { module: sp.module } : {}),
     ...(sp.q ? { OR: [{ actorName: { contains: sp.q, mode: "insensitive" } }, { summary: { contains: sp.q, mode: "insensitive" } }] } : {})
   };

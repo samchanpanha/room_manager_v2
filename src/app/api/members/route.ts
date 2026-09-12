@@ -1,10 +1,91 @@
 import { z } from "zod";
 import { clientIp, fail, ok, parseBody } from "@/lib/api";
 import { authorize } from "@/lib/rbac/guard";
+import { getAuthUser } from "@/lib/auth/session";
+import { hasModuleAccess } from "@/lib/rbac/can";
 import { prisma } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { emitDomainEvent } from "@/lib/events";
 import { toMinor } from "@/lib/money";
+
+export async function GET(req: Request) {
+  const user = await getAuthUser();
+  if (!user) return fail(401, "UNAUTHENTICATED", "Sign in required");
+
+  const canAccess =
+    hasModuleAccess(user, "read", "M02") ||
+    hasModuleAccess(user, "read", "M09") ||
+    hasModuleAccess(user, "create", "M09") ||
+    hasModuleAccess(user, "read", "M05") ||
+    hasModuleAccess(user, "create", "M05") ||
+    hasModuleAccess(user, "read", "M07");
+
+  if (!canAccess) {
+    return fail(403, "FORBIDDEN", "Missing permission to list members");
+  }
+
+  const url = new URL(req.url);
+  const status = url.searchParams.get("status") ?? undefined;
+  const propertyId = url.searchParams.get("propertyId") ?? undefined;
+  const q = url.searchParams.get("q") ?? undefined;
+
+  const members = await prisma.memberProfile.findMany({
+    where: {
+      party: { tenantId: user.tenantId },
+      ...(status ? { status } : {}),
+      ...(propertyId ? { homePropertyId: propertyId } : {}),
+      ...(q
+        ? {
+            OR: [
+              { party: { name: { contains: q, mode: "insensitive" } } },
+              { party: { email: { contains: q, mode: "insensitive" } } },
+              { party: { phone: { contains: q, mode: "insensitive" } } },
+              { idNumber: { contains: q, mode: "insensitive" } }
+            ]
+          }
+        : {})
+    },
+    include: {
+      party: true,
+      homeProperty: true,
+      leases: {
+        where: { status: { in: ["active", "draft"] } },
+        select: {
+          id: true,
+          code: true,
+          status: true,
+          roomId: true,
+          room: { select: { number: true } }
+        },
+        take: 1
+      }
+    },
+    orderBy: { party: { name: "asc" } },
+    take: 300
+  });
+
+  return ok({
+    members: members.map((m) => ({
+      id: m.id,
+      partyId: m.partyId,
+      status: m.status,
+      homePropertyId: m.homePropertyId,
+      propertyCode: m.homeProperty?.code ?? null,
+      party: {
+        id: m.party.id,
+        name: m.party.name,
+        email: m.party.email,
+        phone: m.party.phone
+      },
+      leases: m.leases.map((l) => ({
+        id: l.id,
+        code: l.code,
+        status: l.status,
+        room: l.room ? { number: l.room.number } : null
+      }))
+    }))
+  });
+}
 
 const contactSchema = z.object({
   name: z.string().min(2).max(120),
@@ -48,7 +129,7 @@ export async function POST(req: Request) {
 
   const member = await prisma.$transaction(async (tx) => {
     const party = await tx.party.create({
-      data: { type: "PERSON", name: d.name, email: d.email?.toLowerCase(), phone: d.phone }
+      data: { tenantId: g.user.tenantId, type: "PERSON", name: d.name, email: d.email?.toLowerCase(), phone: d.phone }
     });
     return tx.memberProfile.create({
       data: {
@@ -74,6 +155,7 @@ export async function POST(req: Request) {
   });
 
   await logAudit({
+    tenantId: g.user.tenantId,
     actorId: g.user.id,
     actorName: g.user.name,
     module: "M02",

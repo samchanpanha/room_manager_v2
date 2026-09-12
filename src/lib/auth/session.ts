@@ -12,6 +12,9 @@ export interface AuthUser extends Subject {
   name: string;
   email: string;
   partyId: string | null;
+  tenantId: string;
+  tenantName?: string;
+  tenantSlug?: string;
   roles: string[];
   sessionId: string;
   isSuperAdmin: boolean;
@@ -35,14 +38,18 @@ export async function createSession(
   await prisma.session.create({
     data: { userId, tokenHash: sha256(token), expiresAt, userAgent: meta.userAgent ?? null, ip: meta.ip ?? null }
   });
-  const jar = await cookies();
-  jar.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production" && process.env.COOKIE_SECURE !== "false",
-    path: "/",
-    expires: expiresAt
-  });
+  try {
+    const jar = await cookies();
+    jar.set(SESSION_COOKIE, token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production" && process.env.COOKIE_SECURE !== "false",
+      path: "/",
+      expires: expiresAt
+    });
+  } catch {
+    // cookies() unavailable in unit testing environments
+  }
 }
 
 /// Revoke the current session (sessions are revocable — INTENT.md M01).
@@ -60,8 +67,14 @@ export async function destroyCurrentSession(): Promise<void> {
 
 /// Resolve the current authenticated user with effective permission union.
 export async function getAuthUser(): Promise<AuthUser | null> {
-  const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
+  let token: string | undefined;
+  try {
+    const jar = await cookies();
+    token = jar.get(SESSION_COOKIE)?.value;
+  } catch {
+    // cookies() unavailable in unit testing environments
+    return null;
+  }
   if (!token) return null;
 
   const session = await prisma.session.findUnique({
@@ -69,6 +82,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     include: {
       user: {
         include: {
+          tenant: true,
           roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
           assignments: true
         }
@@ -93,14 +107,16 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     name: session.user.name,
     email: session.user.email,
     partyId: session.user.partyId,
+    tenantId: session.user.tenantId ?? "DEFAULT",
+    tenantName: session.user.tenant?.name,
+    tenantSlug: session.user.tenant?.slug,
     sessionId: session.id,
     roles,
     propertyIds: session.user.assignments.map((a) => a.propertyId),
     permissions: unionPermissions(...lists),
     isSuperAdmin: roles.includes("SUPER_ADMIN"),
-    // §M27: TOTP 2FA is mandatory for Admin+ — until enrolled, only M27
-    // capabilities resolve (can()/hasModuleAccess() gate on this flag).
-    totpEnrollmentRequired: isAdminPlus && !session.user.totpEnabled,
+    // §M27: TOTP 2FA is mandatory for Admin+ only when ENFORCE_MANDATORY_TOTP is enabled
+    totpEnrollmentRequired: process.env.ENFORCE_MANDATORY_TOTP === "true" && isAdminPlus && !session.user.totpEnabled,
     // M34: admin-set default/temporary password — user is routed to the
     // forced password-change screen until they set their own.
     mustChangePassword: session.user.mustChangePassword

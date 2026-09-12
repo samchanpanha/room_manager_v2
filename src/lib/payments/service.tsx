@@ -31,9 +31,47 @@ export interface ActorCtx {
 export const GATEWAY_ACTOR: ActorCtx = { id: "webhook", name: "payment-gateway", auditActorId: null };
 
 async function allocateCode(tx: Tx, key: string, prefix: string, year: number): Promise<string> {
-  await tx.numberSequence.upsert({ where: { key }, create: { key, value: 1 }, update: { value: { increment: 1 } } });
-  const row = await tx.numberSequence.findUniqueOrThrow({ where: { key } });
-  return `${prefix}-${year}-${String(row.value).padStart(4, "0")}`;
+  let maxNum = 0;
+  if (prefix === "RCP") {
+    const receipts = await tx.payment.findMany({
+      where: { receiptCode: { startsWith: `${prefix}-${year}-` } },
+      select: { receiptCode: true },
+      orderBy: { receiptCode: "desc" },
+      take: 100
+    });
+    for (const r of receipts) {
+      if (r.receiptCode) {
+        const m = r.receiptCode.match(/(\d+)$/);
+        if (m && m[1]) {
+          const v = parseInt(m[1], 10);
+          if (v > maxNum && v <= 2_000_000_000) maxNum = v;
+        }
+      }
+    }
+  } else if (prefix === "PMT") {
+    const payments = await tx.payment.findMany({
+      where: { code: { startsWith: `${prefix}-${year}-` } },
+      select: { code: true },
+      orderBy: { code: "desc" },
+      take: 100
+    });
+    for (const p of payments) {
+      const m = p.code.match(/(\d+)$/);
+      if (m && m[1]) {
+        const v = parseInt(m[1], 10);
+        if (v > maxNum && v <= 2_000_000_000) maxNum = v;
+      }
+    }
+  }
+
+  const seq = await tx.numberSequence.findUnique({ where: { key } });
+  const nextVal = Math.max(seq?.value ?? 0, maxNum) + 1;
+  await tx.numberSequence.upsert({
+    where: { key },
+    create: { key, value: nextVal },
+    update: { value: nextVal }
+  });
+  return `${prefix}-${year}-${String(nextVal).padStart(4, "0")}`;
 }
 
 export type CreatePaymentResult =
@@ -48,6 +86,48 @@ export interface CreatePaymentInput {
   gatewayRef?: string | null;
   idempotencyKey?: string | null;
   receivedAt?: Date | null;
+}
+
+/// A member's live (payable) invoices — issued | partial_paid | overdue with a
+/// positive outstanding balance, oldest due first. Shared by payment intake,
+/// QR pay-all, portal dues and the public /pay page so every surface agrees on
+/// what "open" means (§9.5 FIFO order).
+export interface OpenInvoiceRow {
+  id: string;
+  code: string;
+  status: string;
+  totalMinor: number;
+  amountDueMinor: number;
+  isDeposit: boolean;
+  propertyId: string | null;
+  dueDate: Date | null;
+  periodStart: Date;
+  periodEnd: Date;
+}
+
+export const OPEN_INVOICE_STATUSES = ["issued", "partial_paid", "overdue"] as const;
+
+export async function getOpenMemberInvoices(memberProfileId: string): Promise<OpenInvoiceRow[]> {
+  return prisma.invoice.findMany({
+    where: { memberProfileId, status: { in: [...OPEN_INVOICE_STATUSES] }, amountDueMinor: { gt: 0 } },
+    orderBy: [{ dueDate: "asc" }, { periodStart: "asc" }],
+    select: {
+      id: true,
+      code: true,
+      status: true,
+      totalMinor: true,
+      amountDueMinor: true,
+      isDeposit: true,
+      propertyId: true,
+      dueDate: true,
+      periodStart: true,
+      periodEnd: true
+    }
+  });
+}
+
+export function openInvoicesTotalMinor(rows: Array<{ amountDueMinor: number }>): number {
+  return rows.reduce((s, i) => s + i.amountDueMinor, 0);
 }
 
 /// Record a payment (status pending). Allocations may be explicit or are
@@ -74,10 +154,7 @@ export async function createPayment(
   const member = await prisma.memberProfile.findUnique({ where: { id: input.memberProfileId }, include: { party: true } });
   if (!member) return { ok: false, code: "NOT_FOUND", message: "Member not found" };
 
-  const open = await prisma.invoice.findMany({
-    where: { memberProfileId: member.id, status: { in: ["issued", "partial_paid", "overdue"] }, amountDueMinor: { gt: 0 } },
-    orderBy: [{ dueDate: "asc" }, { periodStart: "asc" }]
-  });
+  const open = await getOpenMemberInvoices(member.id);
 
   let allocations: Array<{ invoiceId: string; amountMinor: number }>;
   if (input.allocations && input.allocations.length > 0) {
@@ -100,10 +177,7 @@ export async function createPayment(
   }
 
   const allocatedMinor = allocations.reduce((s, a) => s + a.amountMinor, 0);
-  const firstProperty =
-    allocations.length > 0
-      ? (await prisma.invoice.findUnique({ where: { id: allocations[0].invoiceId } }))?.propertyId ?? null
-      : null;
+  const firstProperty = allocations.length > 0 ? (open.find((i) => i.id === allocations[0].invoiceId)?.propertyId ?? null) : null;
   const propertyId = firstProperty ?? member.homePropertyId;
 
   const created = await prisma.$transaction(
@@ -380,8 +454,8 @@ export async function fileReceiptPdf(paymentId: string, refile = false): Promise
     include: { member: { include: { party: true } }, allocations: { include: { invoice: true } } }
   });
   if (!payment) throw new Error("Payment not found");
-
-  const { org, locale } = await getSettings();
+  const tenantId = payment.member?.party?.tenantId ?? "DEFAULT";
+  const { org, locale } = await getSettings(tenantId);
   const buffer = await renderToBuffer(
     <ReceiptPdf
       data={{

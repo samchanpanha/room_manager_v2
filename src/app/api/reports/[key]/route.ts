@@ -31,7 +31,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ key: string }> 
 
   // Optional org configuration: a report that is switched off (develop) or not
   // assigned to this caller (assign) is not reachable through the API either.
-  const { reports: reportSettings } = await getSettings();
+  const { reports: reportSettings } = await getSettings(user.tenantId);
   if (!resolveReportKeys([key], reportSettings, user.id).includes(key)) {
     return fail(403, "FORBIDDEN", "This report is not enabled or assigned for your account");
   }

@@ -318,7 +318,7 @@ describe("M21 event dispatcher (§M21 events → templates)", () => {
     expect(stockMsg).toBeNull();
 
     // cursor advanced past the fresh events (idempotency covered above)
-    const cursorAfter = await prisma.setting.findUniqueOrThrow({ where: { key: "telegram.dispatchCursor" } });
+    const cursorAfter = await prisma.setting.findUniqueOrThrow({ where: { tenantId_key: { tenantId: "DEFAULT", key: "telegram.dispatchCursor" } } });
     expect(cursorAfter.value).toBeTruthy();
   });
 

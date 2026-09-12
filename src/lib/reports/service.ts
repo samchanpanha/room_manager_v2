@@ -40,16 +40,16 @@ function parseDate(v: string | undefined, endOfDay = false): Date | undefined {
 
 const money = (minor: number) => minor / 100; // rows carry minor units; exports format
 
-export async function runReport(key: string, filters: ReportFilters, scope: { global: boolean; propertyIds: string[]; ownerProfileId?: string }): Promise<ReportResult | null> {
+export async function runReport(key: string, filters: ReportFilters, scope: { global: boolean; propertyIds: string[]; ownerProfileId?: string; tenantId?: string }): Promise<ReportResult | null> {
   const def = REPORT_BY_KEY.get(key);
   if (!def) return null;
-  // GLOBAL callers may pass an empty list — resolve to all active properties
+  // GLOBAL callers may pass an empty list — resolve to all active properties in organization
   // so ledger-based reports (P&L, collections) see the whole portfolio.
   const effectiveIds =
     scope.propertyIds.length > 0
       ? scope.propertyIds
       : scope.global
-        ? (await prisma.property.findMany({ where: { status: "active" }, select: { id: true } })).map((p) => p.id)
+        ? (await prisma.property.findMany({ where: { status: "active", ...(scope.tenantId ? { tenantId: scope.tenantId } : {}) }, select: { id: true } })).map((p) => p.id)
         : [];
   const propertyIds = filters.propertyId ? (effectiveIds.includes(filters.propertyId) ? [filters.propertyId] : ["__out_of_scope__"]) : effectiveIds;
   const from = parseDate(filters.from);

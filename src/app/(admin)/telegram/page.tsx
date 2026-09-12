@@ -39,7 +39,7 @@ export default async function TelegramPage() {
   const [links, outbox, staff] = await Promise.all([
     prisma.telegramLink.findMany({ where: { unlinkedAt: null }, orderBy: { linkedAt: "desc" } }),
     prisma.telegramOutbox.findMany({ orderBy: { createdAt: "desc" }, take: 20 }),
-    prisma.user.findMany({ where: { status: "active", roles: { some: { role: { key: { in: ["STAFF", "PROPERTY_MANAGER", "ADMIN"] } } } } }, select: { id: true, name: true }, orderBy: { name: "asc" } })
+    prisma.user.findMany({ where: { status: "active", tenantId: user.tenantId, roles: { some: { role: { key: { in: ["STAFF", "PROPERTY_MANAGER", "ADMIN"] } } } } }, select: { id: true, name: true }, orderBy: { name: "asc" } })
   ]);
   const names = await Promise.all(links.map(principalName));
 

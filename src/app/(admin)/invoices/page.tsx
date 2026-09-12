@@ -12,6 +12,8 @@ import { JobsButtons } from "./jobs-buttons";
 import { QrPayButton } from "./qr-pay";
 import { formatMinor } from "@/lib/money";
 import { Tx } from "@/components/i18n-text";
+import { ExportButton } from "@/components/export-button";
+import { WorkflowGuide } from "@/components/workflow-guide";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +29,7 @@ const STATUS_VARIANT: Record<string, "secondary" | "success" | "warning" | "dest
 export default async function InvoicesPage({
   searchParams
 }: {
-  searchParams: Promise<{ status?: string; propertyId?: string }>;
+  searchParams: Promise<{ status?: string; propertyId?: string; type?: string }>;
 }) {
   const user = await getAuthUser();
   const ownMemberId = user?.partyId
@@ -52,8 +54,10 @@ export default async function InvoicesPage({
   const propertyScoped = scope !== "ALL" ? scope.filter((s) => !s.startsWith("member:")) : undefined;
 
   const where = {
+    property: { tenantId: user.tenantId },
     ...(sp.status ? { status: sp.status } : {}),
     ...(sp.propertyId ? { propertyId: sp.propertyId } : propertyScoped ? { propertyId: { in: propertyScoped } } : {}),
+    ...(sp.type === "deposit" ? { isDeposit: true } : sp.type === "rent" ? { isDeposit: false } : {}),
     ...(memberScoped.length > 0
       ? { OR: [{ propertyId: { in: propertyScoped ?? [] } }, { memberProfileId: { in: memberScoped } }] }
       : {})
@@ -65,7 +69,7 @@ export default async function InvoicesPage({
       include: { member: { include: { party: true } }, property: true, lease: true },
       orderBy: [{ periodStart: "desc" }, { code: "desc" }]
     }),
-    prisma.property.findMany({ orderBy: { code: "asc" } }),
+    prisma.property.findMany({ where: { tenantId: user.tenantId }, orderBy: { code: "asc" } }),
     prisma.invoice.aggregate({
       where: { ...where, status: { notIn: ["void", "draft"] } },
       _sum: { totalMinor: true, amountDueMinor: true }
@@ -79,8 +83,46 @@ export default async function InvoicesPage({
     <div>
       <PageHeader
         title="Invoices"
-        description="Billing documents composed by the rent engine (M06/M07)"
-        actions={<JobsButtons canGenerate={can(user, "create", "M07")} canRunDaily={can(user, "update", "M06")} />}
+        description="Billing documents composed by the rent engine (M06/M07) and security deposit obligations (M10)"
+        actions={
+          <div className="flex items-center gap-2">
+            <ExportButton entity="invoices" propertyId={sp.propertyId} status={sp.status} />
+            <JobsButtons canGenerate={can(user, "create", "M07")} canRunDaily={can(user, "update", "M06")} />
+          </div>
+        }
+      />
+
+      <WorkflowGuide
+        moduleKey="M07"
+        title="How Invoices Work in RentManager"
+        subtitle="Automatic periodic generation, gapless numbering, payment collection, and ledger postings"
+        steps={[
+          {
+            title: "1. Generation",
+            description: "Rent engine runs monthly for active leases, combining rent, active services, utilities, and prorations.",
+            badge: "Rent Engine (M06)",
+            badgeVariant: "secondary"
+          },
+          {
+            title: "2. Issue & Numbering",
+            description: "Issued invoices receive a permanent number ({PROP}-{YEAR}-{SEQ}) and post DR Receivable / CR Revenue to Ledger.",
+            badge: "Issued",
+            badgeVariant: "info"
+          },
+          {
+            title: "3. Payment & Receipting",
+            description: "Recorded payments apply to open invoices, reducing amount due and generating an official receipt (RCP-xxxx).",
+            badge: "Payments (M09)",
+            badgeVariant: "warning"
+          },
+          {
+            title: "4. Settlement / Credit",
+            description: "Status moves to 'paid' when balance reaches 0. Any post-issue corrections require Credit Notes (CN-xxxx).",
+            badge: "Settled / Paid",
+            badgeVariant: "success"
+          }
+        ]}
+        tip="Deposit invoices (marked with Deposit badge) are generated upon lease activation and held in 2100 Deposit Liability rather than revenue."
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
@@ -101,6 +143,16 @@ export default async function InvoicesPage({
                 {s.replaceAll("_", " ")}
               </option>
             ))}
+          </Select>
+        </div>
+        <div className="w-44 space-y-1.5">
+          <label htmlFor="f-type" className="text-sm font-medium">
+            <Tx>Invoice Type</Tx>
+          </label>
+          <Select id="f-type" name="type" defaultValue={sp.type ?? ""}>
+            <option value=""><Tx>All types</Tx></option>
+            <option value="rent"><Tx>Rent & Services only</Tx></option>
+            <option value="deposit"><Tx>Security Deposit only</Tx></option>
           </Select>
         </div>
         <div className="w-48 space-y-1.5">
@@ -147,9 +199,16 @@ export default async function InvoicesPage({
               {invoices.map((i) => (
                 <TableRow key={i.id}>
                   <TableCell>
-                    <Link href={`/invoices/${i.id}`} className="font-mono text-xs font-medium underline-offset-4 hover:underline">
-                      {i.code}
-                    </Link>
+                    <div className="flex items-center gap-1.5">
+                      <Link href={`/invoices/${i.id}`} className="font-mono text-xs font-medium underline-offset-4 hover:underline">
+                        {i.code}
+                      </Link>
+                      {i.isDeposit ? (
+                        <Badge variant="warning" className="text-[10px] px-1 py-0 font-normal">
+                          Deposit
+                        </Badge>
+                      ) : null}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Link href={`/members/${i.memberProfileId}`} className="underline-offset-4 hover:underline">

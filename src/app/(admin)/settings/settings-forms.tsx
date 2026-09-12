@@ -26,13 +26,13 @@ async function send(url: string, method: string, body: unknown): Promise<{ ok: b
   return { ok: res.ok, message: data.message };
 }
 
-function useSave() {
+function useSave(tenantId?: string) {
   const router = useRouter();
   const { push } = useToast();
   const [busy, setBusy] = useState(false);
   async function save(group: string, patch: object, title: string) {
     setBusy(true);
-    const r = await send("/api/settings", "PATCH", { group, patch });
+    const r = await send("/api/settings", "PATCH", { group, patch, tenantId });
     setBusy(false);
     push(r.ok ? { title, variant: "success" } : { title: "Failed", description: r.message, variant: "destructive" });
     if (r.ok) router.refresh();
@@ -49,8 +49,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export function SettingsForms({ settings, canWrite }: { settings: Settings; canWrite: boolean }) {
-  const { busy, save } = useSave();
+export function SettingsForms({ settings, canWrite, tenantId }: { settings: Settings; canWrite: boolean; tenantId?: string }) {
+  const { busy, save } = useSave(tenantId);
   const { push } = useToast();
   const [alertsBusy, setAlertsBusy] = useState(false);
   const [org, setOrg] = useState(settings.org);
@@ -351,7 +351,7 @@ export function SettingsForms({ settings, canWrite }: { settings: Settings; canW
   );
 }
 
-export function SecretForms() {
+export function SecretForms({ tenantId }: { tenantId?: string }) {
   const router = useRouter();
   const { push } = useToast();
   const [pay, setPay] = useState("");
@@ -360,7 +360,7 @@ export function SecretForms() {
 
   async function rotate(name: "paymentCredentials" | "telegramBotToken", value: string, clear: () => void) {
     setBusy(true);
-    const r = await send("/api/settings/secrets", "POST", { name, value });
+    const r = await send("/api/settings/secrets", "POST", { name, value, tenantId });
     setBusy(false);
     push(r.ok ? { title: "Secret sealed & rotated", variant: "success" } : { title: "Failed", description: r.message, variant: "destructive" });
     if (r.ok) {

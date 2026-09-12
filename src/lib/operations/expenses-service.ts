@@ -39,8 +39,13 @@ function isExpenseAccount(code: string): code is ExpenseAccountCode {
   return EXPENSE_ACCOUNT_SET.has(code);
 }
 
-async function approvalThresholdMinor(): Promise<number> {
-  const s = await prisma.setting.findUnique({ where: { key: "expenses.approvalThresholdMinor" } });
+async function approvalThresholdMinor(tenantId: string = "DEFAULT"): Promise<number> {
+  const s = await prisma.setting.findUnique({ where: { tenantId_key: { tenantId, key: "expenses.approvalThresholdMinor" } } });
+  if (!s && tenantId !== "DEFAULT") {
+    const def = await prisma.setting.findUnique({ where: { tenantId_key: { tenantId: "DEFAULT", key: "expenses.approvalThresholdMinor" } } });
+    const v = def ? Number(def.value) : NaN;
+    return Number.isFinite(v) && v >= 0 ? v : DEFAULT_APPROVAL_THRESHOLD_MINOR;
+  }
   const v = s ? Number(s.value) : NaN;
   return Number.isFinite(v) && v >= 0 ? v : DEFAULT_APPROVAL_THRESHOLD_MINOR;
 }

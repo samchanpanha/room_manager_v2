@@ -34,6 +34,7 @@ export default async function InspectionsPage() {
       : [];
 
   const inspections = await prisma.inspection.findMany({
+    where: { property: { tenantId: user.tenantId } },
     include: { lease: { include: { member: { include: { party: true } } } }, room: true, findings: { include: { ticket: true } } },
     orderBy: { createdAt: "desc" },
     take: 200
@@ -46,7 +47,7 @@ export default async function InspectionsPage() {
   const canCreate = can(user, "create", "M18");
   const canUpdate = can(user, "update", "M18");
   const activeLeases = await prisma.lease.findMany({
-    where: { status: { in: ["active", "notice"] } },
+    where: { status: { in: ["active", "notice"] }, property: { tenantId: user.tenantId } },
     include: { member: { include: { party: true } }, room: true },
     orderBy: { code: "asc" }
   });

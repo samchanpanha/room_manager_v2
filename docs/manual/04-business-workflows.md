@@ -51,6 +51,11 @@ Room returns to vacant → ready to re-let                      [M04]
 - A lease can't **end** with outstanding dues or without a move-out inspection.
 - Deposit liability must net to **zero** before the lease is fully closed.
 
+> 🚚 **Closing the move-out step:** the final payment at the end of this chain
+> runs through the **⚡ Urgent Paid & Leave** checkout (final pro-rated invoice +
+> deposit offset + payment + termination in one screen). Full walk-through in
+> [Part 14 — Move-Out Settlement Guide](14-move-out-settlement-guide.md).
+
 ---
 
 ## 4.2 Billing workflow (monthly close rhythm)

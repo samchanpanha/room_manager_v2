@@ -327,7 +327,8 @@ export async function buildSaleReceiptBytes(saleId: string, copies = 1): Promise
     include: { items: true, property: true, member: { include: { party: true } }, session: true }
   });
   if (!sale) throw new Error("Sale not found");
-  const { org, printer, locale } = await getSettings();
+  const tenantId = sale.property?.tenantId ?? "DEFAULT";
+  const { org, printer, locale } = await getSettings(tenantId);
   const barcode = await prisma.posProduct
     .findFirst({ where: { id: { in: sale.items.map((i) => i.productId).filter(Boolean) }, barcode: { not: null } }, orderBy: { createdAt: "asc" } })
     .then((p) => p?.barcode ?? undefined)

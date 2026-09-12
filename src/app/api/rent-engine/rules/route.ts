@@ -14,8 +14,8 @@ export async function GET() {
   const [lateFee, tax, dunning, generation, plans] = await Promise.all([
     prisma.lateFeeRule.findFirst({ where: { isActive: true } }),
     prisma.taxRule.findFirst({ where: { isActive: true, isDefault: true } }),
-    prisma.setting.findUnique({ where: { key: "billing.dunning" } }),
-    prisma.setting.findUnique({ where: { key: "billing.generation" } }),
+    prisma.setting.findUnique({ where: { tenantId_key: { tenantId: user.tenantId, key: "billing.dunning" } } }).then(async (r) => r || (user.tenantId !== "DEFAULT" ? prisma.setting.findUnique({ where: { tenantId_key: { tenantId: "DEFAULT", key: "billing.dunning" } } }) : null)),
+    prisma.setting.findUnique({ where: { tenantId_key: { tenantId: user.tenantId, key: "billing.generation" } } }).then(async (r) => r || (user.tenantId !== "DEFAULT" ? prisma.setting.findUnique({ where: { tenantId_key: { tenantId: "DEFAULT", key: "billing.generation" } } }) : null)),
     prisma.rentPlan.findMany({ where: { isActive: true }, orderBy: { name: "asc" } })
   ]);
 
@@ -48,7 +48,7 @@ export async function PUT(req: Request) {
   const before = {
     lateFee: await prisma.lateFeeRule.findFirst({ where: { isActive: true } }),
     tax: await prisma.taxRule.findFirst({ where: { isActive: true, isDefault: true } }),
-    generation: await prisma.setting.findUnique({ where: { key: "billing.generation" } })
+    generation: await prisma.setting.findUnique({ where: { tenantId_key: { tenantId: g.user.tenantId, key: "billing.generation" } } })
   };
 
   if (d.graceDays !== undefined || d.lateFeeType !== undefined || d.lateFeeAmount !== undefined || d.lateFeePercent !== undefined || d.lateFeeCap !== undefined) {
@@ -74,8 +74,8 @@ export async function PUT(req: Request) {
   }
   if (d.generationLeadDays !== undefined) {
     await prisma.setting.upsert({
-      where: { key: "billing.generation" },
-      create: { key: "billing.generation", value: JSON.stringify({ leadDays: d.generationLeadDays }), updatedBy: g.user.id },
+      where: { tenantId_key: { tenantId: g.user.tenantId, key: "billing.generation" } },
+      create: { tenantId: g.user.tenantId, key: "billing.generation", value: JSON.stringify({ leadDays: d.generationLeadDays }), updatedBy: g.user.id },
       update: { value: JSON.stringify({ leadDays: d.generationLeadDays }), updatedBy: g.user.id }
     });
   }

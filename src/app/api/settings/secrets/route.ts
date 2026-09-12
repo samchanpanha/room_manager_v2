@@ -6,7 +6,8 @@ import { z } from "zod";
 
 const bodySchema = z.object({
   name: z.enum(["paymentCredentials", "telegramBotToken"]),
-  value: z.string().min(8).max(300)
+  value: z.string().min(8).max(300),
+  tenantId: z.string().optional()
 });
 
 /// §M28 secret-typed settings (§15 v1.4b): sealed with AES-256-GCM before
@@ -18,6 +19,13 @@ export async function POST(req: Request) {
   if (!hasModuleAccess(user, "update", "M28")) return fail(403, "FORBIDDEN", "Missing permission M28:update");
   const parsed = await parseBody(req, bodySchema);
   if (parsed.response) return parsed.response;
-  await setProviderSecret(parsed.data.name, parsed.data.value, { id: user.id, name: user.name }, ip);
-  return ok({ settings: await getSettings() });
+
+  const isSuperAdmin = user.roles.includes("SUPER_ADMIN") || user.tenantId === "DEFAULT";
+  const targetTenantId = isSuperAdmin && parsed.data.tenantId ? parsed.data.tenantId : user.tenantId;
+
+  await setProviderSecret(parsed.data.name, parsed.data.value, { id: user.id, name: user.name }, ip, targetTenantId);
+  return ok({
+    settings: await getSettings(targetTenantId),
+    tenantId: targetTenantId
+  });
 }

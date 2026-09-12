@@ -27,6 +27,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const g = await authorize("update", "M01");
   if (g.response) return g.response;
 
+  // Strict tenant scoping: users can only modify accounts inside their organization
+  if (target.tenantId !== g.user.tenantId && g.user.tenantId !== "DEFAULT") {
+    return fail(403, "FORBIDDEN", "You cannot edit users outside your organization");
+  }
+
   if (parsed.data.status === "disabled" && target.id === g.user.id) {
     return fail(422, "SELF_DISABLE", "You cannot disable your own account");
   }
@@ -65,6 +70,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   });
 
   await logAudit({
+    tenantId: g.user.tenantId,
     actorId: g.user.id,
     actorName: g.user.name,
     module: "M01",

@@ -15,7 +15,7 @@ export interface ExpensesScope {
 export async function expensesScope(user: AuthUser): Promise<ExpensesScope> {
   if (can(user, "read", "M20")) {
     if (user.permissions.some((p) => p.module === "M20" && p.action === "read" && p.scope === "GLOBAL")) {
-      const all = await prisma.property.findMany({ where: { status: "active" }, select: { id: true } });
+      const all = await prisma.property.findMany({ where: { status: "active", tenantId: user.tenantId }, select: { id: true } });
       return { allowed: true, propertyIds: all.map((p) => p.id), global: true };
     }
     if (user.propertyIds.length > 0) return { allowed: true, propertyIds: user.propertyIds, global: false };

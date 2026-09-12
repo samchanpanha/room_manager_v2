@@ -88,12 +88,20 @@ export async function POST(req: Request) {
       wifiAccountId?: string;
     }> = [];
 
+    const seenSlots = new Set<string>();
+    const seenWifi = new Set<string>();
+
     for (const s of d.services) {
       let parkingSlotId: string | undefined;
       let wifiAccountId: string | undefined;
       let finalName = s.name;
 
       if (s.parkingSlotCode) {
+        if (seenSlots.has(s.parkingSlotCode)) {
+          return fail(422, "SLOT_DUPLICATE", `Parking slot ${s.parkingSlotCode} is specified more than once`);
+        }
+        seenSlots.add(s.parkingSlotCode);
+
         const slot = await prisma.parkingSlot.findUnique({ where: { code: s.parkingSlotCode } });
         if (!slot) return fail(404, "NOT_FOUND", `Parking slot ${s.parkingSlotCode} not found`);
         if (slot.status !== "free") return fail(422, "SLOT_TAKEN", `Parking slot ${slot.code} is already assigned`);
@@ -104,6 +112,11 @@ export async function POST(req: Request) {
         }
       }
       if (s.wifiSsid) {
+        if (seenWifi.has(s.wifiSsid)) {
+          return fail(422, "WIFI_DUPLICATE", `WiFi account ${s.wifiSsid} is specified more than once`);
+        }
+        seenWifi.add(s.wifiSsid);
+
         const wifi = await prisma.wifiAccount.findUnique({ where: { ssid: s.wifiSsid } });
         if (!wifi) return fail(404, "NOT_FOUND", `WiFi account ${s.wifiSsid} not found`);
         if (wifi.status !== "free") return fail(422, "WIFI_TAKEN", `WiFi account ${wifi.ssid} is already assigned`);

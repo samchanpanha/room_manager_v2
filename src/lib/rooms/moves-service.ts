@@ -29,8 +29,13 @@ export interface MovePreview {
   roomNumber: string;
 }
 
-async function moveFeeSetting(): Promise<number> {
-  const s = await prisma.setting.findUnique({ where: { key: "moves.moveFeeMinor" } });
+async function moveFeeSetting(tenantId: string = "DEFAULT"): Promise<number> {
+  const s = await prisma.setting.findUnique({ where: { tenantId_key: { tenantId, key: "moves.moveFeeMinor" } } });
+  if (!s && tenantId !== "DEFAULT") {
+    const def = await prisma.setting.findUnique({ where: { tenantId_key: { tenantId: "DEFAULT", key: "moves.moveFeeMinor" } } });
+    const n = def ? Number(def.value) : 0;
+    return Number.isFinite(n) && n >= 0 ? Math.round(n) : 0;
+  }
   const n = s ? Number(s.value) : 0;
   return Number.isFinite(n) && n >= 0 ? Math.round(n) : 0;
 }

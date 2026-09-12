@@ -21,11 +21,12 @@ export default async function UsersPage() {
 
   const [users, roles, properties] = await Promise.all([
     prisma.user.findMany({
+      where: { tenantId: user.tenantId },
       include: { roles: { include: { role: true } }, assignments: { include: { property: true } } },
       orderBy: { createdAt: "asc" }
     }),
     prisma.role.findMany({ orderBy: [{ isSystem: "desc" }, { name: "asc" }] }),
-    prisma.property.findMany({ orderBy: { code: "asc" } })
+    prisma.property.findMany({ where: { tenantId: user.tenantId }, orderBy: { code: "asc" } })
   ]);
 
   return (

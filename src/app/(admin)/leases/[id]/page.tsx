@@ -23,7 +23,17 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
     include: {
       member: { include: { party: true } },
       room: { include: { floor: { include: { building: { include: { property: true } } } }, beds: true } },
-      services: { orderBy: { createdAt: "asc" } }
+      services: { orderBy: { createdAt: "asc" } },
+      deposit: {
+        include: {
+          invoice: true,
+          transactions: true
+        }
+      },
+      invoices: {
+        orderBy: { periodStart: "desc" },
+        take: 8
+      }
     }
   });
   if (!lease) notFound();
@@ -52,6 +62,11 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
     prisma.parkingSlot.findMany({ where: { propertyId: lease.propertyId, status: "free" }, orderBy: { code: "asc" } }),
     prisma.wifiAccount.findMany({ where: { propertyId: lease.propertyId, status: "free" }, orderBy: { ssid: "asc" } })
   ]);
+
+  const depositCollected = lease.deposit?.invoice?.amountPaidMinor ?? 0;
+  const depositDeducted = (lease.deposit?.transactions ?? []).filter((t) => t.type === "deduction").reduce((s, t) => s + t.amountMinor, 0);
+  const depositRefunded = (lease.deposit?.transactions ?? []).filter((t) => t.type === "refund").reduce((s, t) => s + t.amountMinor, 0);
+  const depositHeld = Math.max(0, depositCollected - depositDeducted - depositRefunded);
 
   return (
     <div>
@@ -176,6 +191,106 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
           parkingSlots={parkingSlots.map((s) => ({ id: s.id, code: s.code, monthlyFeeMinor: s.monthlyFeeMinor }))}
           wifiAccounts={wifiAccounts.map((w) => ({ id: w.id, ssid: w.ssid, speedLabel: w.speedLabel }))}
         />
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        {/* Deposit & Security Collateral Card */}
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-sm font-medium"><Tx>Security Deposit (M10)</Tx></p>
+                <p className="text-xs text-muted-foreground"><Tx>Liability tracking & move-out settlement</Tx></p>
+              </div>
+              {lease.deposit ? (
+                <Badge variant={lease.deposit.status === "held" ? "success" : lease.deposit.status === "billed" ? "warning" : "secondary"}>
+                  {lease.deposit.status}
+                </Badge>
+              ) : (
+                <Badge variant="outline"><Tx>None</Tx></Badge>
+              )}
+            </div>
+
+            <dl className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground"><Tx>Required deposit</Tx></dt>
+                <dd className="font-semibold tabular-nums">{money(lease.depositTotalMinor)}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground"><Tx>Collected</Tx></dt>
+                <dd className="tabular-nums">{money(depositCollected)}</dd>
+              </div>
+              <div className="flex justify-between border-t pt-1.5 font-medium">
+                <dt className="text-muted-foreground"><Tx>Currently held (2100)</Tx></dt>
+                <dd className="tabular-nums text-foreground">{money(depositHeld)}</dd>
+              </div>
+              {lease.deposit?.invoice ? (
+                <div className="flex justify-between border-t pt-1.5 text-xs">
+                  <dt className="text-muted-foreground"><Tx>Deposit Invoice</Tx></dt>
+                  <dd>
+                    <Link href={`/invoices/${lease.deposit.invoice.id}`} className="font-mono underline hover:text-primary">
+                      {lease.deposit.invoice.code} ({lease.deposit.invoice.status})
+                    </Link>
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+
+            <div className="mt-3 flex justify-end">
+              <Link href="/deposits" className="text-xs text-primary underline underline-offset-4">
+                <Tx>Open Deposits Module →</Tx>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Invoices for this Lease */}
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-sm font-medium"><Tx>Lease Invoices (M07)</Tx></p>
+                <p className="text-xs text-muted-foreground"><Tx>Periodic rent, services & deposit billing</Tx></p>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                {lease.invoices.length} invoice(s)
+              </Badge>
+            </div>
+
+            {lease.invoices.length === 0 ? (
+              <p className="py-4 text-center text-xs text-muted-foreground">
+                <Tx>No invoices billed yet. Monthly billing runs automatically on day </Tx>{lease.billingCycleDay}.
+              </p>
+            ) : (
+              <ul className="divide-y text-xs">
+                {lease.invoices.map((inv) => (
+                  <li key={inv.id} className="flex items-center justify-between py-2">
+                    <div>
+                      <Link href={`/invoices/${inv.id}`} className="font-mono font-medium underline hover:text-primary">
+                        {inv.code}
+                      </Link>
+                      <span className="ml-1.5 text-muted-foreground">
+                        {inv.isDeposit ? "(Deposit)" : `${inv.periodStart.toISOString().slice(0, 7)}`}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="tabular-nums font-medium">{money(inv.totalMinor)}</span>
+                      <Badge variant={inv.status === "paid" ? "success" : inv.status === "overdue" ? "destructive" : "warning"} className="text-[10px] px-1 py-0">
+                        {inv.status}
+                      </Badge>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="mt-3 flex justify-end">
+              <Link href={`/invoices?propertyId=${lease.propertyId}`} className="text-xs text-primary underline underline-offset-4">
+                <Tx>View all property invoices →</Tx>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="mt-4">

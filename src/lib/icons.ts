@@ -34,6 +34,7 @@ export function navIcon(label: string): IconName {
     case "Help & Guide": return "book";
     case "Telegram Bot": return "send";
     case "Reports": return "chart";
+    case "Organizations": return "building";
     case "Users": return "user";
     case "Roles & Permissions": return "shield";
     case "Audit Log": return "list";

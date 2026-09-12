@@ -14,8 +14,7 @@
 ///     so the ledger, member statements and trial balance tell one story;
 ///   - number-sequences are re-synced from the rows we inserted, so the app
 ///     keeps numbering without collisions after the demo.
-import { Prisma, type PrismaClient } from "@prisma/client";
-import { randomBytes } from "node:crypto";
+import { Prisma, type PrismaClient, type InspectionTemplate, type StockItem, type Tariff, type User } from "@prisma/client";
 import { ACC } from "../src/lib/ledger/accounts";
 import { creditNoteLines, invoiceIssueLines, lateFeeLines } from "../src/lib/ledger/postings";
 import { postTransaction } from "../src/lib/ledger/service";
@@ -46,15 +45,13 @@ class Numbers {
 }
 
 async function seedFullDemo(db: PrismaClient): Promise<void> {
-  const marker = await db.setting.findUnique({ where: { key: "demo.full" } });
+  const marker = await db.setting.findUnique({ where: { tenantId_key: { tenantId: "DEFAULT", key: "demo.full" } } });
   if (marker) {
     console.log("  demo data: already present (demo.full marker) — skipping");
     return;
   }
 
   const nums = new Numbers();
-  const now = new Date();
-  const today = firstOfMonth(now);
 
   // ── resolve existing baseline rows we build on ──────────────────────────
   const blr = await db.property.findUniqueOrThrow({ where: { code: "BLR" } });
@@ -64,8 +61,6 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
 
   const room = (floorName: string, number: string) =>
     db.room.findFirstOrThrow({ where: { number, floor: { name: floorName } } });
-  const rA101 = await room("Floor 1", "A1-01");
-  const rA102 = await room("Floor 1", "A1-02");
   const rA103 = await room("Floor 1", "A1-03");
   const rA104 = await room("Floor 1", "A1-04");
   const rA201 = await room("Floor 2", "A2-01");
@@ -82,7 +77,6 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
   const rV01 = await room("Ground", "V-01");
   const rV02 = await room("Ground", "V-02");
 
-  const admin = await db.user.findUniqueOrThrow({ where: { email: "admin@demo.test" } });
   const accountant = await db.user.findUniqueOrThrow({ where: { email: "accountant@demo.test" } });
   const staff = await db.user.findUniqueOrThrow({ where: { email: "staff@demo.test" } });
   const pm = await db.user.findUniqueOrThrow({ where: { email: "pm@demo.test" } });
@@ -100,6 +94,9 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
   const remarksSummary: string[] = [];
 
   // ── helpers: issue an invoice + its balanced accrual posting ─────────────
+  type DemoInvoice = Prisma.InvoiceGetPayload<{ include: { items: true } }>;
+  type DemoPayment = Prisma.PaymentGetPayload<object>;
+
   async function issueInvoice(opts: {
     propertyId: string;
     memberProfileId: string;
@@ -116,7 +113,7 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
     dunningStage?: number;
     notes?: string;
     propertyCode: string;
-  }): Promise<any> {
+  }): Promise<DemoInvoice> {
     const prop = opts.propertyCode;
     nums.inv[prop] = (nums.inv[prop] ?? 0) + 1;
     const code = `${prop}-2026-${String(nums.inv[prop]).padStart(4, "0")}`;
@@ -178,12 +175,12 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
   /// Confirm a payment against one invoice (creates Payment + allocation +
   /// keeps invoice.amountDueMinor internally consistent + posts the ledger leg).
   async function payInvoice(opts: {
-    invoice: any;
+    invoice: Pick<DemoInvoice, "id" | "propertyId" | "amountDueMinor" | "amountPaidMinor" | "status">;
     memberProfileId: string;
     method: "cash" | "bank_transfer" | "qr";
     amountMinor?: number;
     receivedAt: Date;
-  }): Promise<{ payment: any; paidMinor: number }> {
+  }): Promise<{ payment: DemoPayment; paidMinor: number }> {
     const paidMinor = opts.amountMinor ?? opts.invoice.amountDueMinor;
     if (paidMinor <= 0) throw new Error("payInvoice: nothing to pay");
     const dueAfter = Math.max(0, opts.invoice.amountDueMinor - paidMinor);
@@ -244,7 +241,7 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
     occupation: string;
     propertyId: string;
     contact: { name: string; relationship: string; phone: string };
-  }): Promise<any> {
+  }): Promise<Prisma.MemberProfileGetPayload<object>> {
     const party = await db.party.create({
       data: { id: `party_${opts.email}`, type: "PERSON", name: opts.name, email: opts.email, phone: opts.phone }
     });
@@ -466,7 +463,7 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
   const rentItem = (rent: number) => ({ kind: "rent" as const, name: "Monthly rent", unitMinor: rent });
   const svcItem = (name: string, amt: number) => ({ kind: "service" as const, name, unitMinor: amt });
   const utilItem = (name: string, amt: number) => ({ kind: "utility" as const, name, unitMinor: amt });
-  const payPrev = (inv: any, memberId: string, method: "cash" | "qr" | "bank_transfer" = "bank_transfer") =>
+  const payPrev = (inv: DemoInvoice, memberId: string, method: "cash" | "qr" | "bank_transfer" = "bank_transfer") =>
     payInvoice({ invoice: inv, memberProfileId: memberId, method, receivedAt: new Date(monthN(-1).getTime() + 3 * DAY) });
 
   // ── previous month (all settled) ──
@@ -554,7 +551,7 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
     periodStart: prevMonth[0], periodEnd: prevMonth[1], dueDate: prevMonth[0],
     items: [rentItem(45000)]
   });
-  const lp8 = await payPrev(nunPrev, nun.id);
+  await payPrev(nunPrev, nun.id);
 
   // ── current month (varied financial states) ──
   // Ling & Sokha & Nun: generous early payers — current month already settled.
@@ -650,7 +647,7 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
   const elecTariff = await db.tariff.findFirstOrThrow({ where: { utilityType: "elec" } });
   const waterTariff = await db.tariff.findFirstOrThrow({ where: { utilityType: "water" } });
 
-  const addReading = async (meterId: string, readAt: Date, valueMilli: number, tariff: any, leaseId: string, roomId: string, periodStart: Date, periodEnd: Date, opts: { invoiceId?: string; invoiceItemId?: string; anomaly?: boolean } = {}) => {
+  const addReading = async (meterId: string, readAt: Date, valueMilli: number, tariff: Tariff, leaseId: string, roomId: string, periodStart: Date, periodEnd: Date, opts: { invoiceId?: string; invoiceItemId?: string; anomaly?: boolean } = {}) => {
     const reading = await db.meterReading.create({ data: { meterId, valueMilli, readAt, source: "manual", note: "Demo reading" } });
     const consumptionMilli = valueMilli - ((await db.meterReading.findFirst({ where: { meterId, readAt: { lt: readAt } }, orderBy: { readAt: "desc" } }))?.valueMilli ?? 0);
     const amountMinor = Math.round((consumptionMilli / 1000) * tariff.unitRateMinor);
@@ -701,17 +698,25 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
       }
     });
   };
-  const pA01 = await db.parkingSlot.findFirstOrThrow({ where: { code: "P-A01" } });
+  const pA03 = await db.parkingSlot.upsert({
+    where: { code: "P-A03" },
+    create: { code: "P-A03", propertyId: blr.id, monthlyFeeMinor: 3000 },
+    update: {}
+  });
   const pA02 = await db.parkingSlot.findFirstOrThrow({ where: { code: "P-A02" } });
-  const w101 = await db.wifiAccount.findFirstOrThrow({ where: { ssid: "demo-wifi-101" } });
+  const w103 = await db.wifiAccount.upsert({
+    where: { ssid: "demo-wifi-103" },
+    create: { ssid: "demo-wifi-103", propertyId: blr.id, speedLabel: "100 Mbps" },
+    update: {}
+  });
   const w102 = await db.wifiAccount.findFirstOrThrow({ where: { ssid: "demo-wifi-102" } });
-  await assignService(wifi.id, L3.id, monthN(-1), undefined, w101.id);
-  await assignService(park.id, L3.id, monthN(-1), pA01.id);
+  await assignService(wifi.id, L3.id, monthN(-1), undefined, w103.id);
+  await assignService(park.id, L3.id, monthN(-1), pA03.id);
   await assignService(wifi.id, L4.id, monthN(-1), undefined, w102.id);
   await assignService(park.id, L4.id, monthN(-1), pA02.id);
-  await db.parkingSlot.update({ where: { id: pA01.id }, data: { status: "assigned" } });
+  await db.parkingSlot.update({ where: { id: pA03.id }, data: { status: "assigned" } });
   await db.parkingSlot.update({ where: { id: pA02.id }, data: { status: "assigned" } });
-  await db.wifiAccount.update({ where: { id: w101.id }, data: { status: "assigned" } });
+  await db.wifiAccount.update({ where: { id: w103.id }, data: { status: "assigned" } });
   await db.wifiAccount.update({ where: { id: w102.id }, data: { status: "assigned" } });
 
   // Sokha: laundry per-use pending → one-time line on next invoice (2.5 kg @ 2.00).
@@ -725,7 +730,7 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
   // ═══════════════════════ M18/M19/M22 FACILITIES ═══════════════════════
   const inspTemplate = async (roomType: string) => db.inspectionTemplate.findFirstOrThrow({ where: { roomType } });
   const completeInspection = async (opts: {
-    code: string; type: string; leaseId: string; roomId: string; propertyId: string; template: any;
+    code: string; type: string; leaseId: string; roomId: string; propertyId: string; template: InspectionTemplate;
     scheduledAt?: Date; completedAt: Date; inspectorId: string; failures: Array<{ section: string; item: string; severity: string; note: string }>;
     summaryNote: string; depositDeduction?: { minor: number; status: string };
   }) => {
@@ -739,7 +744,7 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
       })
     }));
     const total = items.reduce((n, s) => n + s.items.length, 0);
-    const pass = items.reduce((n, s) => n + s.items.filter((i: any) => i.result === "pass").length, 0);
+    const pass = items.reduce((n, s) => n + s.items.filter((i: { result: string }) => i.result === "pass").length, 0);
     const insp = await db.inspection.create({
       data: {
         code: opts.code, type: opts.type, status: "completed", leaseId: opts.leaseId, roomId: opts.roomId,
@@ -873,7 +878,7 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
       }
     }
   });
-  const inflow = async (item: any, qtyMilli: number, unitCostMilli: number) => {
+  const inflow = async (item: StockItem, qtyMilli: number, unitCostMilli: number) => {
     const qtyAfterMilli = item.qtyMilli + qtyMilli;
     const avgCostAfterMilli = item.qtyMilli === 0 ? unitCostMilli : Math.round((item.qtyMilli * item.avgCostMilli + qtyMilli * unitCostMilli) / qtyAfterMilli);
     const valueMilli = Math.round((qtyMilli / 1000) * (unitCostMilli / 1000) * 1000);
@@ -966,7 +971,7 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
   const stk = await db.stocktake.create({
     data: { code: "STK-2026-0001", propertyId: blr.id, status: "completed", note: "Monthly count — two items short vs book", createdById: staff.id }
   });
-  const stockLine = async (item: any, countedMilli: number) => {
+  const stockLine = async (item: StockItem, countedMilli: number) => {
     const varianceMilli = countedMilli - item.qtyMilli;
     await db.stocktakeLine.create({ data: { stocktakeId: stk.id, stockItemId: item.id, expectedMilli: item.qtyMilli, countedMilli, varianceMilli } });
     if (varianceMilli !== 0) {
@@ -1068,7 +1073,7 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
 
   // ═══════════════════════ M23 ATTENDANCE ═══════════════════════
   const shiftMorning = await db.shift.findFirstOrThrow({ where: { propertyId: blr.id, name: "Morning 08:00–16:00" } });
-  const punch = async (user: any, dayOffset: number, clockInMin: number, clockOutMin: number, opts: { minutesWorked?: number; overtimeMinutes?: number; note?: string; late?: boolean } = {}) => {
+  const punch = async (user: User, dayOffset: number, clockInMin: number, clockOutMin: number, opts: { minutesWorked?: number; overtimeMinutes?: number; note?: string; late?: boolean } = {}) => {
     const day = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() - dayOffset));
     const clockIn = new Date(day.getTime() + clockInMin * 60_000);
     const clockOut = clockOutMin ? new Date(day.getTime() + clockOutMin * 60_000) : null;
@@ -1182,13 +1187,20 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
   // ── finalize: sync number sequences to what we inserted ────────────────────
   const seq = async (key: string, value: number) =>
     db.numberSequence.upsert({ where: { key }, create: { key, value }, update: { value } });
-  const countPrefix = async (model: "invoice" | "payment" | "creditNote" | "maintenanceTicket" | "complaint" | "inspection" | "purchaseOrder" | "posSale" | "stocktake" | "stayBooking" | "ownerStatement" | "roomMove" | "lease" | "expense" | "depositTransaction", prefix: string) => (db as any)[model].count({ where: { code: { startsWith: prefix } } }) as Promise<number>;
+  const countPrefix = async (model: "invoice" | "payment" | "creditNote" | "maintenanceTicket" | "complaint" | "inspection" | "purchaseOrder" | "posSale" | "stocktake" | "stayBooking" | "ownerStatement" | "roomMove" | "lease" | "expense" | "depositTransaction", prefix: string) =>
+    (db[model] as unknown as { count: (args: { where: { code: { startsWith: string } } }) => Promise<number> }).count({ where: { code: { startsWith: prefix } } });
 
   await seq("LEASE", await countPrefix("lease", "LSE-"));
   await seq("INV:BLR:2026", await countPrefix("invoice", "BLR-2026-"));
   await seq("INV:RV:2026", await countPrefix("invoice", "RV-2026-"));
   await seq("PMT:2026", await countPrefix("payment", "PMT-2026-"));
-  await seq("RCP:2026", await countPrefix("payment", "RCP-2026-"));
+  const rcpMax = await db.payment.findFirst({
+    where: { receiptCode: { startsWith: "RCP-2026-" } },
+    orderBy: { receiptCode: "desc" },
+    select: { receiptCode: true }
+  });
+  const rcpCount = rcpMax?.receiptCode ? parseInt(rcpMax.receiptCode.split("-").pop() || "0", 10) : 0;
+  await seq("RCP:2026", rcpCount);
   await seq("CREDITNOTE", await countPrefix("creditNote", "CN-"));
   await seq("TK", await countPrefix("maintenanceTicket", "TK-2026-"));
   await seq("CMP", await countPrefix("complaint", "CMP-2026-"));
@@ -1201,7 +1213,7 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
   await seq("STATEMENT", await countPrefix("ownerStatement", "STM-2026-"));
   await seq("ROOMMOVE", await countPrefix("roomMove", "MOV-2026-"));
 
-  await db.setting.create({ data: { key: "demo.full", value: JSON.stringify({ version: 1, seededAt: new Date().toISOString() }), updatedBy: "seed" } });
+  await db.setting.create({ data: { tenantId: "DEFAULT", key: "demo.full", value: JSON.stringify({ version: 1, seededAt: new Date().toISOString() }), updatedBy: "seed" } });
   await db.auditLog.create({
     data: { actorName: "system", module: "M00", action: "seed", entityType: "system", summary: "Full client-demo dataset seeded (SEED_FULL_DEMO)" }
   });

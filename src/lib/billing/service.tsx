@@ -606,7 +606,8 @@ export async function fileInvoicePdf(invoiceId: string, refile = false): Promise
   });
   if (!invoice) throw new Error("Invoice not found");
 
-  const { org: orgSettings, locale } = await getSettings(); // §M28 org identity + currency
+  const tenantId = invoice.property.tenantId ?? "DEFAULT";
+  const { org: orgSettings, locale } = await getSettings(tenantId); // §M28 org identity + currency
   const orgProfile = { name: orgSettings.name, currency: locale.currency };
 
   // M13: print the member's scan-to-pay QR on open invoices (§M13 receipt).

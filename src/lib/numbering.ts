@@ -14,9 +14,9 @@ export async function nextNumber(key: string, format: (n: number) => string): Pr
       let maxNum = 0;
       for (const l of leases) {
         const m = l.code.match(/(\d+)$/);
-        if (m && m[1]) {
+        if (m && m[1] && m[1].length <= 8) {
           const v = parseInt(m[1], 10);
-          if (v > maxNum) maxNum = v;
+          if (v > maxNum && v <= 2_000_000_000) maxNum = v;
         }
       }
       const seq = await tx.numberSequence.findUnique({ where: { key } });
@@ -39,9 +39,9 @@ export async function nextNumber(key: string, format: (n: number) => string): Pr
       let maxNum = 0;
       for (const c of contracts) {
         const m = c.code.match(/(\d+)$/);
-        if (m && m[1]) {
+        if (m && m[1] && m[1].length <= 8) {
           const v = parseInt(m[1], 10);
-          if (v > maxNum) maxNum = v;
+          if (v > maxNum && v <= 2_000_000_000) maxNum = v;
         }
       }
       const seq = await tx.numberSequence.findUnique({ where: { key } });

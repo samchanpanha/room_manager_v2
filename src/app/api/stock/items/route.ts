@@ -33,10 +33,10 @@ export async function GET() {
   const user = await getAuthUser();
   if (!user) return fail(401, "UNAUTHENTICATED", "Sign in required");
   if (!hasModuleAccess(user, "read", "M15")) return fail(403, "FORBIDDEN", "Missing permission M15:read");
-  // GLOBAL holders see every property (§5 scope resolution); otherwise assigned only.
+  // GLOBAL holders see every property in their organization; otherwise assigned only.
   const grants = user.permissions.filter((p) => p.module === "M15" && p.action === "read");
   const scoped = grants.some((g) => g.scope === "GLOBAL")
-    ? (await prisma.property.findMany({ select: { id: true } })).map((p) => p.id)
+    ? (await prisma.property.findMany({ where: { tenantId: user.tenantId }, select: { id: true } })).map((p) => p.id)
     : user.propertyIds;
   const reports = await Promise.all([...new Set(scoped)].map((pid) => valuationReport(pid)));
   const items = reports.flatMap((r) => r.items);

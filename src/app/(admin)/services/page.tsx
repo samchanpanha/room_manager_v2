@@ -28,6 +28,7 @@ export default async function ServicesPage() {
   const [catalog, assignments, usages, slots, wifi, activeLeases] = await Promise.all([
     prisma.serviceCatalog.findMany({ orderBy: { code: "asc" } }),
     prisma.serviceAssignment.findMany({
+      where: { lease: { property: { tenantId: user.tenantId } } },
       include: {
         service: true,
         lease: { include: { member: { include: { party: true } }, room: true } },
@@ -38,14 +39,15 @@ export default async function ServicesPage() {
       take: 200
     }),
     prisma.serviceUsage.findMany({
+      where: { lease: { property: { tenantId: user.tenantId } } },
       include: { service: true, lease: { include: { member: { include: { party: true } }, room: true } } },
       orderBy: { usedAt: "desc" },
       take: 100
     }),
-    prisma.parkingSlot.findMany({ include: { property: true }, orderBy: { code: "asc" } }),
-    prisma.wifiAccount.findMany({ include: { property: true }, orderBy: { ssid: "asc" } }),
+    prisma.parkingSlot.findMany({ where: { property: { tenantId: user.tenantId } }, include: { property: true }, orderBy: { code: "asc" } }),
+    prisma.wifiAccount.findMany({ where: { property: { tenantId: user.tenantId } }, include: { property: true }, orderBy: { ssid: "asc" } }),
     prisma.lease.findMany({
-      where: { status: "active" },
+      where: { status: "active", property: { tenantId: user.tenantId } },
       include: {
         member: { include: { party: true } },
         room: { include: { floor: { include: { building: { include: { property: true } } } } } }

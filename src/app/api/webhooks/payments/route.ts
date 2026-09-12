@@ -2,8 +2,38 @@ import { z } from "zod";
 import { clientIp, fail, ok } from "@/lib/api";
 import { rateLimit } from "@/lib/ratelimit";
 import { getProviderSecret } from "@/lib/settings";
-import { handlePaymentWebhook } from "@/lib/payments/service";
+import { handlePaymentWebhook, GATEWAY_ACTOR } from "@/lib/payments/service";
 import { resolveProvider } from "@/lib/qrpay/adapter";
+import { prisma } from "@/lib/db";
+import { completeUrgentSettlementAfterPayment } from "@/lib/leases/urgent-settlement";
+
+const URGENT_QR_PREFIX = "URGENT:";
+
+/// A confirmed QR-first urgent settlement (gatewayRef `URGENT:<leaseId>:…`)
+/// finally terminates the lease — only here, so the lease stays open until the
+/// gateway actually confirms the money (§M05 QR-first move-out).
+async function maybeFinishUrgentSettlement(
+  refs: { paymentId?: string; gatewayRef?: string; idempotencyKey?: string },
+  receiptCode: string | null
+): Promise<void> {
+  try {
+    const payment = await prisma.payment.findFirst({
+      where: {
+        OR: [
+          ...(refs.paymentId ? [{ id: refs.paymentId }] : []),
+          ...(refs.gatewayRef ? [{ gatewayRef: refs.gatewayRef }] : []),
+          ...(refs.idempotencyKey ? [{ idempotencyKey: refs.idempotencyKey }] : []),
+          ...(receiptCode ? [{ receiptCode }] : [])
+        ]
+      }
+    });
+    if (!payment || !payment.gatewayRef?.startsWith(URGENT_QR_PREFIX)) return;
+    await completeUrgentSettlementAfterPayment(payment.id, GATEWAY_ACTOR);
+  } catch {
+    // Settlement completion is a side-effect of the webhook — never fail the
+    // 200 ack because of it; the lease can be closed manually if needed.
+  }
+}
 
 const genericSchema = z
   .object({
@@ -53,6 +83,9 @@ export async function POST(req: Request) {
   if (!result.ok) {
     const status = result.code === "NOT_FOUND" ? 404 : result.code === "INVALID_TRANSITION" ? 422 : 400;
     return fail(status, result.code, result.message);
+  }
+  if (payload.status === "confirmed") {
+    await maybeFinishUrgentSettlement(payload, result.receiptCode);
   }
   return ok({ received: true, ignored: result.ignored, paymentStatus: result.paymentStatus, receiptCode: result.receiptCode });
 }

@@ -376,10 +376,12 @@ export async function fileStatementPdf(statementId: string): Promise<void> {
       ownerProfile: { include: { party: { select: { name: true } } } },
       contract: { select: { code: true, model: true } },
       building: { select: { name: true } },
-      property: { select: { code: true, name: true } }
+      property: { select: { code: true, name: true, tenantId: true } }
     }
   });
-  const { org } = await getSettings();
+  if (!st) throw new Error("Statement not found");
+  const tenantId = st.property?.tenantId ?? "DEFAULT";
+  const { org } = await getSettings(tenantId);
   const buffer = await renderToBuffer(
     <OwnerStatementPdf
       data={{

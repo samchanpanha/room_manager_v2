@@ -337,6 +337,11 @@ reason), give **notice**, add/manage services, generate/download contract PDF.
 > ✅ **Best practice:** always activate only after KYC + deposit terms are set;
 > let the system prorate — don't hand-calculate partial months.
 
+> 🚚 **Moving a member out?** When a member leaves, the final balance (open
+> invoices + pro-rated final period + pending usages, minus deposit) is handled
+> by the **⚡ Urgent Paid & Leave** checkout. Walk through it in
+> [Part 14 — Move-Out Settlement Guide](14-move-out-settlement-guide.md).
+
 ---
 
 ## 7. Rent Engine (M06)

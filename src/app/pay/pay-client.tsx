@@ -39,6 +39,7 @@ export function PayClient() {
   const [charge, setCharge] = useState<Charge | null>(null);
   const [payStatus, setPayStatus] = useState<"pending" | "confirmed" | "failed" | null>(null);
   const [busyInvoice, setBusyInvoice] = useState<string | null>(null);
+  const [busyAll, setBusyAll] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const token = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("m") : null;
@@ -69,6 +70,24 @@ export function PayClient() {
     return stopPolling;
   }, [loadDues]);
 
+  function startChargePolling(paymentId: string) {
+    if (!token) return;
+    stopPolling();
+    pollRef.current = setInterval(async () => {
+      const r = await fetch("/api/qrpay/status", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ m: token, paymentId }) });
+      if (!r.ok) return;
+      const s = (await r.json()) as { status: string };
+      if (s.status === "confirmed" || s.status === "failed") {
+        stopPolling();
+        setPayStatus(s.status);
+        if (s.status === "confirmed") {
+          push({ title: "Payment confirmed — thank you!", variant: "success" });
+          void loadDues();
+        }
+      }
+    }, 3000);
+  }
+
   async function pay(invoiceId: string) {
     if (!token) return;
     setBusyInvoice(invoiceId);
@@ -81,20 +100,22 @@ export function PayClient() {
     }
     setCharge(data);
     setPayStatus("pending");
-    stopPolling();
-    pollRef.current = setInterval(async () => {
-      const r = await fetch("/api/qrpay/status", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ m: token, paymentId: data.paymentId }) });
-      if (!r.ok) return;
-      const s = (await r.json()) as { status: string };
-      if (s.status === "confirmed" || s.status === "failed") {
-        stopPolling();
-        setPayStatus(s.status);
-        if (s.status === "confirmed") {
-          push({ title: "Payment confirmed — thank you!", variant: "success" });
-          void loadDues();
-        }
-      }
-    }, 3000);
+    startChargePolling(data.paymentId);
+  }
+
+  async function payAll() {
+    if (!token) return;
+    setBusyAll(true);
+    const res = await fetch("/api/qrpay/pay-all", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ m: token }) });
+    const data = (await res.json().catch(() => ({}))) as Charge & { message?: string };
+    setBusyAll(false);
+    if (!res.ok) {
+      push({ title: "QR unavailable", description: data.message, variant: "destructive" });
+      return;
+    }
+    setCharge(data);
+    setPayStatus("pending");
+    startChargePolling(data.paymentId);
   }
 
   return (
@@ -123,6 +144,11 @@ export function PayClient() {
               <p className="text-lg font-semibold">{dues.member.name}</p>
               <p className="mt-3 text-3xl font-bold tabular-nums">{usd(dues.totalDueMinor)}</p>
               <p className="text-xs text-muted-foreground"><Tx>total outstanding across </Tx>{dues.invoices.length} <Tx>invoice(s)</Tx></p>
+              {dues.totalDueMinor > 0 ? (
+                <Button className="mt-4 w-full" size="lg" disabled={busyAll} onClick={() => void payAll()}>
+                  {busyAll ? <Tx>Preparing QR…</Tx> : <Tx>Pay all outstanding</Tx>}
+                </Button>
+              ) : null}
             </CardContent>
           </Card>
 

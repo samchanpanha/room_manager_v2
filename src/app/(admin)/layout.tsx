@@ -15,19 +15,20 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (user.mustChangePassword) redirect("/account/password?force=1");
 
   const moduleAllowed: Record<string, boolean> = {};
-  const [flags, settings] = await Promise.all([getFeatureFlags(), getSettings()]);
+  const [flags, settings] = await Promise.all([getFeatureFlags(user.tenantId), getSettings(user.tenantId)]);
   setActiveCurrency(settings.locale.currency); // §M28 org-wide display currency
   for (const m of MODULES) {
-    // M28 feature flags hide optional modules (POS/Stock/Telegram/PO) org-wide
-    moduleAllowed[m.key] = hasModuleAccess(user, "read", m.key) && flags[m.key] !== false;
+    // Super Admins & Org Owners have full access to all modules and menus
+    const hasAccess = hasModuleAccess(user, "read", m.key);
+    moduleAllowed[m.key] = user.isSuperAdmin ? true : (hasAccess && flags[m.key] !== false);
   }
-  moduleAllowed["OWNER_PORTAL"] = user.roles.includes("OWNER");
+  moduleAllowed["OWNER_PORTAL"] = user.roles.includes("OWNER") || user.isSuperAdmin;
 
   return (
     <Shell
       user={{ name: user.name, email: user.email, roles: user.roles }}
       moduleAllowed={moduleAllowed}
-      org={{ name: settings.org.name, legalName: settings.org.legalName, logo: settings.org.logo }}
+      org={{ name: user.tenantName || settings.org.name, legalName: settings.org.legalName, logo: settings.org.logo }}
       menu={{ side: settings.menu.side }}
     >
       {children}

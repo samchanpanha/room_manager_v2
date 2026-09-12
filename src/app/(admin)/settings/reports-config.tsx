@@ -43,12 +43,14 @@ export function ReportsConfig({
   reports,
   users,
   value,
-  canWrite
+  canWrite,
+  tenantId
 }: {
   reports: ReportConfigEntry[];
   users: ReportUserOption[];
   value: ReportSettings;
   canWrite: boolean;
+  tenantId?: string;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -152,7 +154,7 @@ export function ReportsConfig({
     const res = await fetch("/api/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ group: "reports", patch: draft })
+      body: JSON.stringify({ group: "reports", patch: draft, tenantId })
     });
     const data = (await res.json().catch(() => ({}))) as { message?: string; settings?: { reports?: ReportSettings } };
     setBusy(false);

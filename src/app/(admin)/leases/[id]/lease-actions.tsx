@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Label, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/toast";
+import { UrgentSettlementDialog } from "./urgent-settlement-dialog";
 
 export function LeaseActions({
   lease,
@@ -20,6 +21,7 @@ export function LeaseActions({
   const { push } = useToast();
   const [busy, setBusy] = useState(false);
   const [terminateOpen, setTerminateOpen] = useState(false);
+  const [urgentOpen, setUrgentOpen] = useState(false);
 
   async function act(action: string, body?: unknown, confirmText?: string) {
     if (confirmText && !window.confirm(confirmText)) return;
@@ -84,6 +86,15 @@ export function LeaseActions({
 
       {canUpdate && (lease.status === "active" || lease.status === "notice") ? (
         <>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() => setUrgentOpen(true)}
+            className="border-amber-500/40 text-amber-700 hover:bg-amber-500/10 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200"
+          >
+            ⚡ Urgent Paid & Leave
+          </Button>
           <Button variant="secondary" size="sm" disabled={busy} onClick={() => act("complete", undefined, `Complete ${lease.code}? Room goes to cleaning, deposit settlement is triggered.`)}>
             Complete
           </Button>
@@ -92,6 +103,13 @@ export function LeaseActions({
           </Button>
         </>
       ) : null}
+
+      <UrgentSettlementDialog
+        open={urgentOpen}
+        onClose={() => setUrgentOpen(false)}
+        leaseId={lease.id}
+        leaseCode={lease.code}
+      />
 
       <Dialog open={terminateOpen} onClose={() => setTerminateOpen(false)} title="Terminate lease" description="A written reason is mandatory. Clearance and inspection gates tighten as those modules land.">
         <form

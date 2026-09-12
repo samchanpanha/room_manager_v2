@@ -24,7 +24,8 @@ export const PART_LABELS = {
   "10-troubleshooting": "ការដោះស្រាយបញ្ហា",
   "11-faq": "សំណួរជួញជុំ",
   "12-glossary": "វចនានុក្រម",
-  "13-golden-paths": "ផ្លូវមាស និងស្ថានការណ៍"
+  "13-golden-paths": "ផ្លូវមាស និងស្ថានការណ៍",
+  "14-move-out-settlement-guide": "មគ្គុទ្ទេសក៍ការបិទគណនីពេលចាកចេញ"
 };
 
 export const UI = {

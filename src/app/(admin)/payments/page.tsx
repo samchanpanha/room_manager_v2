@@ -11,6 +11,8 @@ import { timeAgo } from "@/lib/utils";
 import { PaymentActions, RecordPaymentButton } from "./payment-jobs";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Tx } from "@/components/i18n-text";
+import { ExportButton } from "@/components/export-button";
+import { WorkflowGuide } from "@/components/workflow-guide";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +45,7 @@ export default async function PaymentsPage({
 
   const payments = await prisma.payment.findMany({
     where: {
+      member: { party: { tenantId: user.tenantId } },
       ...(sp.status ? { status: sp.status } : {}),
       ...(sp.method ? { method: sp.method } : {}),
       ...(scope === "ALL" ? {} : { OR: [{ propertyId: { in: scope.propertyIds } }, { memberProfileId: { in: scope.memberIds } }] })
@@ -59,12 +62,76 @@ export default async function PaymentsPage({
   const pendingCount = payments.filter((p) => p.status === "pending").length;
   const credit = confirmed.reduce((s, p) => s + p.remainingMinor, 0);
 
+  const memberProfiles = await prisma.memberProfile.findMany({
+    where: {
+      party: { tenantId: user.tenantId },
+      ...(scope === "ALL" ? {} : scope.propertyIds.length > 0 ? { homePropertyId: { in: scope.propertyIds } } : {})
+    },
+    include: {
+      party: true,
+      leases: {
+        where: { status: { in: ["active", "draft"] } },
+        select: { room: { select: { number: true } } },
+        take: 1
+      }
+    },
+    orderBy: { party: { name: "asc" } },
+    take: 300
+  });
+
+  const memberOptions = memberProfiles.map((m) => {
+    const room = m.leases[0]?.room?.number;
+    const phone = m.party.phone;
+    return {
+      id: m.id,
+      name: `${m.party.name}${room ? ` (Room ${room})` : ""}${phone ? ` · ${phone}` : ""}`
+    };
+  });
+
   return (
     <div>
       <PageHeader
         title="Payments"
         description="Collections against invoices — receipts numbered, allocations oldest-first, money through the ledger"
-        actions={<RecordPaymentButton canCreate={can(user, "create", "M09")} />}
+        actions={
+          <div className="flex items-center gap-2">
+            <ExportButton entity="payments" status={sp.status} />
+            <RecordPaymentButton canCreate={can(user, "create", "M09")} initialMembers={memberOptions} />
+          </div>
+        }
+      />
+
+      <WorkflowGuide
+        moduleKey="M09"
+        title="How Payments & Collections Work"
+        subtitle="Receipt recording, verification, invoice allocation, and ledger postings"
+        steps={[
+          {
+            title: "1. Record Payment",
+            description: "Front desk or clerk logs the money received (cash, bank transfer, qr, card, cheque) with status 'pending'.",
+            badge: "Intake",
+            badgeVariant: "secondary"
+          },
+          {
+            title: "2. Verify & Confirm",
+            description: "Staff confirms payment once verified against the physical till drawer or bank statement line.",
+            badge: "Confirmed",
+            badgeVariant: "info"
+          },
+          {
+            title: "3. Allocation & Receipting",
+            description: "System allocates money to open invoices (oldest-first or specific) and issues a gapless receipt (RCP-xxxx).",
+            badge: "Allocated",
+            badgeVariant: "warning"
+          },
+          {
+            title: "4. Ledger Balanced",
+            description: "Confirmation posts DR 1100 Cash / 1200 Bank and CR 1300 Rent Receivable. Any remainder stays as Member Credit.",
+            badge: "Ledger",
+            badgeVariant: "success"
+          }
+        ]}
+        tip="If a payment has leftover unallocated money, it becomes Member Credit. Accountants can refund member credit directly."
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">

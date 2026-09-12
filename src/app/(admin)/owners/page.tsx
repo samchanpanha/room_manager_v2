@@ -34,7 +34,10 @@ export default async function OwnersPage() {
   }
 
   const rows = await prisma.ownerProfile.findMany({
-    where: scope === "ALL" ? undefined : { id: { in: scope.ownerProfileIds } },
+    where: {
+      party: { tenantId: user.tenantId },
+      ...(scope === "ALL" ? {} : { id: { in: scope.ownerProfileIds } })
+    },
     include: {
       party: { include: { users: { take: 1 } } },
       buildings: { include: { property: true } },

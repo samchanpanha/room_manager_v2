@@ -19,6 +19,12 @@ export default async function LoginPage() {
           <p className="mt-1 text-sm text-muted-foreground">{t("auth.login.tagline")}</p>
         </div>
         <Loginform />
+        <div className="mt-4 text-center text-sm text-muted-foreground">
+          <Tx>New organization?</Tx>{" "}
+          <a href="/register" className="font-semibold text-primary hover:underline">
+            <Tx>Register workspace</Tx>
+          </a>
+        </div>
         <div className="mt-4 rounded-lg border bg-card p-3 text-xs text-muted-foreground">
           <p className="font-medium text-foreground">{t("auth.login.demoTitle")}</p>
           <p className="mt-1"><Tx>root@demo.test · admin@demo.test · pm@demo.test</Tx></p>

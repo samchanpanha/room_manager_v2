@@ -12,6 +12,7 @@ export interface ReportScope {
   allowed: boolean;
   global: boolean;
   propertyIds: string[];
+  tenantId?: string;
   /// set ⇒ owner (owner-statement-history only, own rows)
   ownerProfileId?: string;
 }
@@ -19,20 +20,20 @@ export interface ReportScope {
 export async function reportScope(user: AuthUser): Promise<ReportScope> {
   const globalRead = user.permissions.some((p) => p.module === "M26" && p.action === "read" && p.scope === "GLOBAL");
   if (globalRead) {
-    const all = await prisma.property.findMany({ where: { status: "active" }, select: { id: true } });
-    return { allowed: true, global: true, propertyIds: all.map((p) => p.id) };
+    const all = await prisma.property.findMany({ where: { status: "active", tenantId: user.tenantId }, select: { id: true } });
+    return { allowed: true, global: true, propertyIds: all.map((p) => p.id), tenantId: user.tenantId };
   }
   if (user.roles.includes("OWNER")) {
     const link = await getOwnerLinkForUser(user);
     if (link) {
       const buildings = await prisma.building.findMany({ where: { id: { in: link.ownedBuildingIds } }, select: { propertyId: true } });
-      return { allowed: true, global: false, propertyIds: [...new Set(buildings.map((b) => b.propertyId))], ownerProfileId: link.ownerProfileId };
+      return { allowed: true, global: false, propertyIds: [...new Set(buildings.map((b) => b.propertyId))], ownerProfileId: link.ownerProfileId, tenantId: user.tenantId };
     }
   }
   if (user.propertyIds.length > 0) {
-    return { allowed: true, global: false, propertyIds: user.propertyIds };
+    return { allowed: true, global: false, propertyIds: user.propertyIds, tenantId: user.tenantId };
   }
-  return { allowed: false, global: false, propertyIds: [] };
+  return { allowed: false, global: false, propertyIds: [], tenantId: user.tenantId };
 }
 
 function isSuper(user: AuthUser): boolean {

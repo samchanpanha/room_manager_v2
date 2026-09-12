@@ -23,6 +23,7 @@ export default async function UtilitiesPage() {
   const canCreate = can(user, "create", "M11");
 
   const meters = await prisma.meter.findMany({
+    where: { room: { floor: { building: { property: { tenantId: user.tenantId } } } } },
     include: {
       room: { include: { floor: { include: { building: { include: { property: true } } } } } },
       readings: { orderBy: { readAt: "desc" } },

@@ -53,7 +53,7 @@ export async function POST(req: Request) {
   const owner = await prisma.$transaction(async (tx) => {
     const partyId = d.email ? `party_${d.email.toLowerCase()}` : `party_${randomBytes(8).toString("hex")}`;
     const party = await tx.party.create({
-      data: { id: partyId, type: d.companyName ? "COMPANY" : "PERSON", name: d.name, email: d.email?.toLowerCase(), phone: d.phone }
+      data: { id: partyId, tenantId: g.user.tenantId, type: d.companyName ? "COMPANY" : "PERSON", name: d.name, email: d.email?.toLowerCase(), phone: d.phone }
     });
     const profile = await tx.ownerProfile.create({
       data: {
@@ -69,6 +69,7 @@ export async function POST(req: Request) {
     if (d.portalLogin && ownerRole) {
       await tx.user.create({
         data: {
+          tenantId: g.user.tenantId,
           email: d.portalLogin.email.toLowerCase(),
           name: d.name,
           passwordHash: hashPassword(d.portalLogin.password),
@@ -81,6 +82,7 @@ export async function POST(req: Request) {
   });
 
   await logAudit({
+    tenantId: g.user.tenantId,
     actorId: g.user.id,
     actorName: g.user.name,
     module: "M03",

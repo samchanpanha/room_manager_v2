@@ -90,8 +90,8 @@ export async function collectRentDues(propertyIds: string[], aheadDays = 7): Pro
   return digest;
 }
 
-async function readSent(): Promise<{ reminders: string[]; overdue: string[] }> {
-  const row = await prisma.setting.findUnique({ where: { key: SENT_KEY } });
+async function readSent(tenantId: string = "DEFAULT"): Promise<{ reminders: string[]; overdue: string[] }> {
+  const row = await prisma.setting.findUnique({ where: { tenantId_key: { tenantId, key: SENT_KEY } } });
   if (!row) return { reminders: [], overdue: [] };
   try {
     const v = JSON.parse(row.value) as { reminders?: unknown; overdue?: unknown };
@@ -104,10 +104,10 @@ async function readSent(): Promise<{ reminders: string[]; overdue: string[] }> {
   }
 }
 
-async function writeSent(sent: { reminders: string[]; overdue: string[] }): Promise<void> {
+async function writeSent(sent: { reminders: string[]; overdue: string[] }, tenantId: string = "DEFAULT"): Promise<void> {
   await prisma.setting.upsert({
-    where: { key: SENT_KEY },
-    create: { key: SENT_KEY, value: JSON.stringify(sent), updatedBy: "cron:m33" },
+    where: { tenantId_key: { tenantId, key: SENT_KEY } },
+    create: { tenantId, key: SENT_KEY, value: JSON.stringify(sent), updatedBy: "cron:m33" },
     update: { value: JSON.stringify(sent), updatedBy: "cron:m33" }
   });
 }
@@ -122,15 +122,15 @@ export interface RentAlertRun {
 
 /// Cron-shaped job: emit one reminder/overdue event per open rent invoice,
 /// deduped against the last run, and prune entries for settled invoices.
-export async function runRentAlerts(propertyIds?: string[]): Promise<RentAlertRun> {
-  const { rentAlerts } = await getSettings();
+export async function runRentAlerts(propertyIds?: string[], tenantId: string = "DEFAULT"): Promise<RentAlertRun> {
+  const { rentAlerts } = await getSettings(tenantId);
   const aheadDays = Math.max(1, rentAlerts.aheadDays);
   const overdueDays = Math.max(0, rentAlerts.overdueDays);
 
   const scopeIds =
     propertyIds && propertyIds.length > 0
       ? propertyIds
-      : (await prisma.property.findMany({ where: { status: "active" }, select: { id: true } })).map((p) => p.id);
+      : (await prisma.property.findMany({ where: { status: "active", ...(tenantId ? { tenantId } : {}) }, select: { id: true } })).map((p) => p.id);
 
   const digest = await collectRentDues(scopeIds, aheadDays);
   const sent = await readSent();

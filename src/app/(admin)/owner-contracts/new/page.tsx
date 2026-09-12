@@ -21,8 +21,9 @@ export default async function NewOwnerContractPage() {
   }
 
   const [owners, buildings] = await Promise.all([
-    prisma.ownerProfile.findMany({ include: { party: true }, orderBy: { createdAt: "asc" } }),
+    prisma.ownerProfile.findMany({ where: { party: { tenantId: user.tenantId } }, include: { party: true }, orderBy: { createdAt: "asc" } }),
     prisma.building.findMany({
+      where: { property: { tenantId: user.tenantId } },
       include: { property: true, owner: { include: { party: true } }, contracts: { where: { status: { in: ["draft", "active"] } } } },
       orderBy: { name: "asc" }
     })

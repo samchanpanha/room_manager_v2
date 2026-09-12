@@ -35,6 +35,7 @@ as recommended, and split into 13 parts so you can open only what you need.
 | 11 · FAQ | [11-faq.md](./11-faq.md) | Everyone |
 | 12 · Glossary | [12-glossary.md](./12-glossary.md) | Everyone |
 | 13 · Golden Paths & Scenarios | [13-golden-paths.md](./13-golden-paths.md) | Trainers, new employees, admins |
+| 14 · Move-Out Settlement Guide | [14-move-out-settlement-guide.md](./14-move-out-settlement-guide.md) | Staff, managers, cashiers |
 
 There is also a short one-page index card inside Part 2.
 

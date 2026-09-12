@@ -24,7 +24,8 @@ export const PART_LABELS = {
   "10-troubleshooting": "故障排除",
   "11-faq": "常见问题",
   "12-glossary": "术语表",
-  "13-golden-paths": "黄金路径与场景"
+  "13-golden-paths": "黄金路径与场景",
+  "14-move-out-settlement-guide": "退租结算指南"
 };
 
 export const UI = {

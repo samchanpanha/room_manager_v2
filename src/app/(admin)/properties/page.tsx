@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { NewPropertyButton } from "./new-property";
 import { Tx } from "@/components/i18n-text";
+import { ExportButton } from "@/components/export-button";
 
 export const dynamic = "force-dynamic";
 
@@ -70,10 +71,12 @@ export default async function PropertiesPage() {
   } else {
     const [allProperties, rooms, ownerLink] = await Promise.all([
       prisma.property.findMany({
+        where: { tenantId: user.tenantId },
         include: { _count: { select: { buildings: true, assignedUsers: true } } },
         orderBy: { createdAt: "asc" }
       }),
       prisma.room.findMany({
+        where: { floor: { building: { property: { tenantId: user.tenantId } } } },
         select: { status: true, floor: { select: { building: { select: { propertyId: true } } } } }
       }),
       getOwnerLinkForUser(user)
@@ -124,7 +127,12 @@ export default async function PropertiesPage() {
       <PageHeader
         title="Properties"
         description="Physical inventory: properties → buildings → floors → rooms → beds"
-        actions={can(user, "create", "M04") ? <NewPropertyButton /> : undefined}
+        actions={
+          <div className="flex items-center gap-2">
+            <ExportButton entity="rooms" label="Export Rooms" />
+            {can(user, "create", "M04") && <NewPropertyButton />}
+          </div>
+        }
       />
       {rows.length === 0 ? (
         <EmptyState title="No properties yet" hint="Create your first property to start adding buildings and rooms." />

@@ -35,6 +35,7 @@ export default async function RoomMovesPage() {
       : [];
 
   const moves = await prisma.roomMove.findMany({
+    where: { fromLease: { property: { tenantId: user.tenantId } } },
     include: {
       member: { include: { party: true } },
       fromLease: true,
@@ -54,13 +55,13 @@ export default async function RoomMovesPage() {
   const canRequestStaff = can(user, "create", "M16");
   const canTransition = can(user, "update", "M16");
   const activeLeases = await prisma.lease.findMany({
-    where: { status: "active" },
+    where: { status: "active", property: { tenantId: user.tenantId } },
     include: { member: { include: { party: true } }, room: true },
     orderBy: { code: "asc" }
   });
   const visibleLeases = activeLeases.filter((l) => isGlobal || user.propertyIds.includes(l.propertyId) || l.memberProfileId === ownMemberId);
   const vacantRooms = await prisma.room.findMany({
-    where: { status: { in: ["vacant", "reserved"] } },
+    where: { status: { in: ["vacant", "reserved"] }, floor: { building: { property: { tenantId: user.tenantId } } } },
     include: { floor: { include: { building: { include: { property: true } } } } },
     orderBy: { number: "asc" }
   });

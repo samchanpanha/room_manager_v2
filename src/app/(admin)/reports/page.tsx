@@ -15,6 +15,8 @@ import { getT } from "@/lib/locale-server";
 import { REPORTS } from "@/lib/reports/registry";
 import { ReportPicker } from "./report-picker";
 import { ReportsConfigToggle } from "./config-toggle";
+import { ExportButton } from "@/components/export-button";
+import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
 
@@ -41,13 +43,13 @@ export default async function ReportsPage({
 
   const scope = await reportScope(user);
   if (!scope.allowed) redirect("/dashboard");
-  const settings = await getSettings();
+  const settings = await getSettings(user.tenantId);
 
   // M28 readers may tune the optional config; only M28:update can write it.
   const canConfigure = hasModuleAccess(user, "read", "M28");
   const [activeUsers] = await Promise.all([
     canConfigure
-      ? prisma.user.findMany({ where: { status: "active" }, select: { id: true, name: true, email: true }, orderBy: { name: "asc" } })
+      ? prisma.user.findMany({ where: { status: "active", tenantId: user.tenantId }, select: { id: true, name: true, email: true }, orderBy: { name: "asc" } })
       : Promise.resolve([] as Array<{ id: string; name: string; email: string }>)
   ]);
 
@@ -78,7 +80,42 @@ export default async function ReportsPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("reports.page.title")} description={t("reports.page.description")} />
+      <PageHeader
+        title={t("reports.page.title")}
+        description={t("reports.page.description")}
+        actions={
+          (user.isSuperAdmin || user.roles.includes("ADMIN")) ? (
+            <ExportButton entity="all" label="Download Complete Workspace (.xlsx)" variant="default" size="default" />
+          ) : undefined
+        }
+      />
+
+      {/* Central Excel Data Export Center */}
+      <Card className="border-emerald-200/50 bg-emerald-50/20 dark:border-emerald-900/40 dark:bg-emerald-950/10">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <svg className="h-5 w-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <Tx>Excel Data Export Center</Tx>
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            <Tx>Download formatted spreadsheets (.xlsx) for your tenant records with current filters applied.</Tx>
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-center gap-2">
+            <ExportButton entity="members" propertyId={sp.propertyId} label="Export Members / Tenants" />
+            <ExportButton entity="leases" propertyId={sp.propertyId} label="Export Leases" />
+            <ExportButton entity="invoices" propertyId={sp.propertyId} from={sp.from} to={sp.to} label="Export Invoices" />
+            <ExportButton entity="payments" propertyId={sp.propertyId} from={sp.from} to={sp.to} label="Export Payments" />
+            <ExportButton entity="rooms" propertyId={sp.propertyId} label="Export Rooms & Units" />
+            {(user.isSuperAdmin || user.roles.includes("ADMIN")) && (
+              <ExportButton entity="all" propertyId={sp.propertyId} label="Full Workspace Multi-Sheet (.xlsx)" variant="secondary" />
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <ReportPicker
         reports={reports.map((r) => {

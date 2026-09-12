@@ -372,8 +372,8 @@ const MEMBER_EVENT_TEMPLATES = {
   "rent.overdue": "rentReminder"
 } as const;
 
-async function readCursor(): Promise<{ occurredAt: Date; id: string } | null> {
-  const row = await prisma.setting.findUnique({ where: { key: CURSOR_KEY } });
+async function readCursor(tenantId: string = "DEFAULT"): Promise<{ occurredAt: Date; id: string } | null> {
+  const row = await prisma.setting.findUnique({ where: { tenantId_key: { tenantId, key: CURSOR_KEY } } });
   if (!row) return null;
   try {
     const v = JSON.parse(row.value) as { occurredAt: string; id: string };
@@ -383,10 +383,10 @@ async function readCursor(): Promise<{ occurredAt: Date; id: string } | null> {
   }
 }
 
-async function writeCursor(event: { occurredAt: Date; id: string }): Promise<void> {
+async function writeCursor(event: { occurredAt: Date; id: string }, tenantId: string = "DEFAULT"): Promise<void> {
   await prisma.setting.upsert({
-    where: { key: CURSOR_KEY },
-    create: { key: CURSOR_KEY, value: JSON.stringify({ occurredAt: event.occurredAt.toISOString(), id: event.id }) },
+    where: { tenantId_key: { tenantId, key: CURSOR_KEY } },
+    create: { tenantId, key: CURSOR_KEY, value: JSON.stringify({ occurredAt: event.occurredAt.toISOString(), id: event.id }) },
     update: { value: JSON.stringify({ occurredAt: event.occurredAt.toISOString(), id: event.id }) }
   });
 }

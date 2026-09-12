@@ -10,6 +10,7 @@ import { formatMinor } from "@/lib/money";
 import { DepositActions } from "./deposit-actions";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Tx } from "@/components/i18n-text";
+import { WorkflowGuide } from "@/components/workflow-guide";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,7 @@ export default async function DepositsPage({
 
   const deposits = await prisma.deposit.findMany({
     where: {
+      lease: { property: { tenantId: user.tenantId } },
       ...(sp.status ? { status: sp.status } : {}),
       ...(scope === "ALL" ? {} : { OR: [{ propertyId: { in: scope.propertyIds } }, { memberProfileId: { in: scope.memberIds } }] })
     },
@@ -66,7 +68,8 @@ export default async function DepositsPage({
       deductedMinor: deducted,
       refundedMinor: refunded,
       remainingMinor: Math.max(0, collected - deducted - refunded),
-      invoiceId: d.invoiceId
+      invoiceId: d.invoiceId,
+      invoiceCode: d.invoice?.code ?? null
     };
   });
 
@@ -75,12 +78,46 @@ export default async function DepositsPage({
   const settling = rows.filter((r) => r.status === "held" && r.leaseStatus !== "active").length;
   const canUpdate = can(user, "update", "M10");
   const canRefund = user.permissions.some((p) => p.module === "M10" && p.action === "update" && p.scope === "GLOBAL");
+  const canCollectPayment = can(user, "create", "M09");
 
   return (
     <div>
       <PageHeader
         title="Deposits"
         description="Security deposits — collected as installment invoices, held in 2100 Deposit Liability, settled with evidence-backed deductions + refund at move-out"
+      />
+
+      <WorkflowGuide
+        moduleKey="M10"
+        title="Security Deposit Lifecycle & Settlement Workflow"
+        subtitle="Installment billing, liability holding (2100), evidence-backed deductions, and move-out refunds"
+        steps={[
+          {
+            title: "1. Billed on Activation",
+            description: "Activating a lease automatically generates a deposit installment invoice (isDeposit=true) with status 'billed'.",
+            badge: "Billed",
+            badgeVariant: "warning"
+          },
+          {
+            title: "2. Collected & Held",
+            description: "When the member pays the deposit invoice (M09), status flips to 'held' and money sits in 2100 Deposit Liability.",
+            badge: "Held (2100)",
+            badgeVariant: "success"
+          },
+          {
+            title: "3. Move-Out Inspection",
+            description: "At lease end (notice/completed/terminated), a completed move-out inspection (M18) catalogs any room damages.",
+            badge: "Gate (M18)",
+            badgeVariant: "info"
+          },
+          {
+            title: "4. Settle: Deduct & Refund",
+            description: "Staff posts deductions with uploaded evidence photos/reports, and refunds the remainder. Liability nets to 0 ('settled').",
+            badge: "Settled",
+            badgeVariant: "outline"
+          }
+        ]}
+        tip="Deductions require an evidence document from the document registry. Unpaid rent deductions credit 1300 Receivable; damage/cleaning deductions credit 4900 Revenue."
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
@@ -145,9 +182,14 @@ export default async function DepositsPage({
                   </TableCell>
                   <TableCell>
                     {d.invoiceId ? (
-                      <a href={`/invoices/${d.invoiceId}`} className="font-mono text-xs underline underline-offset-4 hover:underline">
-                        <Tx>view
-                      </Tx></a>
+                      <div className="flex items-center gap-1.5">
+                        <a href={`/invoices/${d.invoiceId}`} className="font-mono text-xs underline underline-offset-4 hover:underline">
+                          {d.invoiceCode ?? "view"}
+                        </a>
+                        <Badge variant={d.collectedMinor >= d.requiredMinor ? "success" : "warning"} className="text-[10px] px-1 py-0">
+                          {d.collectedMinor >= d.requiredMinor ? "paid" : "unpaid"}
+                        </Badge>
+                      </div>
                     ) : (
                       <span className="text-xs text-muted-foreground"><Tx>not billed</Tx></span>
                     )}
@@ -157,14 +199,27 @@ export default async function DepositsPage({
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{formatMinor(d.requiredMinor)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatMinor(d.collectedMinor)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{d.deductedMinor ? formatMinor(d.deductedMinor) : "—"}</TableCell>
-                  <TableCell className="text-right tabular-nums">{d.refundedMinor ? formatMinor(d.refundedMinor) : "—"}</TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">{formatMinor(d.remainingMinor)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatMinor(d.deductedMinor)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatMinor(d.refundedMinor)}</TableCell>
+                  <TableCell className="text-right tabular-nums font-medium">{formatMinor(d.remainingMinor)}</TableCell>
                   <TableCell className="text-right">
                     <DepositActions
-                      deposit={{ id: d.id, leaseStatus: d.leaseStatus, status: d.status, remainingMinor: d.remainingMinor }}
+                      deposit={{
+                        id: d.id,
+                        leaseId: d.leaseId,
+                        leaseStatus: d.leaseStatus,
+                        status: d.status,
+                        remainingMinor: d.remainingMinor,
+                        requiredMinor: d.requiredMinor,
+                        collectedMinor: d.collectedMinor,
+                        invoiceId: d.invoiceId,
+                        invoiceCode: d.invoiceCode,
+                        memberProfileId: d.member.id,
+                        memberName: d.member.name
+                      }}
                       canUpdate={canUpdate}
                       canRefund={canRefund}
+                      canCollectPayment={canCollectPayment}
                     />
                   </TableCell>
                 </TableRow>

@@ -11,6 +11,7 @@ import { OwnerContractActions } from "./contract-actions";
 import { formatMinor } from "@/lib/money";
 import { formatDate, titleCase } from "@/lib/utils";
 import { Tx } from "@/components/i18n-text";
+import { ExportButton } from "@/components/export-button";
 
 export const dynamic = "force-dynamic";
 
@@ -32,10 +33,12 @@ export default async function LeasesPage({ searchParams }: { searchParams: Promi
   const canCreate = can(user, "create", "M05");
 
   const leases = await prisma.lease.findMany({
+    where: { property: { tenantId: user.tenantId } },
     include: { member: { include: { party: true } }, room: { include: { floor: { include: { building: { include: { property: true } } } } } }, services: true },
     orderBy: { createdAt: "desc" }
   });
   const contracts = await prisma.ownerContract.findMany({
+    where: { building: { property: { tenantId: user.tenantId } } },
     include: { owner: { include: { party: true } }, building: { include: { property: true } } },
     orderBy: { createdAt: "desc" }
   });
@@ -46,16 +49,19 @@ export default async function LeasesPage({ searchParams }: { searchParams: Promi
         title="Leases & Contracts"
         description="Member occupancy leases and owner building contracts (M05)"
         actions={
-          canCreate ? (
-            <>
-              <Link href="/owner-contracts/new" className={buttonClassName("outline")}>
-                <Tx>+ Owner contract</Tx>
-              </Link>
-              <Link href="/leases/new" className={buttonClassName()}>
-                <Tx>+ New lease</Tx>
-              </Link>
-            </>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            <ExportButton entity="leases" />
+            {canCreate && (
+              <>
+                <Link href="/owner-contracts/new" className={buttonClassName("outline")}>
+                  <Tx>+ Owner contract</Tx>
+                </Link>
+                <Link href="/leases/new" className={buttonClassName()}>
+                  <Tx>+ New lease</Tx>
+                </Link>
+              </>
+            )}
+          </div>
         }
       />
 

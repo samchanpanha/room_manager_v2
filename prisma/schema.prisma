@@ -16,9 +16,29 @@ datasource db {
 
 // ───────────────────────────── M00 Kernel ─────────────────────────────
 
+model Tenant {
+  id           String     @id @default(cuid())
+  slug         String     @unique // url-safe identifier e.g. "acme-housing"
+  name         String     // display company name e.g. "Acme Housing Ltd."
+  contactEmail String?
+  status       String     @default("active") // active | suspended | disabled
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @default(now()) @updatedAt
+  users        User[]
+  properties   Property[]
+  parties      Party[]
+  auditLogs    AuditLog[]
+  settings     Setting[]
+
+  @@index([status])
+  @@index([slug])
+}
+
 /// Party model: one table reused for members, owners, vendors, staff contacts.
 model Party {
   id             String          @id @default(cuid())
+  tenantId       String          @default("DEFAULT")
+  tenant         Tenant?         @relation(fields: [tenantId], references: [id])
   type           String // PERSON | COMPANY
   name           String
   email          String?
@@ -27,10 +47,14 @@ model Party {
   users          User[]
   memberProfiles MemberProfile[]
   ownerProfiles  OwnerProfile[]
+
+  @@index([tenantId])
 }
 
 model User {
   id                   String                   @id @default(cuid())
+  tenantId             String                   @default("DEFAULT")
+  tenant               Tenant?                  @relation(fields: [tenantId], references: [id])
   email                String                   @unique
   name                 String
   passwordHash         String
@@ -52,6 +76,8 @@ model User {
   attendanceRecords    AttendanceRecord[]
   attendanceExceptions AttendanceException[]
   resolvedExceptions   AttendanceException[]    @relation("ExceptionResolver")
+
+  @@index([tenantId])
 }
 
 model Session {
@@ -121,6 +147,8 @@ model UserPropertyAssignment {
 
 model Property {
   id                   String                   @id @default(cuid())
+  tenantId             String                   @default("DEFAULT")
+  tenant               Tenant?                  @relation(fields: [tenantId], references: [id])
   code                 String                   @unique
   name                 String
   address              String?
@@ -157,6 +185,8 @@ model Property {
   rentModules          RentModule[]
   stayRateRules        StayRateRule[]
   stayBookings         StayBooking[]
+
+  @@index([tenantId])
 }
 
 model Building {
@@ -223,6 +253,8 @@ model Bed {
 
 model AuditLog {
   id         String   @id @default(cuid())
+  tenantId   String   @default("DEFAULT")
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id])
   actorId    String?
   actor      User?    @relation("AuditActor", fields: [actorId], references: [id])
   actorName  String
@@ -241,6 +273,7 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([module])
   @@index([createdAt])
+  @@index([tenantId])
 }
 
 model DomainEvent {
@@ -254,10 +287,15 @@ model DomainEvent {
 }
 
 model Setting {
-  key       String   @id
+  tenantId  String   @default("DEFAULT")
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  key       String
   value     String // JSON string
   updatedBy String?
   updatedAt DateTime @updatedAt
+
+  @@id([tenantId, key])
+  @@index([tenantId])
 }
 
 model NumberSequence {
@@ -994,15 +1032,17 @@ model ServiceAssignment {
   startDate     DateTime
   suspendedAt   DateTime?
   endedAt       DateTime?
-  parkingSlotId String?        @unique
+  parkingSlotId String?
   parkingSlot   ParkingSlot?   @relation(fields: [parkingSlotId], references: [id])
-  wifiAccountId String?        @unique
+  wifiAccountId String?
   wifiAccount   WifiAccount?   @relation(fields: [wifiAccountId], references: [id])
   snapshotId    String? // LeaseService row driving billing (fixed_monthly)
   note          String?
   createdAt     DateTime       @default(now())
 
   @@index([leaseId, status])
+  @@index([parkingSlotId])
+  @@index([wifiAccountId])
 }
 
 /// Per-use entry (laundry kg, visitor parking…) → one-time line on the next
@@ -1036,7 +1076,7 @@ model ParkingSlot {
   status          String   @default("free") // free | assigned
   createdAt       DateTime @default(now())
 
-  assignment ServiceAssignment?
+  assignments ServiceAssignment[]
 }
 
 model WifiAccount {
@@ -1048,7 +1088,7 @@ model WifiAccount {
   status     String   @default("free") // free | assigned | suspended
   createdAt  DateTime @default(now())
 
-  assignment ServiceAssignment?
+  assignments ServiceAssignment[]
 }
 
 // ─────────────────────── M16 Room Moves ───────────────────────

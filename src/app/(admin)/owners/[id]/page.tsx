@@ -44,7 +44,7 @@ export default async function OwnerDetailPage({ params }: { params: Promise<{ id
   const docTypes = await prisma.docType.findMany({ orderBy: { sortOrder: "asc" } });
 
   const unownedBuildings = await prisma.building.findMany({
-    where: { ownerId: null },
+    where: { ownerId: null, property: { tenantId: user.tenantId } },
     include: { property: true },
     orderBy: { name: "asc" }
   });

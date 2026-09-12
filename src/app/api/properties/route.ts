@@ -21,8 +21,9 @@ export async function POST(req: Request) {
   const exists = await prisma.property.findUnique({ where: { code: parsed.data.code } });
   if (exists) return fail(409, "DUPLICATE", `Property code ${parsed.data.code} already exists`);
 
-  const property = await prisma.property.create({ data: parsed.data });
+  const property = await prisma.property.create({ data: { ...parsed.data, tenantId: g.user.tenantId } });
   await logAudit({
+    tenantId: g.user.tenantId,
     actorId: g.user.id,
     actorName: g.user.name,
     module: "M04",

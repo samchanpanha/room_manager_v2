@@ -15,7 +15,7 @@ export interface StatementsScope {
 
 export async function statementsScope(user: AuthUser): Promise<StatementsScope> {
   if (user.permissions.some((p) => p.module === "M24" && p.action === "read" && p.scope === "GLOBAL")) {
-    const all = await prisma.property.findMany({ where: { status: "active" }, select: { id: true } });
+    const all = await prisma.property.findMany({ where: { status: "active", tenantId: user.tenantId }, select: { id: true } });
     return { allowed: true, propertyIds: all.map((p) => p.id), global: true };
   }
   if (can(user, "read", "M24", { ownerUserId: user.id })) {
