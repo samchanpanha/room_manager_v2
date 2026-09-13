@@ -6,6 +6,10 @@ running live with seeded demo data.
 
 ## Quick start
 
+> 🖥️ **New here?** Follow the step-by-step guides with screenshots-free commands:
+> **[Deploy on macOS](./docs/DEPLOY_MAC.md)** · **[Deploy on Windows](./docs/DEPLOY_WINDOWS.md)** ·
+> then the **[Administrator Guide](./docs/ADMIN_GUIDE.md)** (first login, setup, security).
+
 ```bash
 npm install
 npx prisma generate

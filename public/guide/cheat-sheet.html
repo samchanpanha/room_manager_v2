@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>RentManager — Admin Cheat Sheet</title>
+<style>
+*{box-sizing:border-box}
+body{font:12px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans Khmer","PingFang SC",sans-serif;color:#1e293b;margin:0;padding:18px;background:#f1f5f9}
+.page{max-width:1020px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:22px 26px}
+header{display:flex;align-items:center;gap:12px;border-bottom:3px solid #2563eb;padding-bottom:10px;margin-bottom:12px}
+.badge{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#0d9488);color:#fff;font-weight:800;display:grid;place-items:center;font-size:15px}
+h1{font-size:19px;margin:0}
+.sub{font-size:11.5px;color:#64748b}
+.printbtn{margin-left:auto;border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:8px 16px;font-weight:700;cursor:pointer;font-size:12.5px;color:#1d4ed8}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px 18px}
+section{break-inside:avoid}
+h2{font-size:12.5px;text-transform:uppercase;letter-spacing:.05em;color:#1d4ed8;margin:10px 0 6px;border-bottom:1px solid #e2e8f0;padding-bottom:3px}
+table{width:100%;border-collapse:collapse;font-size:11.5px}
+th,td{padding:3px 6px;text-align:left;border-bottom:1px solid #f1f5f9;vertical-align:top}
+th{color:#64748b;font-size:10px;text-transform:uppercase}
+code{background:#eef2f7;border:1px solid #e2e8f0;border-radius:5px;padding:0 5px;font-size:10.8px;font-family:ui-monospace,Menlo,monospace;color:#be185d;white-space:nowrap}
+pre{background:#0f172a;color:#e2e8f0;border-radius:9px;padding:9px 12px;font-size:10.8px;line-height:1.5;overflow-x:auto;font-family:ui-monospace,Menlo,monospace;margin:6px 0}
+ol,ul{margin:5px 0;padding-left:19px}
+li{margin:2.5px 0}
+.warn{color:#b45309;font-weight:700}
+footer{margin-top:10px;font-size:10.5px;color:#64748b;border-top:1px solid #e2e8f0;padding-top:7px}
+@media print{
+  body{background:#fff;padding:0}
+  .page{border:0;border-radius:0;padding:0;max-width:100%}
+  .printbtn{display:none}
+  @page{size:A4;margin:10mm}
+}
+</style>
+</head>
+<body>
+<div class="page">
+<header>
+  <div class="badge">RM</div>
+  <div><h1>RentManager — Admin Cheat Sheet</h1><div class="sub">Deploy · verify · operate · fix — one page. Full docs: in-app Help &amp; Guide → Part 15 (Deployment) + Part 8 (Admin).</div></div>
+  <button class="printbtn" onclick="window.print()">🖨️ Print / Save PDF</button>
+</header>
+<div class="cols">
+<div>
+<section><h2>URLs &amp; logins</h2>
+<table>
+<tr><th>Service</th><th>URL</th><th>Login</th></tr>
+<tr><td>App</td><td><code>localhost:3000</code></td><td><code>root@demo.test</code> / <code>Demo1234!</code></td></tr>
+<tr><td>Swagger APIs</td><td><code>localhost:8080/swagger-ui.html</code></td><td>—</td></tr>
+<tr><td>Nacos / Keycloak</td><td><code>:8848/nacos</code> · <code>:7080</code></td><td><code>nacos/nacos</code> · <code>admin/admin</code></td></tr>
+<tr><td>Kafka UI / MinIO / Grafana</td><td><code>:8090</code> · <code>:9001</code> · <code>:9090</code></td><td>— · <code>rentmanager/…</code> · <code>admin/admin</code></td></tr>
+</table>
+<div style="font-size:11px;margin-top:4px">Demo accounts (all <code>Demo1234!</code>): <code>root@</code> Super Admin · <code>admin@</code> · <code>pm@</code> (BLR only) · <code>accountant@</code> · <code>staff@</code> · <code>owner@</code> · <code>owner2@</code> · <code>member@</code></div>
+</section>
+<section><h2>Deploy (Docker — Mac &amp; Windows)</h2>
+<pre>git clone &lt;URL&gt; room_manager_v2 &amp;&amp; cd room_manager_v2
+docker compose up --build -d      # first build 10–40 min
+docker compose up -d --wait       # wait for green
+curl -sf localhost:3000/api/health  # → {"status":"ok"}</pre>
+<div style="font-size:11px">Windows first: <code>wsl --install</code> (Admin) → Docker Desktop + WSL 2 backend.<br/>Docker Settings → Resources → <b>RAM ≥ 8 GB</b>, CPUs ≥ 4.</div>
+</section>
+<section><h2>Daily commands</h2>
+<pre>docker compose ps | logs -f rentmanager | stop | start | down
+docker compose down -v    # <span class="warn">⚠ wipes ALL data</span>
+git pull &amp;&amp; docker compose up --build -d   # update</pre>
+</section>
+</div>
+<div>
+<section><h2>Must-schedule jobs (Admin token)</h2>
+<table>
+<tr><th>Job</th><th>Endpoint</th><th>When</th></tr>
+<tr><td>billing</td><td><code>POST /api/jobs/billing-daily</code></td><td>daily 01:00</td></tr>
+<tr><td><b>backup</b></td><td><code>POST /api/jobs/backup</code></td><td><b>daily 02:00 — never skip</b></td></tr>
+<tr><td>alerts</td><td><code>POST /api/jobs/rent-alerts</code></td><td>daily 06:00</td></tr>
+<tr><td>invoices / statements</td><td><code>…/invoice-generation</code> / <code>…/statement-generation</code></td><td>monthly</td></tr>
+</table>
+<div style="font-size:11px;margin-top:4px">Mac: <code>crontab -e</code> + <code>curl -X POST … -H "Cookie: $RM_ADMIN_COOKIE"</code><br/>Win: Task Scheduler → <code>powershell.exe -ExecutionPolicy Bypass -File C:\RentManager\jobs\invoke-jobs.ps1</code></div>
+</section>
+<section><h2>First-login checklist</h2>
+<ol>
+<li>Sign in <code>root@demo.test</code> → enroll <b>2FA</b> (Account → Security)</li>
+<li>Create your <b>real Super Admin</b> → disable all <code>*@demo.test</code></li>
+<li>Settings: Org · Locale (<b>currency is final!</b>) · Billing · Secrets</li>
+<li>Properties → Buildings → Floors → Rooms → users/roles</li>
+<li>Schedule jobs + test-restore the backup once</li>
+</ol>
+</section>
+<section><h2>Fast fixes</h2>
+<table>
+<tr><td>Daemon error</td><td>Open Docker Desktop, wait for whale; Win: WSL 2 backend on</td></tr>
+<tr><td>Port allocated</td><td>Mac <code>lsof -i :3000</code>; Win <code>netstat -ano | findstr :3000</code> → kill it</td></tr>
+<tr><td>DB wait loop</td><td><code>docker compose ps</code> → postgres healthy? <code>logs postgres</code></td></tr>
+<tr><td>Can't sign in</td><td><code>logs --tail=100 rentmanager</code>; <code>/api/health</code> = 200?</td></tr>
+<tr><td>403 on action</td><td>Correct RBDC denial → roles / scopes / property assignment</td></tr>
+<tr><td>No menu item</td><td>Missing <code>read</code> on module, or feature flag off</td></tr>
+</table>
+</section>
+</div>
+</div>
+<footer>Health: <code>/api/health</code> · Audit: <code>/api/audit/verify</code> → <code>{ok:true}</code> · Books: collections report reconciles · Backups: <code>backups/*.dump</code> (keep 7) — restore runbook in <code>docs/BACKUP.md</code></footer>
+</div>
+</body>
+</html>

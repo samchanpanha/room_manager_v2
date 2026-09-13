@@ -25,7 +25,8 @@ export const PART_LABELS = {
   "11-faq": "常见问题",
   "12-glossary": "术语表",
   "13-golden-paths": "黄金路径与场景",
-  "14-move-out-settlement-guide": "退租结算指南"
+  "14-move-out-settlement-guide": "退租结算指南",
+  "15-deployment-guide": "部署指南（Mac 与 Windows）"
 };
 
 export const UI = {
@@ -276,6 +277,23 @@ export const WALKS = [
       { t: "在聊天中绑定", d: "用户在 Telegram 打开机器人并发送 `/link <code>`。机器人（经权限检查）绑定其账户并确认。", menu: "机器人 → /link <code>" },
       { t: "设置通知开关", d: "开关其接收的事件：账单出具、收款确认、催缴、提醒、工单/投诉更新、业主对账单、低库存、入住率摘要。", menu: "通知开关" },
       { t: "自定义文案（可选）", d: "在**设置 → 模板**中用 {placeholders} 覆盖五类会员事件的文案。演示系统中，消息被**模拟到发件箱**（显示在 Telegram 页面）。", menu: "设置 → 模板" }
+    ]
+  },
+  {
+    id: "deploy",
+    title: "🚀 部署 RentManager（Mac 与 Windows）",
+    role: "管理员 / IT",
+    time: "约 30–60 分钟",
+    intro: "用 Docker 安装完整系统、验证运行，并排好每夜备份。",
+    steps: [
+      { t: "检查系统要求", d: "需要**最低 8 GB 内存（推荐 16 GB）**、20 GB 可用磁盘和 **Docker Desktop**（Windows：需 **WSL 2**）。3000 / 5432 / 8080–8088 等端口必须空闲。", menu: "第 15 部分 → 15.1 系统要求" },
+      { t: "安装 Docker Desktop", d: "macOS：下载 Apple Silicon 或 Intel 版本。Windows：先运行 `wsl --install`，再安装 WSL 2 后端的 Docker。在设置 → Resources 中给 Docker 分配 **≥ 8 GB 内存**。", menu: "安装 Docker" },
+      { t: "克隆仓库", d: "执行 `git clone <URL> room_manager_v2` 到短且无空格的路径，然后 `cd room_manager_v2`。", menu: "终端 / PowerShell" },
+      { t: "设置密钥（演示可跳过）", d: "首次启动前覆盖开发默认值：MinIO/Grafana 密码、webhook 密钥、`SETTINGS_ENC_KEY`。切勿提交真实密钥。", menu: "环境变量" },
+      { t: "启动一切", d: "执行 `docker compose up --build -d`。首次构建需要 10–40 分钟；启动时应用会自动运行**迁移 + 种子数据**。", menu: "docker compose up" },
+      { t: "验证运行", d: "用 `docker compose up -d --wait` 等待，然后确认 `http://localhost:3000/api/health` 返回 ok，登录页正常加载。", menu: "验证" },
+      { t: "以超级管理员首次登录", d: "以 **root@demo.test / Demo1234!** 登录，注册 2FA，创建真实管理员，然后禁用演示账号。", menu: "登录 → 管理" },
+      { t: "安排每夜备份", d: "添加 cron 任务（Mac）或任务计划程序任务（Windows），每夜调用 `POST /api/jobs/backup` — 外加 billing-daily 与 rent-alerts。", menu: "任务 → backup" }
     ]
   }
 ];

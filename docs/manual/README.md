@@ -63,6 +63,19 @@ A seeded training system is included. Every demo account uses the password **`De
 > ⚠️ These are **training accounts only**. Change or disable them before go-live
 > (see Part 8 → User Management).
 
+## Operations & deployment docs (outside this manual)
+
+These live next to the manual and cover installing and running the system:
+
+| Doc | What it covers |
+|---|---|
+| [`../ADMIN_GUIDE.md`](../ADMIN_GUIDE.md) | Detailed Administrator Guide: architecture & ports, first login, RBDC matrix, user SOPs, setup order, settings reference, per-module admin ops, cron jobs, backup/restore, hardening, monitoring, go-live checklist ([ខ្មែរ](../ADMIN_GUIDE_KM.md) · [中文](../ADMIN_GUIDE_ZH.md)) |
+| [`../DEPLOY_MAC.md`](../DEPLOY_MAC.md) | macOS requirements + step-by-step deploy (Docker full stack + lightweight local dev) |
+| [`../DEPLOY_WINDOWS.md`](../DEPLOY_WINDOWS.md) | Windows 10/11 requirements + step-by-step deploy (Docker/WSL2 full stack + native local dev) |
+| [`../CHEAT_SHEET.md`](../CHEAT_SHEET.md) | One-page admin cheat sheet (printable HTML ships with the guide at `/guide/cheat-sheet.html`) |
+| [`../BACKUP.md`](../BACKUP.md) | Backup & restore runbook (M27) |
+| [`../SECURITY.md`](../SECURITY.md) | Security notes |
+
 ## Conventions used in this manual
 
 - **`Menu → Item`** is a navigation path inside the admin console.
