@@ -1,0 +1,71 @@
+server:
+  port: 8085
+spring:
+  application:
+    name: staff-service
+  config:
+    import:
+      - optional:nacos:shared-common.yml
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+      config:
+        server-addr: ${NACOS_SERVER:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        file-extension: yml
+        import-check:
+          enabled: false
+        shared-configs:
+          - data-id: shared-common.yml
+            refresh: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/rentmanager}
+    username: ${DB_USER:rentmanager}
+    password: ${DB_PASSWORD:rentmanager}
+  jpa:
+    hibernate:
+      ddl-auto: none
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    open-in-view: false
+    properties:
+      hibernate:
+        globally_quoted_identifiers: true
+  flyway:
+    enabled: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      group-id: staff-service
+      auto-offset-reset: earliest
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:7080/realms/rentmanager}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+
+logging:
+  level:
+    com.rentmanager: DEBUG

@@ -100,3 +100,41 @@ export function DeleteRoleButton({ id, name, inUse }: { id: string; name: string
     </Button>
   );
 }
+
+/// Enable / disable a role (§M01). Disabling keeps the role and its memberships
+/// but immediately stops granting permissions — membership is preserved so
+/// re-enabling restores access without re-assigning everyone.
+export function ToggleRoleButton({ id, name, active }: { id: string; name: string; active: boolean }) {
+  const router = useRouter();
+  const { push } = useToast();
+  const [busy, setBusy] = useState(false);
+
+  async function toggle() {
+    const next = !active;
+    if (!next && !window.confirm(`Disable role "${name}"? Users holding this role will immediately lose its permissions (membership is kept).`)) return;
+    setBusy(true);
+    const res = await fetch(`/api/roles/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active: next })
+    });
+    const body = (await res.json().catch(() => ({}))) as { message?: string };
+    setBusy(false);
+    if (!res.ok) {
+      push({ title: "Could not update role", description: body.message, variant: "destructive" });
+      return;
+    }
+    push(
+      next
+        ? { title: `Role ${name} re-enabled`, variant: "success" }
+        : { title: `Role ${name} disabled`, description: "Memberships no longer grant permissions.", variant: "success" }
+    );
+    router.refresh();
+  }
+
+  return (
+    <Button size="sm" variant="outline" disabled={busy} onClick={toggle}>
+      {active ? "Disable" : "Enable"}
+    </Button>
+  );
+}

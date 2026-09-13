@@ -13,6 +13,9 @@ import { formatDate, titleCase } from "@/lib/utils";
 import { Tx } from "@/components/i18n-text";
 import { ExportButton } from "@/components/export-button";
 
+import { BACKEND_ENABLED } from "@/lib/backend/config";
+import { api as backend, type LeaseSummary } from "@/lib/backend/client";
+
 export const dynamic = "force-dynamic";
 
 const LEASE_VARIANT: Record<string, "secondary" | "success" | "warning" | "destructive" | "info" | "outline"> = {
@@ -32,16 +35,69 @@ export default async function LeasesPage({ searchParams }: { searchParams: Promi
   const tab = sp.tab === "contracts" ? "contracts" : "leases";
   const canCreate = can(user, "create", "M05");
 
-  const leases = await prisma.lease.findMany({
-    where: { property: { tenantId: user.tenantId } },
-    include: { member: { include: { party: true } }, room: { include: { floor: { include: { building: { include: { property: true } } } } } }, services: true },
-    orderBy: { createdAt: "desc" }
-  });
-  const contracts = await prisma.ownerContract.findMany({
-    where: { building: { property: { tenantId: user.tenantId } } },
-    include: { owner: { include: { party: true } }, building: { include: { property: true } } },
-    orderBy: { createdAt: "desc" }
-  });
+  let leases: Array<{
+    id: string;
+    code: string;
+    status: string;
+    memberProfileId: string;
+    member: { party: { name: string } };
+    room: { number: string; floor: { building: { property: { code: string } } } };
+    bedId: string | null;
+    startDate: Date | string | null;
+    endDate: Date | string | null;
+    rentAmountMinor: number;
+    services: unknown[];
+    nextBillingDate: Date | string | null;
+  }> = [];
+
+  let contracts: Array<{
+    id: string;
+    code: string;
+    ownerProfileId: string;
+    owner: { party: { name: string } };
+    building: { property: { code: string }; name: string };
+    model: string;
+    sharePercent: number | null;
+    fixedRentMinor: number | null;
+    managementFeePercent: number;
+    status: string;
+    startDate: Date;
+    endDate: Date | null;
+    payoutCycleDay: number;
+  }> = [];
+
+  if (BACKEND_ENABLED) {
+    try {
+      const backendLeases = await backend.leases.list();
+      leases = backendLeases.map((l: LeaseSummary) => ({
+        id: l.id,
+        code: l.code,
+        status: l.status,
+        memberProfileId: l.memberProfileId,
+        member: { party: { name: `Member ${l.memberProfileId.slice(0, 8)}` } },
+        room: { number: l.roomId.slice(0, 8), floor: { building: { property: { code: l.propertyId.slice(0, 8) } } } },
+        bedId: l.bedId,
+        startDate: l.startDate,
+        endDate: l.endDate,
+        rentAmountMinor: l.rentAmountMinor,
+        services: [],
+        nextBillingDate: l.nextBillingDate
+      }));
+    } catch {
+      leases = [];
+    }
+  } else {
+    leases = await prisma.lease.findMany({
+      where: { property: { tenantId: user.tenantId } },
+      include: { member: { include: { party: true } }, room: { include: { floor: { include: { building: { include: { property: true } } } } } }, services: true },
+      orderBy: { createdAt: "desc" }
+    });
+    contracts = await prisma.ownerContract.findMany({
+      where: { building: { property: { tenantId: user.tenantId } } },
+      include: { owner: { include: { party: true } }, building: { include: { property: true } } },
+      orderBy: { createdAt: "desc" }
+    });
+  }
 
   return (
     <div>
@@ -116,7 +172,7 @@ export default async function LeasesPage({ searchParams }: { searchParams: Promi
                       <Badge variant={LEASE_VARIANT[l.status] ?? "secondary"}>{l.status}</Badge>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {formatDate(l.startDate)} → {l.endDate ? formatDate(l.endDate) : "open"}
+                      {l.startDate ? formatDate(l.startDate) : "—"} → {l.endDate ? formatDate(l.endDate) : "open"}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatMinor(l.rentAmountMinor)}
@@ -125,7 +181,7 @@ export default async function LeasesPage({ searchParams }: { searchParams: Promi
                       ) : null}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {l.nextBillingDate ? l.nextBillingDate.toISOString().slice(0, 10) : "—"}
+                      {l.nextBillingDate ? (typeof l.nextBillingDate === "string" ? l.nextBillingDate.slice(0, 10) : l.nextBillingDate.toISOString().slice(0, 10)) : "—"}
                     </TableCell>
                   </TableRow>
                 ))}

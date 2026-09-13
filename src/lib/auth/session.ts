@@ -92,7 +92,8 @@ export async function getAuthUser(): Promise<AuthUser | null> {
   if (!session || session.revokedAt || session.expiresAt < new Date()) return null;
   if (session.user.status !== "active") return null;
 
-  const lists: EffectivePermission[][] = session.user.roles.map((ur) =>
+  const activeRoles = session.user.roles.filter((ur) => ur.role.active);
+  const lists: EffectivePermission[][] = activeRoles.map((ur) =>
     ur.role.permissions.map((rp) => ({
       module: rp.permission.module,
       action: rp.permission.action as Action,
@@ -100,7 +101,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     }))
   );
 
-  const roles = session.user.roles.map((ur) => ur.role.key);
+  const roles = activeRoles.map((ur) => ur.role.key);
   const isAdminPlus = roles.some((r) => ADMIN_PLUS_ROLES.has(r));
   return {
     id: session.user.id,

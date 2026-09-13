@@ -27,39 +27,56 @@ let actor = { id: "", name: "" };
 let invoiceId = "";
 let memberId = "";
 let qrPaymentId = "";
-const CODE = "BLR-TEST-QR";
+// Per-run unique codes: Payment/PaymentAllocation are append-only (init
+// migration trigger), so this suite can never DELETE its own fixture rows.
+// Like qrpay-payall.test.ts, it draws a private member + fresh invoices per
+// run instead of cleaning up — re-runs against the same DB stay hermetic.
+const stamp = Date.now();
+const CODE = `BLR-TEST-QR-${stamp}`;
+const CODE2 = `BLR-TEST-QR2-${stamp}`;
+
+const mkInvoice = async (code: string, amountMinor: number, daysShift: number) => {
+  const property = await prisma.property.findFirstOrThrow({ where: { code: "BLR" } });
+  const invoice = await prisma.invoice.create({
+    data: {
+      code,
+      propertyId: property.id,
+      memberProfileId: memberId,
+      status: "issued",
+      issuedAt: new Date(),
+      periodStart: new Date("2026-08-01"),
+      periodEnd: new Date(Date.now() + daysShift * 86400_000),
+      dueDate: new Date("2026-08-01"),
+      subtotalMinor: amountMinor,
+      totalMinor: amountMinor,
+      amountDueMinor: amountMinor,
+      createdById: actor.id,
+      items: { create: { name: `QR test charge ${code}`, kind: "one_time", qty: 1, unitMinor: amountMinor, amountMinor } }
+    }
+  });
+  return invoice.id;
+};
 
 beforeAll(async () => {
   const root = await prisma.user.findFirstOrThrow({ where: { email: "root@demo.test" } });
   actor = { id: root.id, name: root.name };
 
-  // Fixture: one open invoice on the seeded active lease (LSE-0001). Fresh
-  // copies start with no invoices; re-runs clean their own rows first.
-  await prisma.paymentAllocation.deleteMany({ where: { invoice: { code: CODE } } }).catch(() => undefined);
-  await prisma.invoiceItem.deleteMany({ where: { invoice: { code: CODE } } });
-  await prisma.invoice.deleteMany({ where: { code: CODE } });
-
-  const lease = await prisma.lease.findUniqueOrThrow({ where: { code: "LSE-0001" } });
-  memberId = lease.memberProfileId;
-  const invoice = await prisma.invoice.create({
+  // A member nobody else touches (mirrors qrpay-payall.test.ts).
+  const property = await prisma.property.findFirstOrThrow({ where: { code: "BLR" } });
+  const party = await prisma.party.create({
+    data: { type: "PERSON", name: `QrPay Service Test ${stamp}`, tenantId: "DEFAULT" }
+  });
+  const member = await prisma.memberProfile.create({
     data: {
-      code: CODE,
-      propertyId: lease.propertyId,
-      leaseId: lease.id,
-      memberProfileId: memberId,
-      status: "issued",
-      issuedAt: new Date(),
-      periodStart: new Date("2026-08-01"),
-      periodEnd: new Date("2026-09-01"),
-      dueDate: new Date("2026-08-01"),
-      subtotalMinor: 12300,
-      totalMinor: 12300,
-      amountDueMinor: 12300,
-      createdById: actor.id,
-      items: { create: { name: "QR test charge", kind: "one_time", qty: 1, unitMinor: 12300, amountMinor: 12300 } }
+      partyId: party.id,
+      status: "active",
+      homePropertyId: property.id,
+      nationality: "KH"
     }
   });
-  invoiceId = invoice.id;
+  memberId = member.id;
+
+  invoiceId = await mkInvoice(CODE, 12300, 30);
 });
 
 afterAll(async () => {
@@ -126,27 +143,9 @@ describe("§M13 acceptance: portal QR → webhook confirms exactly once", () => 
   });
 
   it("gateway/system actors audit with a null actorId (public poster flow, no 500)", async () => {
-    const lease = await prisma.lease.findUniqueOrThrow({ where: { code: "LSE-0001" } });
-    const inv = await prisma.invoice.create({
-      data: {
-        code: "BLR-TEST-QR2",
-        propertyId: lease.propertyId,
-        leaseId: lease.id,
-        memberProfileId: lease.memberProfileId,
-        status: "issued",
-        issuedAt: new Date(),
-        periodStart: new Date("2026-09-01"),
-        periodEnd: new Date("2026-10-01"),
-        dueDate: new Date("2026-09-01"),
-        subtotalMinor: 500,
-        totalMinor: 500,
-        amountDueMinor: 500,
-        createdById: actor.id,
-        items: { create: { name: "public QR test", kind: "one_time", qty: 1, unitMinor: 500, amountMinor: 500 } }
-      }
-    });
+    const invId2 = await mkInvoice(CODE2, 500, 60);
     const { GATEWAY_ACTOR } = await import("@/lib/payments/service");
-    const result = await createInvoiceQr(inv.id, GATEWAY_ACTOR);
+    const result = await createInvoiceQr(invId2, GATEWAY_ACTOR);
     expect(result.ok).toBe(true);
     const audit = await prisma.auditLog.findFirstOrThrow({ where: { entityType: "payment", entityId: (result as { paymentId: string }).paymentId } });
     expect(audit.actorId).toBeNull();

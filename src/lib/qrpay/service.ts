@@ -7,7 +7,8 @@ import { randomBytes } from "crypto";
 import { prisma } from "@/lib/db";
 import { createPayment, getOpenMemberInvoices, openInvoicesTotalMinor } from "@/lib/payments/service";
 import { getSettings } from "@/lib/settings";
-import { resolveProvider } from "./adapter";
+import { resolveProvider, resolveDefaultProvider } from "./adapter";
+import type { AbaQrConfig } from "./adapter";
 import type { ActorCtx } from "@/lib/payments/service";
 
 export type InvoiceQrResult =
@@ -50,7 +51,7 @@ export async function createInvoiceQr(
     idempotencyKey = `QR:${invoice.id}:${due}:r${attempt + 1}`;
   }
 
-  const { org } = await getSettings();
+  const { org, paymentGateway } = await getSettings(invoice.member?.party?.tenantId ?? "DEFAULT");
   const gatewayRef = `QRPAY-${randomBytes(5).toString("hex").toUpperCase()}`;
 
   const created = await createPayment(actor, {
@@ -70,11 +71,12 @@ export async function createInvoiceQr(
   }
   void reused;
 
-  const provider = resolveProvider(opts.provider);
+  const provider = resolveProvider(opts.provider ?? resolveDefaultProvider(paymentGateway));
   const charge = await provider.generateQR({
     amountMinor: due,
     ref: payment.gatewayRef ?? payment.code,
-    orgAccount: org.name ?? "RentManager"
+    orgAccount: org.name ?? "RentManager",
+    ...(provider.name === "aba" ? { aba: paymentGateway.aba as AbaQrConfig } : {})
   });
   return {
     ok: true,
@@ -146,7 +148,7 @@ export async function createMemberPayAllQr(
     idempotencyKey = `QRALL:${memberProfileId}:${totalDueMinor}:r${attempt + 1}`;
   }
 
-  const { org } = await getSettings(member.party?.tenantId ?? "DEFAULT");
+  const { org, paymentGateway } = await getSettings(member.party?.tenantId ?? "DEFAULT");
   const gatewayRef = `QRPAYALL-${randomBytes(5).toString("hex").toUpperCase()}`;
 
   const created = await createPayment(actor, {
@@ -163,11 +165,12 @@ export async function createMemberPayAllQr(
     return { ok: false, code: "ALREADY_SETTLED", message: `This pay-all QR payment is already ${payment.status}` };
   }
 
-  const provider = resolveProvider(opts.provider);
+  const provider = resolveProvider(opts.provider ?? resolveDefaultProvider(paymentGateway));
   const charge = await provider.generateQR({
     amountMinor: totalDueMinor,
     ref: payment.gatewayRef ?? payment.code,
-    orgAccount: org.name ?? "RentManager"
+    orgAccount: org.name ?? "RentManager",
+    ...(provider.name === "aba" ? { aba: paymentGateway.aba as AbaQrConfig } : {})
   });
 
   return {

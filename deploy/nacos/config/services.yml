@@ -1,0 +1,39 @@
+identity-service:
+  service:
+    name: identity-service
+  totp:
+    window: 1
+    issuer: RentManager
+
+property-service:
+  service:
+    name: property-service
+
+billing-service:
+  service:
+    name: billing-service
+  billing-job:
+    enabled: true
+    cron: "0 0 1 * * *"   # 01:00 UTC daily
+    lead-days: 3           # generate invoice N days before cycle day
+
+ops-service:
+  service:
+    name: ops-service
+
+staff-service:
+  service:
+    name: staff-service
+
+notification-service:
+  service:
+    name: notification-service
+  telegram:
+    bot-token: ${TELEGRAM_BOT_TOKEN:dev-token}
+    webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:dev-secret}
+
+report-service:
+  service:
+    name: report-service
+  cache:
+    ttl-minutes: 5

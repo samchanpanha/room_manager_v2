@@ -38,12 +38,49 @@ const nextConfig: NextConfig = {
   // the Spring Boot backend; everything else stays on the in-app route handlers.
   // Same-origin from the browser's view, so the `rm_session` cookie flows without
   // CORS. Flip modules by editing `src/lib/backend/config.ts`.
+  //
+// `afterFiles` rewrites shadow DYNAMIC in-app file routes (e.g.
+  // /api/invoices/:id/pdf), so the file subroutes under migrated prefixes are
+  // intercepted by `beforeFiles` (highest priority) and rewritten to an internal
+  // `/api/rm-file/*` namespace where the in-app handlers keep serving them — see
+  // src/app/api/rm-file/[...h]/route.ts. Static in-app routes (e.g.
+  // /api/attendance/export) already win over afterFiles on their own.
   async rewrites() {
     if (!BACKEND_ENABLED) return [];
-    return MIGRATED_PREFIXES.flatMap((prefix) => [
+    const beforeFiles = [
+      { source: "/api/invoices/:id/pdf", destination: "/api/rm-file/invoices/pdf/:id" },
+      { source: "/api/payments/:id/receipt", destination: "/api/rm-file/payments/receipt/:id" },
+      { source: "/api/leases/:id/contract", destination: "/api/rm-file/leases/contract/:id" },
+      { source: "/api/statements/:id/pdf", destination: "/api/rm-file/statements/pdf/:id" },
+      { source: "/api/reports/:key/export", destination: "/api/rm-file/reports/export/:key" },
+      { source: "/api/pos/sales/:id/receipt", destination: "/api/rm-file/pos/receipt/:id" },
+      { source: "/api/pos/products/:id/image", destination: "/api/rm-file/pos/image/:id" },
+      { source: "/api/stay/bookings/:id/receipt", destination: "/api/rm-file/stay/receipt/:id" },
+      { source: "/api/services/:id/image", destination: "/api/rm-file/services/image/:id" },
+      { source: "/api/stock/items/:id/image", destination: "/api/rm-file/stock-items/image/:id" },
+
+      // §M13 QR payment lifecycle (in-app only — the Spring billing-service has
+      // no QR routes, so shadowing these returns 404; carve them back to the
+      // in-app handlers).
+      { source: "/api/invoices/:id/qr", destination: "/api/rm-file/invoices/qr/:id" },
+      // Manual record (created pending) then confirm/fail/refund + detail polling.
+      { source: "/api/payments", destination: "/api/rm-file/payments/record" },
+      { source: "/api/payments/:id", destination: "/api/rm-file/payments/detail/:id" },
+      { source: "/api/payments/:id/confirm", destination: "/api/rm-file/payments/confirm/:id" },
+      { source: "/api/payments/:id/fail", destination: "/api/rm-file/payments/fail/:id" },
+      { source: "/api/payments/:id/refund", destination: "/api/rm-file/payments/refund/:id" },
+      { source: "/api/qrpay/dues", destination: "/api/rm-file/qrpay/dues" },
+      { source: "/api/qrpay/pay", destination: "/api/rm-file/qrpay/pay" },
+      { source: "/api/qrpay/pay-all", destination: "/api/rm-file/qrpay/pay-all" },
+      { source: "/api/qrpay/status", destination: "/api/rm-file/qrpay/status" },
+      { source: "/api/portal/pay-all", destination: "/api/rm-file/portal/pay-all" },
+      { source: "/api/webhooks/payments", destination: "/api/rm-file/webhooks/payments" }
+    ];
+    const afterFiles = MIGRATED_PREFIXES.flatMap((prefix) => [
       { source: prefix, destination: `${BACKEND_ORIGIN}${prefix}` },
       { source: `${prefix}/:path*`, destination: `${BACKEND_ORIGIN}${prefix}/:path*` }
     ]);
+    return { beforeFiles, afterFiles, fallback: [] };
   }
 };
 

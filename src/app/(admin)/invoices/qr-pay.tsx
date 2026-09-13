@@ -42,9 +42,10 @@ export function QrPayButton({ invoiceId }: { invoiceId: string }) {
     if (!charge) return null;
     const res = await fetch(`/api/payments/${charge.paymentId}`);
     if (!res.ok) return null;
-    const data = (await res.json()) as { status?: string };
-    if (data.status === "confirmed" || data.status === "failed") return data.status;
-    return data.status === "pending" ? "pending" : null;
+    const data = (await res.json()) as { payment?: { status?: string } };
+    const s = data.payment?.status;
+    if (s === "confirmed" || s === "failed") return s;
+    return s === "pending" ? "pending" : null;
   }
 
   async function openDialog() {

@@ -11,6 +11,9 @@ import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { formatDate } from "@/lib/utils";
 import { Tx } from "@/components/i18n-text";
 
+import { BACKEND_ENABLED } from "@/lib/backend/config";
+import { api as backend, type OwnerSummary } from "@/lib/backend/client";
+
 export const dynamic = "force-dynamic";
 
 export default async function OwnersPage() {
@@ -21,7 +24,6 @@ export default async function OwnersPage() {
 
   const scope = await visibleOwnerIdsFilter(user, user.permissions);
   if (scope !== "ALL" && scope.ownerProfileIds.length === 0) {
-    // Owner-role users are redirected to their portal instead of an empty list.
     if (user.roles.includes("OWNER")) {
       return (
         <EmptyState
@@ -33,18 +35,45 @@ export default async function OwnersPage() {
     return <EmptyState title="No owners visible" hint="PROPERTY-scoped roles see owners of buildings in their assigned properties." />;
   }
 
-  const rows = await prisma.ownerProfile.findMany({
-    where: {
-      party: { tenantId: user.tenantId },
-      ...(scope === "ALL" ? {} : { id: { in: scope.ownerProfileIds } })
-    },
-    include: {
-      party: { include: { users: { take: 1 } } },
-      buildings: { include: { property: true } },
-      payoutMethods: true
-    },
-    orderBy: { createdAt: "asc" }
-  });
+  let rows: Array<{
+    id: string;
+    companyName: string | null;
+    status: string;
+    createdAt: Date | null;
+    party: { name: string; email?: string | null; users: { email?: string | null }[] };
+    buildings: { property: { code: string }; name: string }[];
+    payoutMethods: { isPrimary?: boolean; kind?: string; accountNumber?: string }[];
+  }> = [];
+
+  if (BACKEND_ENABLED) {
+    try {
+      const backendOwners = await backend.owners.list();
+      rows = backendOwners.map((o: OwnerSummary) => ({
+        id: o.id,
+        companyName: o.companyName,
+        status: o.status,
+        createdAt: null as Date | null,
+        party: { name: o.name || o.companyName || `Owner ${o.id.slice(0, 8)}`, email: o.email, users: [] },
+        buildings: [],
+        payoutMethods: o.payoutMethods.map((m) => ({ isPrimary: m.isPrimary, kind: m.kind, accountNumber: m.accountNumber ?? m.accountName ?? "" }))
+      }));
+    } catch {
+      rows = [];
+    }
+  } else {
+    rows = await prisma.ownerProfile.findMany({
+      where: {
+        party: { tenantId: user.tenantId },
+        ...(scope === "ALL" ? {} : { id: { in: scope.ownerProfileIds } })
+      },
+      include: {
+        party: { include: { users: { take: 1 } } },
+        buildings: { include: { property: true } },
+        payoutMethods: true
+      },
+      orderBy: { createdAt: "asc" }
+    });
+  }
 
   return (
     <div>
@@ -92,10 +121,10 @@ export default async function OwnersPage() {
                         : o.buildings.map((b) => `${b.property.code}/${b.name}`).join(", ")}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {primary ? `${primary.kind} ••••${primary.accountNumber.slice(-4)}` : "—"}
+                      {primary ? `${primary.kind} ••••${(primary.accountNumber ?? "").slice(-4)}` : "—"}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{o.party.users[0]?.email ?? "—"}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{formatDate(o.createdAt)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{o.createdAt ? formatDate(o.createdAt) : "—"}</TableCell>
                   </TableRow>
                 );
               })}

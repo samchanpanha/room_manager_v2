@@ -1,19 +1,56 @@
 # ──────────────────────────────────────────────────────────────────────────────
-# RentManager — Docker Compose (local development, PostgreSQL)
+# RentManager — Full System Unified Docker Compose (One-Command Local Deployment)
 # ──────────────────────────────────────────────────────────────────────────────
 # Usage:
-#   docker compose up --build          # build + start (foreground)
-#   docker compose up -d --build       # build + start (detached)
-#   docker compose down                # stop + remove container
-#   docker compose logs -f rentmanager # follow logs
+#   docker compose up --build -d         # Build + start all services in background
+#   docker compose down                  # Stop and remove all containers
+#   docker compose logs -f gateway       # Follow Gateway logs
+#   docker compose logs -f rentmanager   # Follow Frontend logs
 #
-# PostgreSQL:
-#   - `rentmanager` DB for the app (persistent named volume)
-#   - `rentmanager_test` DB created on first init (host-side `npm test`)
-#   - exposed on host port 5432 for local `npm run dev` / `npm test`
+# Unified Stack:
+#   - PostgreSQL Database (5432)
+#   - Object Storage: MinIO (9000 API / 9001 Console)
+#   - Infrastructure: Nacos (8848), Keycloak (7080), Kafka (9092), Schema Registry (8091), Kafka UI (8090), Grafana (9090, Prometheus datasource internal)
+#   - Backend Microservices: Gateway (8080), Identity (8081), Property (8082), Billing (8083), Ops (8084), Staff (8085), Commerce (8086), Notification (8087), Report (8088)
+#   - Frontend Web App: Next.js (3000)
 # ──────────────────────────────────────────────────────────────────────────────
 
+networks:
+  rm-network:
+    driver: bridge
+    name: rm-network
+
+volumes:
+  rentmanager-postgres:
+  rentmanager-nacos:
+  rentmanager-keycloak:
+  rentmanager-kafka:
+  rentmanager-redis:
+  rentmanager-storage:
+  rentmanager-backups:
+  rentmanager-minio:
+  rentmanager-grafana:
+
+x-backend-defaults: &backend-defaults
+  networks:
+    - rm-network
+  restart: unless-stopped
+  environment: &backend-env
+    NACOS_SERVER: nacos:8848
+    KAFKA_BOOTSTRAP: kafka:9092
+    DB_URL: jdbc:postgresql://postgres:5432/rentmanager
+    DB_USER: rentmanager
+    DB_PASSWORD: rentmanager
+    KEYCLOAK_ISSUER: http://keycloak:8080/realms/rentmanager
+    KEYCLOAK_JWKS: http://keycloak:8080/realms/rentmanager/protocol/openid-connect/certs
+    NEXTJS_URL: http://rentmanager:3000
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    REDIS_PASSWORD: rentmanager-redis-secret
+
 services:
+
+  # ── 1. Database (PostgreSQL 16) ──────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: rentmanager-postgres
@@ -24,9 +61,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      # Persistent Postgres data
       - rentmanager-postgres:/var/lib/postgresql/data
-      # One-time init: creates the test/CI database
       - ./deploy/postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U rentmanager -d rentmanager"]
@@ -34,8 +69,400 @@ services:
       timeout: 3s
       retries: 12
       start_period: 10s
+    networks:
+      - rm-network
     restart: unless-stopped
 
+  # ── 1b. Redis In-Memory Cache & Distributed Lock ──────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: rm-redis
+    command: redis-server --requirepass rentmanager-redis-secret --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - rentmanager-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "rentmanager-redis-secret", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - rm-network
+    restart: unless-stopped
+
+  # ── 2. Nacos Discovery & Config Center ─────────────────────────────────────
+  nacos:
+    image: nacos/nacos-server:v2.4.3
+    platform: linux/arm64
+    container_name: rm-nacos
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "false"
+      JVM_XMS: 512m
+      JVM_XMX: 1024m
+      JVM_XMN: 256m
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+      - "9849:9849"
+    volumes:
+      - rentmanager-nacos:/home/nacos/data
+      - ./deploy/nacos/config:/home/nacos/init.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8848/nacos/v1/ns/operator/metrics || exit 0"]
+      interval: 15s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+    networks:
+      - rm-network
+    restart: unless-stopped
+
+  # ── 3. Keycloak IAM & OAuth2 ─────────────────────────────────────────────
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    platform: linux/arm64
+    container_name: rm-keycloak
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8080
+      KC_HOSTNAME_STRICT: "false"
+      KC_OPTS: -Xms256m -Xmx768m
+      JAVA_OPTS_APPEND: -Xms256m -Xmx768m
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_LOG_LEVEL: WARN
+      KC_DB: dev-file
+    mem_limit: 2560m
+    ports:
+      - "7080:8080"
+    volumes:
+      - rentmanager-keycloak:/opt/keycloak/data
+      - ./deploy/keycloak:/opt/keycloak/data/import:ro
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 15s
+      timeout: 8s
+      retries: 15
+      start_period: 45s
+    networks:
+      - rm-network
+    restart: unless-stopped
+
+  # ── 4. Apache Kafka (KRaft Single Broker) ──────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    platform: linux/amd64
+    container_name: rm-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    ports:
+      - "9092:9092"
+    volumes:
+      - rentmanager-kafka:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+    networks:
+      - rm-network
+    restart: unless-stopped
+
+  # ── 5. Schema Registry & Kafka UI ────────────────────────────────────────
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.1
+    platform: linux/amd64
+    container_name: rm-schema-registry
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    ports:
+      - "8091:8081"
+    networks:
+      - rm-network
+    restart: unless-stopped
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    platform: linux/amd64
+    container_name: rm-kafka-ui
+    depends_on:
+      - kafka
+      - schema-registry
+    environment:
+      KAFKA_CLUSTERS_0_NAME: rentmanager-dev
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+    ports:
+      - "8090:8080"
+    networks:
+      - rm-network
+    restart: unless-stopped
+
+  # ── 6. Monitoring: Prometheus (internal scraper) + Grafana (UI on 9090) ───
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    platform: linux/amd64
+    container_name: rm-prometheus
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - rm-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: rm-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+      GF_SERVER_ROOT_URL: http://localhost:9090
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - rentmanager-grafana:/var/lib/grafana
+    ports:
+      - "9090:3000"
+    networks:
+      - rm-network
+    restart: unless-stopped
+
+  # ── 7. MinIO Object Storage (S3-compatible) ──────────────────────────────
+  minio:
+    image: quay.io/minio/minio:latest
+    platform: linux/arm64
+    container_name: rm-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-rentmanager}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-rentmanager-s3-secret}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - rentmanager-minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    networks:
+      - rm-network
+    restart: unless-stopped
+
+  # ── 8. Spring Boot Microservices ──────────────────────────────────────────
+  identity-service:
+    <<: *backend-defaults
+    build:
+      context: ./backend
+      dockerfile: identity-service/Dockerfile
+    container_name: rm-identity
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    environment:
+      <<: *backend-env
+      ENFORCE_MANDATORY_TOTP: "true"
+      SESSION_TTL_DAYS: "30"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/actuator/health || exit 0"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 90s
+
+  property-service:
+    <<: *backend-defaults
+    build:
+      context: ./backend
+      dockerfile: property-service/Dockerfile
+    container_name: rm-property
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *backend-env
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8082/actuator/health || exit 0"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 90s
+
+  billing-service:
+    <<: *backend-defaults
+    build:
+      context: ./backend
+      dockerfile: billing-service/Dockerfile
+    container_name: rm-billing
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *backend-env
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8083/actuator/health || exit 0"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 90s
+
+  ops-service:
+    <<: *backend-defaults
+    build:
+      context: ./backend
+      dockerfile: ops-service/Dockerfile
+    container_name: rm-ops
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *backend-env
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8084/actuator/health || exit 0"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 90s
+
+  staff-service:
+    <<: *backend-defaults
+    build:
+      context: ./backend
+      dockerfile: staff-service/Dockerfile
+    container_name: rm-staff
+    ports:
+      - "8085:8085"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *backend-env
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8085/actuator/health || exit 0"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 90s
+
+  commerce-service:
+    <<: *backend-defaults
+    build:
+      context: ./backend
+      dockerfile: commerce-service/Dockerfile
+    container_name: rm-commerce
+    ports:
+      - "8086:8086"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *backend-env
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8086/actuator/health || exit 0"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 90s
+
+  notification-service:
+    <<: *backend-defaults
+    build:
+      context: ./backend
+      dockerfile: notification-service/Dockerfile
+    container_name: rm-notification
+    ports:
+      - "8087:8087"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *backend-env
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-dev-token}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-dev-secret}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8087/actuator/health || exit 0"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 90s
+
+  report-service:
+    <<: *backend-defaults
+    build:
+      context: ./backend
+      dockerfile: report-service/Dockerfile
+    container_name: rm-report
+    ports:
+      - "8088:8088"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *backend-env
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8088/actuator/health || exit 0"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 90s
+
+  # ── 9. Spring Cloud API Gateway ───────────────────────────────────────────
+  gateway:
+    <<: *backend-defaults
+    build:
+      context: ./backend
+      dockerfile: gateway/Dockerfile
+    container_name: rm-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - identity-service
+      - property-service
+      - billing-service
+    environment:
+      <<: *backend-env
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health || exit 0"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 90s
+
+  # ── 10. Next.js Frontend App ──────────────────────────────────────────────
   rentmanager:
     build:
       context: .
@@ -46,11 +473,19 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      gateway:
+        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://rentmanager:rentmanager@postgres:5432/rentmanager
+      - BACKEND_ORIGIN=http://gateway:8080
       - NODE_ENV=production
       - SEED_FULL_DEMO=1
       - STORAGE_DIR=/app/storage
+      - S3_ENDPOINT=http://minio:9000
+      - S3_REGION=us-east-1
+      - S3_BUCKET=rentmanager
+      - S3_ACCESS_KEY_ID=${MINIO_ROOT_USER:-rentmanager}
+      - S3_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-rentmanager-s3-secret}
       - SESSION_TTL_DAYS=30
       - FILE_SIGNING_SECRET=docker-file-signing-secret-change-me-in-prod
       - PAYMENT_WEBHOOK_SECRET=docker-webhook-secret-change-me-in-prod
@@ -61,10 +496,10 @@ services:
       - SETTINGS_ENC_KEY=docker-settings-enc-key-change-me-32b
       - COOKIE_SECURE=false
     volumes:
-      # File storage (dev-disk driver)
       - rentmanager-storage:/app/storage
-      # Backup snapshots
       - rentmanager-backups:/app/backups
+    networks:
+      - rm-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)throw 1}).catch(()=>process.exit(1))"]
@@ -72,8 +507,3 @@ services:
       timeout: 5s
       retries: 3
       start_period: 40s
-
-volumes:
-  rentmanager-postgres:
-  rentmanager-storage:
-  rentmanager-backups:

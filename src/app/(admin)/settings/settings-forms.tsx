@@ -67,6 +67,7 @@ export function SettingsForms({ settings, canWrite, tenantId }: { settings: Sett
     "payment.confirmed": settings.templates["payment.confirmed"] ?? "",
     "invoice.dunning_reminder": settings.templates["invoice.dunning_reminder"] ?? ""
   });
+  const [gateway, setGateway] = useState(settings.paymentGateway);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -311,6 +312,59 @@ export function SettingsForms({ settings, canWrite, tenantId }: { settings: Sett
       </Card>
 
       {/* Reports configuration lives in ./reports-config (develop · assign · design). */}
+
+      <Card>
+        <CardHeader><CardTitle>Payment gateway — Pay by QR (§M13)</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            <Tx>Which QR provider the Pay-by-QR buttons use. DevMock (default) renders a deterministic development QR; ABA PayWay renders a real
+            merchant-presented QR once activated below. On activation, set the PayWay webhook secret under Secrets (payment credentials)
+            and point PayWay callbacks at your webhook URL.</Tx>
+          </p>
+          <Field label="Provider">
+            <select
+              className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+              value={gateway.provider}
+              disabled={!canWrite}
+              onChange={(e) => setGateway({ ...gateway, provider: e.target.value as Settings["paymentGateway"]["provider"] })}
+            >
+              <option value="devmock">DevMock (development)</option>
+              <option value="aba">ABA PayWay</option>
+            </select>
+          </Field>
+
+          <div className="rounded-lg border p-3 space-y-3">
+            <p className="text-sm font-medium"><Tx>ABA PayWay (Cambodia) — ready for future activation</Tx></p>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={gateway.aba.enabled} disabled={!canWrite} onChange={(e) => setGateway({ ...gateway, aba: { ...gateway.aba, enabled: e.target.checked } })} />
+              <Tx>Activate ABA PayWay as the QR provider</Tx>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={gateway.aba.sandbox} disabled={!canWrite} onChange={(e) => setGateway({ ...gateway, aba: { ...gateway.aba, sandbox: e.target.checked } })} />
+              <Tx>Sandbox mode (uncheck when the store is onboarded to production)</Tx>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Store name (QR tag 59)"><Input value={gateway.aba.storeName} disabled={!canWrite} placeholder="My Rental Co." onChange={(e) => setGateway({ ...gateway, aba: { ...gateway.aba, storeName: e.target.value } })} /></Field>
+              <Field label="Merchant account (ABA account)"><Input value={gateway.aba.merchantAccount} disabled={!canWrite} placeholder="000123456" onChange={(e) => setGateway({ ...gateway, aba: { ...gateway.aba, merchantAccount: e.target.value } })} /></Field>
+              <Field label="Merchant ID (PayWay store id)"><Input value={gateway.aba.merchantId} disabled={!canWrite} placeholder="12345678" onChange={(e) => setGateway({ ...gateway, aba: { ...gateway.aba, merchantId: e.target.value } })} /></Field>
+              <Field label="Country code"><Input value={gateway.aba.countryCode} disabled={!canWrite} placeholder="KH" onChange={(e) => setGateway({ ...gateway, aba: { ...gateway.aba, countryCode: e.target.value } })} /></Field>
+              <Field label="Currency">
+                <select
+                  className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+                  value={gateway.aba.currency}
+                  disabled={!canWrite}
+                  onChange={(e) => setGateway({ ...gateway, aba: { ...gateway.aba, currency: e.target.value } })}
+                >
+                  <option value="USD">USD ($)</option>
+                  <option value="KHR">KHR (៛)</option>
+                </select>
+              </Field>
+              <Field label="Bill-number prefix (numeric)"><Input value={gateway.aba.billNumberPrefix} disabled={!canWrite} placeholder="99" onChange={(e) => setGateway({ ...gateway, aba: { ...gateway.aba, billNumberPrefix: e.target.value } })} /></Field>
+            </div>
+          </div>
+          {canWrite && <Button size="sm" disabled={busy} onClick={() => void save("paymentGateway", gateway, "Payment gateway settings saved")}>Save gateway</Button>}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle>Table defaults</CardTitle></CardHeader>

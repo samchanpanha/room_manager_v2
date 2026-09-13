@@ -127,6 +127,39 @@ export interface RentAlertSettings {
   overdueDays: number;
 }
 
+/// QR payment gateway (M13 §"provider configuration"): which provider the
+/// Pay-by-QR buttons use when no explicit provider is requested, plus the
+/// ABA PayWay merchant configuration, ready for future activation.
+/// Webhook credentials are NOT stored here — `paymentCredentials` is a sealed
+/// secret (see SecretForms / getProviderSecret).
+export interface AbaPayWaySettings {
+  /// Master switch — ABA PayWay only becomes active when true and the
+  /// merchant details below are set ("on futures" activation flag).
+  enabled: boolean;
+  /// Sandbox mode (payway sandbox) — always on first; flip to production
+  /// when the store is onboarded.
+  sandbox: boolean;
+  /// Display name of the store (encoded in the merchant QR, tag 59).
+  storeName: string;
+  /// ABA account name the money lands in (shown on the QR).
+  merchantAccount: string;
+  /// ABA PayWay merchant / store ID (Verification Centre id) — encodes a
+  /// dynamic amount-authorisation bill in the merchant-presented QR.
+  merchantId: string;
+  /// Bank country code (EMVCo tag 58), e.g. "KH".
+  countryCode: string;
+  /// Transaction currency (EMVCo tag 53), e.g. "USD" or "KHR".
+  currency: string;
+  /// Prefix for the bill number ABA echoes back on the webhook (max 8).
+  billNumberPrefix: string;
+}
+
+export interface PaymentGatewaySettings {
+  /// Active QR provider when the UI doesn't ask for one explicitly.
+  provider: "devmock" | "aba";
+  aba: AbaPayWaySettings;
+}
+
 export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
   M14: true, // POS
   M15: true, // Stock
@@ -190,10 +223,26 @@ const TEMPLATES: GroupDefLike & { defaults: TemplateSettings } = { key: "m28.tem
 const PROVIDERS: GroupDefLike & { defaults: Record<string, string> } = { key: "m28.providers", defaults: {} };
 const TABLE: GroupDefLike & { defaults: TableSettings } = { key: "m28.table", defaults: { pageSize: 25 } };
 const RENT_ALERTS: GroupDefLike & { defaults: RentAlertSettings } = { key: "m28.alerts", defaults: { aheadDays: 3, overdueDays: 1 } };
+const PAYMENT_GATEWAY: GroupDefLike & { defaults: PaymentGatewaySettings } = {
+  key: "m28.paymentGateway",
+  defaults: {
+    provider: "devmock",
+    aba: {
+      enabled: false,
+      sandbox: true,
+      storeName: "",
+      merchantAccount: "",
+      merchantId: "",
+      countryCode: "KH",
+      currency: "USD",
+      billNumberPrefix: "RM"
+    }
+  }
+};
 
-const GROUPS: Record<SettingsGroupName, GroupDefLike> = { org: ORG, locale: LOCALE, billing: BILLING, lateFee: LATE_FEE, retention: RETENTION, features: FEATURES, reports: REPORTS, templates: TEMPLATES, printer: PRINTER, telegram: TELEGRAM_BOT, menu: MENU, units: UNITS, table: TABLE, alerts: RENT_ALERTS };
+const GROUPS: Record<SettingsGroupName, GroupDefLike> = { org: ORG, locale: LOCALE, billing: BILLING, lateFee: LATE_FEE, retention: RETENTION, features: FEATURES, reports: REPORTS, templates: TEMPLATES, printer: PRINTER, telegram: TELEGRAM_BOT, menu: MENU, units: UNITS, table: TABLE, alerts: RENT_ALERTS, paymentGateway: PAYMENT_GATEWAY };
 
-export type SettingsGroupName = "org" | "locale" | "billing" | "lateFee" | "retention" | "features" | "reports" | "templates" | "printer" | "telegram" | "menu" | "units" | "table" | "alerts";
+export type SettingsGroupName = "org" | "locale" | "billing" | "lateFee" | "retention" | "features" | "reports" | "templates" | "printer" | "telegram" | "menu" | "units" | "table" | "alerts" | "paymentGateway";
 
 async function readGroup<T extends object>(def: GroupDefLike, tenantId: string = "DEFAULT"): Promise<T> {
   const row = await prisma.setting.findUnique({
@@ -291,9 +340,10 @@ export async function getSettings(tenantId: string = "DEFAULT"): Promise<{
   units: UnitsSettings;
   table: TableSettings;
   rentAlerts: RentAlertSettings;
+  paymentGateway: PaymentGatewaySettings;
   providers: { paymentCredentials: { configured: boolean; last4: string | null }; telegramBotToken: { configured: boolean; last4: string | null } };
 }> {
-  const [org, locale, billing, lateFee, retention, features, reportsRaw, templates, printer, telegram, menu, units, table, rentAlerts, providers] = await Promise.all([
+  const [org, locale, billing, lateFee, retention, features, reportsRaw, templates, printer, telegram, menu, units, table, rentAlerts, paymentGateway, providers] = await Promise.all([
     readGroup<OrgSettings>(ORG, tenantId),
     readGroup<LocaleSettings>(LOCALE, tenantId),
     readGroup<BillingSettings>(BILLING, tenantId),
@@ -308,6 +358,7 @@ export async function getSettings(tenantId: string = "DEFAULT"): Promise<{
     readGroup<UnitsSettings>(UNITS, tenantId),
     readGroup<TableSettings>(TABLE, tenantId),
     readGroup<RentAlertSettings>(RENT_ALERTS, tenantId),
+    readGroup<PaymentGatewaySettings>(PAYMENT_GATEWAY, tenantId),
     readGroup<Record<string, string>>(PROVIDERS, tenantId)
   ]);
   // Report config is coerced on every read: unknown report/column keys and
@@ -328,6 +379,7 @@ export async function getSettings(tenantId: string = "DEFAULT"): Promise<{
     units,
     table,
     rentAlerts,
+    paymentGateway,
     providers: {
       paymentCredentials: maskSecret(providers.paymentCredentials ?? null),
       telegramBotToken: maskSecret(providers.telegramBotToken ?? null)

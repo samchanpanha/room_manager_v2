@@ -1,0 +1,199 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# RentManager — Spring Boot Services Compose
+# Runs all microservices on the rm-infra network alongside the infra stack.
+# ──────────────────────────────────────────────────────────────────────────────
+# Usage:
+#   docker compose -f deploy/docker-compose.infra.yml \
+#                  -f deploy/docker-compose.services.yml up -d
+# ──────────────────────────────────────────────────────────────────────────────
+
+networks:
+  rm-infra:
+    external: true   # created by docker-compose.infra.yml
+
+volumes:
+  identity-data:
+
+x-service-defaults: &service-defaults
+  networks:
+    - rm-infra
+  restart: unless-stopped
+  environment: &common-env
+    NACOS_SERVER: nacos:8848
+    KAFKA_BOOTSTRAP: kafka:9092
+    DB_URL: jdbc:postgresql://rentmanager-postgres:5432/rentmanager
+    DB_USER: rentmanager
+    DB_PASSWORD: rentmanager
+    KEYCLOAK_ISSUER: http://keycloak:8080/realms/rentmanager
+    KEYCLOAK_JWKS: http://keycloak:8080/realms/rentmanager/protocol/openid-connect/certs
+    NEXTJS_URL: http://rentmanager:3000
+
+services:
+
+  # ── API Gateway ──────────────────────────────────────────────────────────────
+  gateway:
+    <<: *service-defaults
+    build:
+      context: ../backend
+      dockerfile: gateway/Dockerfile
+    container_name: rm-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - identity-service
+    environment:
+      <<: *common-env
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Identity Service ─────────────────────────────────────────────────────────
+  identity-service:
+    <<: *service-defaults
+    build:
+      context: ../backend
+      dockerfile: identity-service/Dockerfile
+    container_name: rm-identity
+    ports:
+      - "8081:8081"
+    environment:
+      <<: *common-env
+      ENFORCE_MANDATORY_TOTP: "true"
+      SESSION_TTL_DAYS: "30"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # ── Property Service ─────────────────────────────────────────────────────────
+  property-service:
+    <<: *service-defaults
+    build:
+      context: ../backend
+      dockerfile: property-service/Dockerfile
+    container_name: rm-property
+    ports:
+      - "8082:8082"
+    environment:
+      <<: *common-env
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # ── Billing Service ──────────────────────────────────────────────────────────
+  billing-service:
+    <<: *service-defaults
+    build:
+      context: ../backend
+      dockerfile: billing-service/Dockerfile
+    container_name: rm-billing
+    ports:
+      - "8083:8083"
+    environment:
+      <<: *common-env
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # ── Ops Service ──────────────────────────────────────────────────────────────
+  ops-service:
+    <<: *service-defaults
+    build:
+      context: ../backend
+      dockerfile: ops-service/Dockerfile
+    container_name: rm-ops
+    ports:
+      - "8084:8084"
+    environment:
+      <<: *common-env
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8084/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # ── Staff Service ────────────────────────────────────────────────────────────
+  staff-service:
+    <<: *service-defaults
+    build:
+      context: ../backend
+      dockerfile: staff-service/Dockerfile
+    container_name: rm-staff
+    ports:
+      - "8085:8085"
+    environment:
+      <<: *common-env
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8085/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # ── Commerce Service ─────────────────────────────────────────────────────────
+  commerce-service:
+    <<: *service-defaults
+    build:
+      context: ../backend
+      dockerfile: commerce-service/Dockerfile
+    container_name: rm-commerce
+    ports:
+      - "8086:8086"
+    environment:
+      <<: *common-env
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8086/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # ── Notification Service ─────────────────────────────────────────────────────
+  notification-service:
+    <<: *service-defaults
+    build:
+      context: ../backend
+      dockerfile: notification-service/Dockerfile
+    container_name: rm-notification
+    ports:
+      - "8087:8087"
+    environment:
+      <<: *common-env
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-dev-token}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-dev-secret}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8087/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # ── Report Service ───────────────────────────────────────────────────────────
+  report-service:
+    <<: *service-defaults
+    build:
+      context: ../backend
+      dockerfile: report-service/Dockerfile
+    container_name: rm-report
+    ports:
+      - "8088:8088"
+    environment:
+      <<: *common-env
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8088/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s

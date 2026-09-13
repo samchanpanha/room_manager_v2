@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'rentmanager-services'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - 'gateway:8080'
+          - 'identity-service:8081'
+          - 'property-service:8082'
+          - 'billing-service:8083'
+          - 'ops-service:8084'
+          - 'staff-service:8085'
+          - 'commerce-service:8086'
+          - 'notification-service:8087'
+          - 'report-service:8088'
+        labels:
+          environment: 'local-dev'

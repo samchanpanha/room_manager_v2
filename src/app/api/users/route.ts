@@ -29,6 +29,7 @@ export async function POST(req: Request) {
   if (roles.some((r) => r.key === "SUPER_ADMIN") && !g.user.isSuperAdmin) {
     return fail(403, "PROTECTED_ROLE", "Only a Super Admin can grant the Super Admin role");
   }
+  if (roles.some((r) => !r.active)) return fail(422, "ROLE_DISABLED", `Cannot assign the disabled role "${roles.find((r) => !r.active)?.name}" — enable it in Roles & Permissions first`);
 
   const user = await prisma.user.create({
     data: {

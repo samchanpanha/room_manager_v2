@@ -1,0 +1,291 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: rentmanager-gateway
+
+  config:
+    import:
+      - optional:nacos:shared-common.yml
+
+  # ── Redis Connection ──────────────────────────────────────────────────────
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:rentmanager-redis-secret}
+      timeout: 2000ms
+
+  # ── Nacos Config ──────────────────────────────────────────────────────────
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}          # empty = public namespace
+        group: DEFAULT_GROUP
+        register-enabled: true
+      config:
+        server-addr: ${NACOS_SERVER:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        file-extension: yml
+        import-check:
+          enabled: false
+        shared-configs:
+          - data-id: shared-common.yml
+            refresh: true
+        extension-configs:
+          - data-id: gateway.yml
+            refresh: true
+
+    # ── Spring Cloud Gateway routes ─────────────────────────────────────────
+    # Routes use lb:// (Nacos LoadBalancer) for service name resolution.
+    # Strangler-fig: the legacy Next.js app handles paths not matched here.
+    gateway:
+      discovery:
+        locator:
+          enabled: false          # manual routes only — avoid auto-route leaks
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+      routes:
+
+        # ── Identity Service (M00 M01 M02 M03 M27 M28) ──────────────────────
+        - id: identity-service
+          uri: lb://identity-service
+          predicates:
+            - Path=/api/auth/**, /api/users/**, /api/members/**, /api/owners/**, /api/roles/**, /api/account/**, /api/organizations/**, /api/contacts/**, /api/audit/**, /api/audit-logs/**, /api/documents/**, /api/files/**, /api/settings/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: identityBreaker
+                fallbackUri: forward:/fallback/service-unavailable
+            - name: Retry
+              args:
+                retries: 2
+                statuses: SERVICE_UNAVAILABLE
+
+        # ── Property Service (M04 M11 M12 M32) ──────────────────────────────
+        - id: property-service
+          uri: lb://property-service
+          predicates:
+            - Path=/api/properties/**, /api/rooms/**, /api/meters/**, /api/services/**, /api/stays/**, /api/stay/**, /api/buildings/**, /api/floors/**, /api/tariffs/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: propertyBreaker
+                fallbackUri: forward:/fallback/service-unavailable
+
+        # ── Billing Service (M05 M06 M07 M08 M09 M10 M13) ───────────────────
+        - id: billing-service
+          uri: lb://billing-service
+          predicates:
+            - Path=/api/leases/**, /api/invoices/**, /api/payments/**, /api/ledger/**, /api/deposits/**, /api/qr/**, /api/qrpay/**, /api/lease-services/**, /api/rent-engine/**, /api/jobs/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: billingBreaker
+                fallbackUri: forward:/fallback/service-unavailable
+
+        # ── Ops Service (M16 M18 M19 M22) ───────────────────────────────────
+        - id: ops-service
+          uri: lb://ops-service
+          predicates:
+            - Path=/api/room-moves/**, /api/inspections/**, /api/tickets/**, /api/maintenance/**, /api/complaints/**, /api/findings/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: opsBreaker
+                fallbackUri: forward:/fallback/service-unavailable
+
+        # ── Staff Service (M20 M23 M24) ──────────────────────────────────────
+        - id: staff-service
+          uri: lb://staff-service
+          predicates:
+            - Path=/api/expenses/**, /api/attendance/**, /api/statements/**, /api/owner-contracts/**, /api/payout-methods/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: staffBreaker
+                fallbackUri: forward:/fallback/service-unavailable
+
+        # ── Commerce Service (M14 M15) ───────────────────────────────────────
+        - id: commerce-service
+          uri: lb://commerce-service
+          predicates:
+            - Path=/api/pos/**, /api/stock/**, /api/po/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: commerceBreaker
+                fallbackUri: forward:/fallback/service-unavailable
+
+        # ── Notification Service (M21 M25) ───────────────────────────────────
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/telegram/**, /api/notifications/**, /api/portal/**, /api/webhooks/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: notificationBreaker
+                fallbackUri: forward:/fallback/service-unavailable
+
+        # ── Report Service (M26) ──────────────────────────────────────────────
+        - id: report-service
+          uri: lb://report-service
+          predicates:
+            - Path=/api/reports/**, /api/dashboard/**, /api/export/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: reportBreaker
+                fallbackUri: forward:/fallback/service-unavailable
+
+        # ── OpenAPI Specs Aggregation Routes ──────────────────────────────────
+        - id: identity-openapi
+          uri: lb://identity-service
+          predicates:
+            - Path=/v3/api-docs/identity
+          filters:
+            - RewritePath=/v3/api-docs/identity, /v3/api-docs
+
+        - id: property-openapi
+          uri: lb://property-service
+          predicates:
+            - Path=/v3/api-docs/property
+          filters:
+            - RewritePath=/v3/api-docs/property, /v3/api-docs
+
+        - id: billing-openapi
+          uri: lb://billing-service
+          predicates:
+            - Path=/v3/api-docs/billing
+          filters:
+            - RewritePath=/v3/api-docs/billing, /v3/api-docs
+
+        - id: ops-openapi
+          uri: lb://ops-service
+          predicates:
+            - Path=/v3/api-docs/ops
+          filters:
+            - RewritePath=/v3/api-docs/ops, /v3/api-docs
+
+        - id: staff-openapi
+          uri: lb://staff-service
+          predicates:
+            - Path=/v3/api-docs/staff
+          filters:
+            - RewritePath=/v3/api-docs/staff, /v3/api-docs
+
+        - id: commerce-openapi
+          uri: lb://commerce-service
+          predicates:
+            - Path=/v3/api-docs/commerce
+          filters:
+            - RewritePath=/v3/api-docs/commerce, /v3/api-docs
+
+        - id: notification-openapi
+          uri: lb://notification-service
+          predicates:
+            - Path=/v3/api-docs/notification
+          filters:
+            - RewritePath=/v3/api-docs/notification, /v3/api-docs
+
+        - id: report-openapi
+          uri: lb://report-service
+          predicates:
+            - Path=/v3/api-docs/report
+          filters:
+            - RewritePath=/v3/api-docs/report, /v3/api-docs
+
+        # ── Strangler-fig: Legacy Next.js catch-all ──────────────────────────
+        # All unmatched paths fall through to the existing Next.js app on :3000.
+        # Remove this route progressively as services absorb their modules.
+        - id: legacy-nextjs
+          uri: ${NEXTJS_URL:http://localhost:3000}
+          predicates:
+            - Path=/**
+          order: 9999     # lowest priority — only hits if no service matched
+
+  # ── Security (Keycloak JWKS) ─────────────────────────────────────────────
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:7080/realms/rentmanager}
+          jwk-set-uri: ${KEYCLOAK_JWKS:http://localhost:7080/realms/rentmanager/protocol/openid-connect/certs}
+
+# ── Actuator ───────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+    gateway:
+      enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+# ── SpringDoc Swagger UI Aggregation ───────────────────────────────────────
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: Identity Service
+        url: /v3/api-docs/identity
+      - name: Property Service
+        url: /v3/api-docs/property
+      - name: Billing Service
+        url: /v3/api-docs/billing
+      - name: Ops Service
+        url: /v3/api-docs/ops
+      - name: Staff Service
+        url: /v3/api-docs/staff
+      - name: Commerce Service
+        url: /v3/api-docs/commerce
+      - name: Notification Service
+        url: /v3/api-docs/notification
+      - name: Report Service
+        url: /v3/api-docs/report
+
+# ── Resilience4j ───────────────────────────────────────────────────────────
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+    instances:
+      identityBreaker:
+        baseConfig: default
+      billingBreaker:
+        baseConfig: default
+        waitDurationInOpenState: 30s   # billing gets extra time to recover
+      propertyBreaker:
+        baseConfig: default
+      opsBreaker:
+        baseConfig: default
+      staffBreaker:
+        baseConfig: default
+      commerceBreaker:
+        baseConfig: default
+      notificationBreaker:
+        baseConfig: default
+      reportBreaker:
+        baseConfig: default
+
+logging:
+  level:
+    com.rentmanager: DEBUG
+    org.springframework.cloud.gateway: INFO
+    reactor.netty: WARN

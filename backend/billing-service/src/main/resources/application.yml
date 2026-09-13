@@ -1,0 +1,108 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: billing-service
+
+  config:
+    import:
+      - optional:nacos:shared-common.yml
+
+  # ── Redis Connection ──────────────────────────────────────────────────────
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:rentmanager-redis-secret}
+      timeout: 2000ms
+
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+      config:
+        server-addr: ${NACOS_SERVER:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        file-extension: yml
+        import-check:
+          enabled: false
+        shared-configs:
+          - data-id: shared-common.yml
+            refresh: true
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/rentmanager}
+    username: ${DB_USER:rentmanager}
+    password: ${DB_PASSWORD:rentmanager}
+  jpa:
+    hibernate:
+      ddl-auto: none
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+        globally_quoted_identifiers: true
+  flyway:
+    enabled: false
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+    consumer:
+      group-id: billing-service
+      auto-offset-reset: earliest
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:7080/realms/rentmanager}
+
+  # Quartz scheduler for invoice generation job
+  quartz:
+    job-store-type: ${QUARTZ_STORE_TYPE:memory}
+    jdbc:
+      initialize-schema: never   # Prisma owns the schema
+
+# Invoice generation job (overridable via Nacos)
+rm:
+  billing:
+    enabled: true
+    cron: "0 0 1 * * *"   # 01:00 UTC daily
+    lead-days: 3
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+
+logging:
+  level:
+    com.rentmanager: DEBUG
+    org.hibernate.SQL: WARN

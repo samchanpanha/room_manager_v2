@@ -4,6 +4,22 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       RentManager — Multi-Module Maven Parent POM
+       ═══════════════════════════════════════════════════════════════════════
+       Module layout:
+         common            → shared DTOs, RBDC engine, Kafka envelope, JWT adapter
+         gateway           → Spring Cloud Gateway (Keycloak JWT + Nacos routing)
+         identity-service  → M00 M01 M02 M03 M27 M28 (migrated from Slice 1)
+         property-service  → M04 M11 M12 M32
+         billing-service   → M05 M06 M07 M08 M09 M10 M13
+         ops-service       → M16 M18 M19 M22
+         staff-service     → M20 M23 M24
+         commerce-service  → M14 M15
+         notification-svc  → M21 M25 outbox relay
+         report-service    → M26 read-only
+       ═══════════════════════════════════════════════════════════════════════ -->
+
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
@@ -12,18 +28,68 @@
   </parent>
 
   <groupId>com.rentmanager</groupId>
-  <artifactId>rentmanager-backend</artifactId>
-  <version>0.1.0</version>
-  <name>RentManager Backend</name>
-  <description>Strangler-fig slice 1: modular monolith backend (members reads + auth) on the Prisma-owned schema</description>
+  <artifactId>rentmanager-parent</artifactId>
+  <version>0.2.0</version>
+  <packaging>pom</packaging>
+  <name>RentManager Parent</name>
+  <description>Multi-module parent for RentManager microservices</description>
+
+  <modules>
+    <module>common</module>
+    <module>gateway</module>
+    <module>identity-service</module>
+    <module>property-service</module>
+    <module>billing-service</module>
+    <module>ops-service</module>
+    <module>staff-service</module>
+    <module>commerce-service</module>
+    <module>notification-service</module>
+    <module>report-service</module>
+  </modules>
 
   <properties>
     <java.version>21</java.version>
     <spring-modulith.version>1.2.4</spring-modulith.version>
+    <spring-cloud.version>2023.0.3</spring-cloud.version>
+    <spring-cloud-alibaba.version>2023.0.1.2</spring-cloud-alibaba.version>
+    <mapstruct.version>1.5.5.Final</mapstruct.version>
+    <springdoc.version>2.5.0</springdoc.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
+
+      <!-- OpenAPI / Swagger UI -->
+      <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        <version>${springdoc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+        <version>${springdoc.version}</version>
+      </dependency>
+
+      <!-- Spring Cloud BOM -->
+      <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-dependencies</artifactId>
+        <version>${spring-cloud.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- Spring Cloud Alibaba BOM (Nacos discovery + config) -->
+      <dependency>
+        <groupId>com.alibaba.cloud</groupId>
+        <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+        <version>${spring-cloud-alibaba.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- Spring Modulith BOM -->
       <dependency>
         <groupId>org.springframework.modulith</groupId>
         <artifactId>spring-modulith-bom</artifactId>
@@ -31,78 +97,90 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+
+      <!-- Internal common library -->
+      <dependency>
+        <groupId>com.rentmanager</groupId>
+        <artifactId>rentmanager-common</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+
+      <!-- Spring Data Redis -->
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-redis</artifactId>
+        <version>3.3.4</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+        <version>3.3.4</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.data</groupId>
+        <artifactId>spring-data-redis</artifactId>
+        <version>3.3.4</version>
+      </dependency>
+
     </dependencies>
   </dependencyManagement>
 
+  <!-- Dependencies inherited by ALL modules -->
   <dependencies>
     <dependency>
       <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-web</artifactId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-registry-prometheus</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-data-jpa</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-security</artifactId>
-    </dependency>
-    <!-- Spring Modulith (module boundary verification in tests) -->
-    <dependency>
-      <groupId>org.springframework.modulith</groupId>
-      <artifactId>spring-modulith-starter-core</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.postgresql</groupId>
-      <artifactId>postgresql</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <!-- Flyway is present but DISABLED for slice 1 (schema is Prisma-owned). -->
-    <dependency>
-      <groupId>org.flywaydb</groupId>
-      <artifactId>flyway-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.flywaydb</groupId>
-      <artifactId>flyway-database-postgresql</artifactId>
-    </dependency>
-
-    <!-- Tests -->
+    <!-- Nacos config + discovery pulled in via service-specific starters -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- MapStruct for DTO mapping -->
     <dependency>
-      <groupId>org.springframework.modulith</groupId>
-      <artifactId>spring-modulith-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <!-- H2 lets the pure ModulithityTests boot a context without a live Postgres. -->
-    <dependency>
-      <groupId>com.h2database</groupId>
-      <artifactId>h2</artifactId>
-      <scope>test</scope>
+      <groupId>org.mapstruct</groupId>
+      <artifactId>mapstruct</artifactId>
+      <version>${mapstruct.version}</version>
     </dependency>
   </dependencies>
 
   <build>
-    <plugins>
-      <plugin>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-maven-plugin</artifactId>
-      </plugin>
-    </plugins>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <configuration>
+            <source>${java.version}</source>
+            <target>${java.version}</target>
+            <annotationProcessorPaths>
+              <path>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct-processor</artifactId>
+                <version>${mapstruct.version}</version>
+              </path>
+            </annotationProcessorPaths>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
   </build>
 
   <profiles>
-    <!-- Integration (parity) tests hit a real Postgres with the Prisma-owned schema.
-         Run: ./mvnw -Pintegration test   (expects a migrated+seeded rentmanager_test DB) -->
+    <!-- Integration tests: ./mvnw -Pintegration test -->
     <profile>
       <id>integration</id>
       <build>
@@ -121,4 +199,5 @@
       </build>
     </profile>
   </profiles>
+
 </project>

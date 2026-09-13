@@ -3,7 +3,7 @@ import { clientIp, fail, ok } from "@/lib/api";
 import { rateLimit } from "@/lib/ratelimit";
 import { getProviderSecret } from "@/lib/settings";
 import { handlePaymentWebhook, GATEWAY_ACTOR } from "@/lib/payments/service";
-import { resolveProvider } from "@/lib/qrpay/adapter";
+import { resolveProvider, tryNormalizeWebhook } from "@/lib/qrpay/adapter";
 import { prisma } from "@/lib/db";
 import { completeUrgentSettlementAfterPayment } from "@/lib/leases/urgent-settlement";
 
@@ -73,10 +73,21 @@ export async function POST(req: Request) {
   } else {
     const parsed = genericSchema.safeParse(raw);
     if (!parsed.success) {
-      const first = parsed.error.issues[0];
-      return fail(400, "VALIDATION_ERROR", `${first.path.join(".")}: ${first.message}`);
+      // Not the generic §9.6 shape — try normalizing a raw provider callback
+      // (e.g. ABA PayWay posts merchant_trans_id/app_trans_id/ack without any
+      // provider marker, so the provider is detected by content).
+      const detected = tryNormalizeWebhook(raw);
+      if (!detected) {
+        const first = parsed.error.issues[0];
+        return fail(400, "VALIDATION_ERROR", `${first.path.join(".")}: ${first.message}`);
+      }
+      payload = { gatewayRef: detected.gatewayRef, idempotencyKey: detected.idempotencyKey, status: detected.status, reason: detected.reason };
+      if (!payload.gatewayRef && !payload.idempotencyKey) {
+        return fail(400, "INVALID_PAYLOAD", "Provider webhook must reference a payment (ref/idempotencyKey)");
+      }
+    } else {
+      payload = parsed.data;
     }
-    payload = parsed.data;
   }
 
   const result = await handlePaymentWebhook(payload, clientIp(req));

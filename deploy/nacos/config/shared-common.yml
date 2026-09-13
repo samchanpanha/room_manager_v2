@@ -1,0 +1,42 @@
+# ── shared-common.yml ─────────────────────────────────────────────────────────
+# Shared infrastructure config imported by all services via Nacos
+# Overridden per environment (dev / stage / prod)
+# ─────────────────────────────────────────────────────────────────────────────
+
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/rentmanager
+    username: rentmanager
+    password: rentmanager
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 20000
+
+  kafka:
+    bootstrap-servers: kafka:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.rentmanager.*"
+
+keycloak:
+  realm: rentmanager
+  auth-server-url: http://keycloak:8080
+  jwks-uri: http://keycloak:8080/realms/rentmanager/protocol/openid-connect/certs
+  token-issuer: http://keycloak:8080/realms/rentmanager
+
+rm:
+  outbox:
+    poll-interval-ms: 5000
+    batch-size: 50

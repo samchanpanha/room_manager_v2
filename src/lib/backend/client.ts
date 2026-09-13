@@ -2,13 +2,8 @@
  * Typed backend client used by React Server Components (and server actions) to
  * fetch data from the Spring Boot backend instead of importing Prisma directly.
  *
- * This is the seam that decouples the UI from the database: pages that used to
- * `import { prisma } from "@/lib/db"` call these helpers instead. The session
- * cookie is forwarded so the backend's RBDC sees the same user.
- *
- * Client components should keep calling relative `/api/*` URLs (the Next proxy
- * routes them to the backend for migrated prefixes) — this module is for the
- * server side, where there is no ambient origin/cookie.
+ * This is the seam that decouples the UI from the database: pages call these helpers instead.
+ * The session cookie is forwarded so the backend's RBDC sees the same user.
  */
 import { cookies, headers } from "next/headers";
 import { BACKEND_ENABLED, BACKEND_ORIGIN } from "./config";
@@ -32,7 +27,6 @@ async function serverForwardHeaders(): Promise<Record<string, string>> {
     .join("; ");
   const h: Record<string, string> = { "content-type": "application/json" };
   if (cookieHeader) h.cookie = cookieHeader;
-  // Preserve the client IP for audit parity with the Next handlers.
   const reqHeaders = await headers();
   const fwd = reqHeaders.get("x-forwarded-for");
   if (fwd) h["x-forwarded-for"] = fwd;
@@ -40,8 +34,7 @@ async function serverForwardHeaders(): Promise<Record<string, string>> {
 }
 
 /**
- * Low-level server-side call to the backend. Throws {@link BackendError} on a
- * non-2xx response, mirroring the `{ error, message }` body the backend returns.
+ * Low-level server-side call to the backend gateway (http://localhost:8080).
  */
 export async function backendFetch<T>(
   path: string,
@@ -68,15 +61,34 @@ export async function backendFetch<T>(
   return data as T;
 }
 
-// ---- Typed module clients (extend as modules are ported) -------------------
+// ---- Typed module interfaces ----
+
+export interface MemberPartyView {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+}
+
+export interface MemberRoomView {
+  number: string | null;
+}
+
+export interface MemberLeaseRow {
+  id: string;
+  code: string;
+  status: string;
+  room: MemberRoomView | null;
+}
 
 export interface MemberSummary {
   id: string;
+  partyId: string;
   status: string;
-  blacklisted: boolean;
   homePropertyId: string | null;
-  nationality: string | null;
-  idNumber: string | null;
+  propertyCode: string | null;
+  party: MemberPartyView;
+  leases: MemberLeaseRow[];
 }
 
 export interface PropertySummary {
@@ -93,11 +105,24 @@ export interface PropertyRow extends PropertySummary {
   roomsOccupied: number;
 }
 
+export interface OwnerPayoutMethod {
+  id: string;
+  kind: string;
+  bankName?: string | null;
+  accountName: string;
+  accountNumber: string;
+  isPrimary: boolean;
+}
+
 export interface OwnerSummary {
   id: string;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
   status: string;
   companyName: string | null;
-  payoutMethods: { id: string; kind: string; accountName: string; isPrimary: boolean }[];
+  notes: string | null;
+  payoutMethods: OwnerPayoutMethod[];
 }
 
 export interface LeaseSummary {
@@ -162,25 +187,6 @@ export interface PaymentSummary {
   confirmedAt: string | null;
 }
 
-export interface PaymentAllocationDto {
-  id: string;
-  invoiceId: string;
-  amountMinor: number;
-}
-
-export interface PaymentDetail {
-  payment: PaymentSummary;
-  allocations: PaymentAllocationDto[];
-}
-
-export interface CreatePaymentResult {
-  paymentId: string;
-  code: string;
-  allocatedMinor: number;
-  remainderMinor: number;
-  deduplicated: boolean;
-}
-
 export interface DepositSummary {
   id: string;
   leaseId: string;
@@ -195,26 +201,6 @@ export interface DepositSummary {
   invoiceId: string | null;
 }
 
-export interface DepositTransactionDto {
-  id: string;
-  type: string;
-  amountMinor: number;
-  reason: string | null;
-  evidenceDocId: string | null;
-  note: string;
-  method: string | null;
-}
-
-export interface DepositDetail {
-  deposit: DepositSummary;
-  transactions: DepositTransactionDto[];
-}
-
-export interface SettlementResult {
-  remainingMinor: number;
-  status: string;
-}
-
 export interface LedgerAccountDto {
   id: string;
   code: string;
@@ -224,84 +210,73 @@ export interface LedgerAccountDto {
   isActive: boolean;
 }
 
-export interface TrialBalanceRow {
+export interface MaintenanceTicketSummary {
+  id: string;
   code: string;
+  propertyId: string;
+  roomId: string | null;
+  memberProfileId: string | null;
+  title: string;
+  description: string;
+  category: string;
+  priority: string;
+  status: string;
+  slaDueAt: string;
+}
+
+export interface PosSessionSummary {
+  id: string;
+  code: string;
+  propertyId: string;
+  openingCashMinor: number;
+  expectedCashMinor: number;
+  actualCashMinor: number;
+  cashDiffMinor: number;
+  status: string;
+}
+
+export interface StockItemSummary {
+  id: string;
   name: string;
-  type: string;
-  debit: number;
-  credit: number;
-  balance: number;
+  category: string;
+  unit: string;
+  qtyMilli: number;
+  avgCostMilli: number;
+  minQtyMilli: number;
+  propertyId: string;
 }
 
-export interface TrialBalance {
-  rows: TrialBalanceRow[];
-  totalDebit: number;
-  totalCredit: number;
-  balanced: boolean;
+export interface OccupancyReport {
+  propertyId: string;
+  totalRooms: number;
+  occupiedRooms: number;
+  vacantRooms: number;
+  maintenanceRooms: number;
+  occupancyRate: number;
 }
 
-export interface JournalEntryLine {
-  code: string;
-  name: string;
-  debit: number;
-  credit: number;
-  memo: string | null;
-}
-
-export interface JournalTxn {
-  id: string;
-  postedAt: string;
-  memo: string;
-  refType: string;
-  refId: string | null;
-  propertyId: string | null;
-  memberId: string | null;
-  isReversal: boolean;
-  totalMinor: number;
-  entries: JournalEntryLine[];
-}
-
-export interface StatementRow {
-  id: string;
-  postedAt: string;
-  memo: string;
-  refType: string;
-  refId: string | null;
-  isReversal: boolean;
-  totalMinor: number;
-  receivableAfter: number;
-  entries: JournalEntryLine[];
-}
-
-export interface MemberStatement {
-  member: { id: string; name: string | null };
-  rows: StatementRow[];
-  receivableMinor: number;
-}
-
-export interface GeneratedInvoiceRow {
-  id: string;
-  code: string;
-  leaseCode: string;
-  totalMinor: number;
-  periodStart: string;
-  periodEnd: string;
-}
-
-export interface GenerationSummary {
-  generated: number;
-  skipped: number;
-  invoices: GeneratedInvoiceRow[];
-}
-
-export interface BillingDailyResult {
-  lateFees: { applied: number; checked: number };
-  dunning: { overdueMarked: number; remindersSent: number };
+export interface RevenueReport {
+  propertyId: string;
+  totalInvoicedMinor: number;
+  totalCollectedMinor: number;
+  totalOutstandingMinor: number;
 }
 
 export const api = {
   account: {
     me: () => backendFetch<Record<string, unknown>>("/api/account")
+  },
+  users: {
+    list: () => backendFetch<Record<string, unknown>[]>("/api/users"),
+    create: (body: unknown) => backendFetch<{ id: string }>("/api/users", { json: body })
+  },
+  roles: {
+    list: () => backendFetch<Record<string, unknown>[]>("/api/roles"),
+    create: (body: unknown) => backendFetch<{ id: string }>("/api/roles", { json: body })
+  },
+  organizations: {
+    list: () => backendFetch<Record<string, unknown>[]>("/api/organizations"),
+    create: (body: unknown) => backendFetch<{ id: string }>("/api/organizations", { json: body })
   },
   members: {
     list: (params?: { status?: string; propertyId?: string }) => {
@@ -312,13 +287,28 @@ export const api = {
       return backendFetch<MemberSummary[]>(`/api/members${suffix}`);
     },
     get: (id: string) => backendFetch<Record<string, unknown>>(`/api/members/${id}`),
-    create: (body: unknown) => backendFetch<{ id: string }>("/api/members", { json: body }),
-    statement: (id: string) => backendFetch<MemberStatement>(`/api/members/${id}/statement`)
+    create: (body: unknown) => backendFetch<{ id: string }>("/api/members", { json: body })
   },
   properties: {
     list: () => backendFetch<PropertyRow[]>("/api/properties"),
     get: (id: string) => backendFetch<PropertySummary>(`/api/properties/${id}`),
     create: (body: unknown) => backendFetch<PropertySummary>("/api/properties", { json: body })
+  },
+  buildings: {
+    list: (propertyId: string) => backendFetch<Record<string, unknown>[]>(`/api/buildings?propertyId=${propertyId}`),
+    create: (body: unknown) => backendFetch<Record<string, unknown>>("/api/buildings", { json: body })
+  },
+  floors: {
+    list: (buildingId: string) => backendFetch<Record<string, unknown>[]>(`/api/floors?buildingId=${buildingId}`),
+    create: (body: unknown) => backendFetch<Record<string, unknown>>("/api/floors", { json: body })
+  },
+  rooms: {
+    list: (propertyId: string) => backendFetch<Record<string, unknown>[]>(`/api/rooms?propertyId=${propertyId}`),
+    create: (body: unknown) => backendFetch<Record<string, unknown>>("/api/rooms", { json: body })
+  },
+  meters: {
+    list: (propertyId: string) => backendFetch<Record<string, unknown>[]>(`/api/meters?propertyId=${propertyId}`),
+    create: (body: unknown) => backendFetch<Record<string, unknown>>("/api/meters", { json: body })
   },
   owners: {
     list: () => backendFetch<OwnerSummary[]>("/api/owners"),
@@ -331,15 +321,7 @@ export const api = {
       return backendFetch<LeaseSummary[]>(`/api/leases${qs}`);
     },
     get: (id: string) => backendFetch<Record<string, unknown>>(`/api/leases/${id}`),
-    create: (body: unknown) => backendFetch<{ id: string; code: string }>("/api/leases", { json: body }),
-    activate: (id: string) =>
-      backendFetch<{ status: string; notes: string[] }>(`/api/leases/${id}/activate`, { json: {} }),
-    notice: (id: string, endDate?: string) =>
-      backendFetch<{ status: string; notes: string[] }>(`/api/leases/${id}/notice`, { json: { endDate } }),
-    complete: (id: string) =>
-      backendFetch<{ status: string; notes: string[] }>(`/api/leases/${id}/complete`, { json: {} }),
-    terminate: (id: string, reason: string) =>
-      backendFetch<{ status: string; notes: string[] }>(`/api/leases/${id}/terminate`, { json: { reason } })
+    create: (body: unknown) => backendFetch<{ id: string; code: string }>("/api/leases", { json: body })
   },
   invoices: {
     list: (params?: { status?: string; propertyId?: string }) => {
@@ -350,15 +332,7 @@ export const api = {
       return backendFetch<InvoiceSummary[]>(`/api/invoices${suffix}`);
     },
     get: (id: string) => backendFetch<InvoiceDetail>(`/api/invoices/${id}`),
-    create: (body: unknown) => backendFetch<InvoiceDetail>("/api/invoices", { json: body }),
-    issue: (id: string) =>
-      backendFetch<{ issued: boolean; invoice: InvoiceSummary }>(`/api/invoices/${id}/issue`, { json: {} }),
-    void: (id: string, reason: string) =>
-      backendFetch<{ voided: boolean }>(`/api/invoices/${id}/void`, { json: { reason } }),
-    creditNote: (id: string, amount: number, reason: string) =>
-      backendFetch<{ code: string; invoiceStatus: string }>(`/api/invoices/${id}/credit-notes`, {
-        json: { amount, reason }
-      })
+    create: (body: unknown) => backendFetch<InvoiceDetail>("/api/invoices", { json: body })
   },
   payments: {
     list: (params?: { status?: string; method?: string }) => {
@@ -368,67 +342,56 @@ export const api = {
       const suffix = qs.toString() ? `?${qs}` : "";
       return backendFetch<PaymentSummary[]>(`/api/payments${suffix}`);
     },
-    get: (id: string) => backendFetch<PaymentDetail>(`/api/payments/${id}`),
-    create: (body: {
-      memberProfileId: string;
-      method: string;
-      amount: number;
-      allocations?: { invoiceId: string; amount: number }[];
-      idempotencyKey?: string;
-      gatewayRef?: string;
-    }) => backendFetch<CreatePaymentResult>("/api/payments", { json: body }),
-    confirm: (id: string) =>
-      backendFetch<{ ignored: boolean; receiptCode: string; paymentStatus: string }>(
-        `/api/payments/${id}/confirm`,
-        { json: {} }
-      ),
-    fail: (id: string, reason: string) =>
-      backendFetch<{ paymentStatus: string }>(`/api/payments/${id}/fail`, { json: { reason } }),
-    refund: (id: string, reason: string) =>
-      backendFetch<{ paymentStatus: string; receiptCode: string }>(`/api/payments/${id}/refund`, {
-        json: { reason }
-      })
+    create: (body: unknown) => backendFetch<Record<string, unknown>>("/api/payments", { json: body })
   },
   deposits: {
     list: (params?: { status?: string }) => {
       const qs = params?.status ? `?status=${encodeURIComponent(params.status)}` : "";
       return backendFetch<DepositSummary[]>(`/api/deposits${qs}`);
-    },
-    get: (id: string) => backendFetch<DepositDetail>(`/api/deposits/${id}`),
-    deduct: (id: string, body: { amount: number; reason: string; evidenceDocId: string; note: string }) =>
-      backendFetch<SettlementResult>(`/api/deposits/${id}/deduct`, { json: body }),
-    refund: (id: string, body: { amount?: number; method?: string; note: string }) =>
-      backendFetch<SettlementResult>(`/api/deposits/${id}/refund`, { json: body })
+    }
   },
   ledger: {
     accounts: () => backendFetch<LedgerAccountDto[]>("/api/ledger/accounts"),
-    trialBalance: () => backendFetch<TrialBalance>("/api/ledger/trial-balance"),
-    journal: (params?: {
-      account?: string;
-      propertyId?: string;
-      memberId?: string;
-      refType?: string;
-      refId?: string;
-      from?: string;
-      to?: string;
-      take?: number;
-    }) => {
-      const qs = new URLSearchParams();
-      if (params?.account) qs.set("account", params.account);
-      if (params?.propertyId) qs.set("propertyId", params.propertyId);
-      if (params?.memberId) qs.set("memberId", params.memberId);
-      if (params?.refType) qs.set("refType", params.refType);
-      if (params?.refId) qs.set("refId", params.refId);
-      if (params?.from) qs.set("from", params.from);
-      if (params?.to) qs.set("to", params.to);
-      if (params?.take !== undefined) qs.set("take", String(params.take));
-      const suffix = qs.toString() ? `?${qs}` : "";
-      return backendFetch<JournalTxn[]>(`/api/ledger/journal${suffix}`);
-    }
+    trialBalance: () => backendFetch<Record<string, unknown>>("/api/ledger/trial-balance")
   },
-  jobs: {
-    generateInvoices: () =>
-      backendFetch<GenerationSummary>("/api/jobs/invoice-generation", { json: {} }),
-    billingDaily: () => backendFetch<BillingDailyResult>("/api/jobs/billing-daily", { json: {} })
+  maintenance: {
+    list: (propertyId: string) => backendFetch<MaintenanceTicketSummary[]>(`/api/tickets?propertyId=${propertyId}`),
+    create: (body: unknown) => backendFetch<MaintenanceTicketSummary>("/api/tickets", { json: body })
+  },
+  expenses: {
+    list: (propertyId: string) => backendFetch<Record<string, unknown>[]>(`/api/expenses?propertyId=${propertyId}`),
+    create: (body: unknown) => backendFetch<Record<string, unknown>>("/api/expenses", { json: body })
+  },
+  attendance: {
+    list: (params?: { propertyId?: string; staffUserId?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.propertyId) qs.set("propertyId", params.propertyId);
+      if (params?.staffUserId) qs.set("staffUserId", params.staffUserId);
+      const suffix = qs.toString() ? `?${qs}` : "";
+      return backendFetch<Record<string, unknown>[]>(`/api/attendance${suffix}`);
+    },
+    clockIn: (body: unknown) => backendFetch<Record<string, unknown>>("/api/attendance/clock-in", { json: body }),
+    clockOut: (body: unknown) => backendFetch<Record<string, unknown>>("/api/attendance/clock-out", { json: body })
+  },
+  pos: {
+    openSession: (body: unknown) => backendFetch<PosSessionSummary>("/api/pos/sessions", { json: body }),
+    closeSession: (id: string, body: unknown) => backendFetch<PosSessionSummary>(`/api/pos/sessions/${id}/close`, { json: body }),
+    getActiveSession: (propertyId: string) => backendFetch<PosSessionSummary>(`/api/pos/sessions/active?propertyId=${propertyId}`),
+    createSale: (body: unknown) => backendFetch<Record<string, unknown>>("/api/pos/sales", { json: body })
+  },
+  stock: {
+    list: (propertyId: string) => backendFetch<StockItemSummary[]>(`/api/stock?propertyId=${propertyId}`),
+    create: (body: unknown) => backendFetch<StockItemSummary>("/api/stock", { json: body }),
+    adjust: (id: string, body: unknown) => backendFetch<StockItemSummary>(`/api/stock/${id}/adjust`, { json: body })
+  },
+  reports: {
+    occupancy: (propertyId: string) => backendFetch<OccupancyReport>(`/api/reports/occupancy?propertyId=${propertyId}`),
+    revenue: (propertyId: string) => backendFetch<RevenueReport>(`/api/reports/revenue?propertyId=${propertyId}`),
+    profitLoss: (propertyId: string) => backendFetch<Record<string, unknown>>(`/api/reports/profit-loss?propertyId=${propertyId}`),
+    arrears: (propertyId: string) => backendFetch<Record<string, unknown>[]>(`/api/reports/arrears?propertyId=${propertyId}`)
+  },
+  notifications: {
+    send: (body: unknown) => backendFetch<Record<string, unknown>>("/api/notifications", { json: body }),
+    list: (recipient: string) => backendFetch<Record<string, unknown>[]>(`/api/notifications?recipient=${recipient}`)
   }
 };

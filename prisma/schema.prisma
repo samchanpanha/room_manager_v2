@@ -101,6 +101,7 @@ model Role {
   description String?
   isSystem    Boolean          @default(false)
   isProtected Boolean          @default(false) // protected roles cannot be deleted (Super Admin)
+  active      Boolean          @default(true) // disabled roles grant no permissions (§M01 enable/disable)
   createdAt   DateTime         @default(now())
   permissions RolePermission[]
   users       UserRole[]
@@ -277,13 +278,17 @@ model AuditLog {
 }
 
 model DomainEvent {
-  id         String   @id @default(cuid())
-  type       String // e.g. room.status_changed, property.created
-  payload    String // JSON string
-  propertyId String?
-  occurredAt DateTime @default(now())
+  id          String    @id @default(cuid())
+  type        String    // e.g. room.status_changed, member.created
+  payload     String    // JSON string
+  propertyId  String?
+  occurredAt  DateTime  @default(now())
+  /// Timestamp set by OutboxRelay after successful Kafka publish.
+  /// NULL = not yet relayed. Indexed for poll performance.
+  publishedAt DateTime?
 
   @@index([type])
+  @@index([publishedAt]) // OutboxRelay poll: WHERE publishedAt IS NULL
 }
 
 model Setting {

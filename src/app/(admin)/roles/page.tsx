@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
-import { NewRoleButton, DeleteRoleButton } from "./role-actions";
+import { NewRoleButton, DeleteRoleButton, ToggleRoleButton } from "./role-actions";
 import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
@@ -17,11 +17,13 @@ export default async function RolesPage() {
     return <EmptyState title="No access" hint="Your roles do not include read on Users & RBDC (M01)." />;
   }
   const canCreate = can(user, "create", "M01");
+  const canUpdate = can(user, "update", "M01");
   const canDelete = can(user, "delete", "M01");
 
+  // Disabled roles sort last so active roles stay visible first.
   const roles = await prisma.role.findMany({
     include: { _count: { select: { users: true, permissions: true } } },
-    orderBy: [{ isSystem: "desc" }, { name: "asc" }]
+    orderBy: [{ isSystem: "desc" }, { active: "desc" }, { name: "asc" }]
   });
 
   return (
@@ -56,6 +58,11 @@ export default async function RolesPage() {
                         protected
                       </Badge>
                     ) : null}
+                    {!r.active ? (
+                      <Badge className="ml-2" variant="secondary">
+                        disabled
+                      </Badge>
+                    ) : null}
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{r.key}</TableCell>
                   <TableCell className="max-w-md truncate text-xs text-muted-foreground">{r.description ?? "—"}</TableCell>
@@ -69,6 +76,7 @@ export default async function RolesPage() {
                       >
                         <Tx>Edit grid</Tx>
                       </Link>
+                      {canUpdate && !r.isProtected ? <ToggleRoleButton id={r.id} name={r.name} active={r.active} /> : null}
                       {canDelete && !r.isProtected ? <DeleteRoleButton id={r.id} name={r.name} inUse={r._count.users > 0} /> : null}
                     </div>
                   </TableCell>

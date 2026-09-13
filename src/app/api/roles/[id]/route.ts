@@ -6,7 +6,8 @@ import { logAudit } from "@/lib/audit";
 
 const patchSchema = z.object({
   name: z.string().min(2).max(80).optional(),
-  description: z.string().max(300).optional()
+  description: z.string().max(300).optional(),
+  active: z.boolean().optional()
 });
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -19,6 +20,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const g = await authorize("update", "M01");
   if (g.response) return g.response;
 
+  // Protected roles (Super Admin) can be renamed but never disabled — a hard
+  // lock against locking the last admin out of the system (§M01).
+  if (parsed.data.active === false && role.isProtected) {
+    return fail(409, "PROTECTED", "Protected roles cannot be disabled");
+  }
+
   const updated = await prisma.role.update({ where: { id }, data: parsed.data });
   await logAudit({
     actorId: g.user.id,
@@ -27,7 +34,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     action: "update",
     entityType: "role",
     entityId: id,
-    summary: `Updated role ${updated.name}`,
+    summary:
+      parsed.data.active === false
+        ? `Disabled role ${updated.name} — its memberships no longer grant permissions`
+        : parsed.data.active === true
+          ? `Re-enabled role ${updated.name}`
+          : `Updated role ${updated.name}`,
     before: role,
     after: updated,
     ip: clientIp(req)

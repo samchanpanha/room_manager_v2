@@ -17,6 +17,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
 ENV NEXT_TELEMETRY_DISABLED=1
+# Bake the backend gateway origin into the Next.js rewrites at build time so
+# `/api/*` proxying points at the internal `gateway` container (not localhost).
+ARG BACKEND_ORIGIN
+ENV BACKEND_ORIGIN=${BACKEND_ORIGIN:-http://gateway:8080}
 RUN npm run build
 
 # ── Stage 3: Production runner ────────────────────────────────────────────────

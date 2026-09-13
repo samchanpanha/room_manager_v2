@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.rentmanager</groupId>
+    <artifactId>rentmanager-parent</artifactId>
+    <version>0.2.0</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>rentmanager-gateway</artifactId>
+  <name>RentManager API Gateway</name>
+  <description>Spring Cloud Gateway — single entry point with Keycloak JWT validation, Nacos service discovery, and RBDC header injection</description>
+
+  <dependencies>
+
+    <!-- Reactive Gateway (WebFlux-based; must NOT have spring-boot-starter-web) -->
+    <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-gateway</artifactId>
+    </dependency>
+
+    <!-- Reactive Redis for Gateway Rate Limiter & Caching -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+    </dependency>
+
+    <!-- Nacos service discovery (lets gateway resolve service names → instances) -->
+    <dependency>
+      <groupId>com.alibaba.cloud</groupId>
+      <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+    </dependency>
+
+    <!-- Nacos config (gateway routes & rate-limit rules hot-reloaded from Nacos) -->
+    <dependency>
+      <groupId>com.alibaba.cloud</groupId>
+      <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+    </dependency>
+
+    <!-- LoadBalancer for lb:// (Nacos discovery) route URIs -->
+    <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+    </dependency>
+
+    <!-- Keycloak JWT validation (JWKS endpoint) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+    </dependency>
+
+    <!-- Shared AuthPrincipal + KeycloakJwtConverter -->
+    <dependency>
+      <groupId>com.rentmanager</groupId>
+      <artifactId>rentmanager-common</artifactId>
+    </dependency>
+
+    <!-- Reactor Netty health check endpoint -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+
+    <!-- Circuit breaker for upstream service calls -->
+    <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-circuitbreaker-reactor-resilience4j</artifactId>
+    </dependency>
+
+    <!-- OpenAPI / Swagger UI (WebFlux reactive) -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>

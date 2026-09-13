@@ -7,7 +7,7 @@ import { z } from "zod";
 const patchSchema = z.object({
   // Every SettingsGroupName is accepted — the enum previously omitted `table`
   // and `alerts`, so saving those two cards 400'd on a valid request.
-  group: z.enum(["org", "locale", "billing", "lateFee", "retention", "features", "reports", "templates", "printer", "telegram", "menu", "units", "table", "alerts"]),
+  group: z.enum(["org", "locale", "billing", "lateFee", "retention", "features", "reports", "templates", "printer", "telegram", "menu", "units", "table", "alerts", "paymentGateway"]),
   patch: z.record(z.string(), z.unknown()),
   tenantId: z.string().optional()
 });

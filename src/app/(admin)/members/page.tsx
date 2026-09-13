@@ -2,6 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth/session";
 import { can, hasModuleAccess, type EffectivePermission } from "@/lib/rbac/can";
+import { BACKEND_ENABLED } from "@/lib/backend/config";
+import { api as backend, type PropertyRow, type MemberSummary } from "@/lib/backend/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -54,20 +56,66 @@ export default async function MembersPage({
       : {})
   };
 
-  const [members, properties, dues] = await Promise.all([
-    prisma.memberProfile.findMany({
-      where,
-      include: { party: true, homeProperty: true },
-      orderBy: { createdAt: "desc" }
-    }),
-    prisma.property.findMany({ where: { tenantId: user.tenantId }, orderBy: { code: "asc" } }),
-    prisma.invoice.groupBy({
-      by: ["memberProfileId"],
-      where: { property: { tenantId: user.tenantId }, status: { in: ["issued", "partial_paid", "overdue"] }, amountDueMinor: { gt: 0 } },
-      _sum: { amountDueMinor: true }
-    })
-  ]);
-  const duesByMember = new Map(dues.map((d) => [d.memberProfileId, d._sum.amountDueMinor ?? 0]));
+  let members: {
+    id: string;
+    status: string;
+    blacklisted: boolean;
+    homePropertyId: string | null;
+    nationality: string | null;
+    idNumber: string | null;
+    party: { name: string; email: string | null; phone: string | null };
+    homeProperty: { code: string; name: string } | null;
+    kycCompletedAt: Date | string | null;
+    createdAt: Date | string;
+  }[];
+  let properties: { id: string; code: string; name: string }[];
+  let duesByMember = new Map<string, number>();
+
+  if (BACKEND_ENABLED) {
+    try {
+      const [backendMembers, backendProps] = await Promise.all([
+        backend.members.list({ status: sp.status, propertyId: sp.propertyId }),
+        backend.properties.list()
+      ]);
+      properties = backendProps.map((p: PropertyRow) => ({ id: p.id, code: p.code, name: p.name }));
+      members = backendMembers.map((m: MemberSummary) => ({
+        id: m.id,
+        status: m.status,
+        blacklisted: false,
+        homePropertyId: m.homePropertyId,
+        nationality: null,
+        idNumber: null,
+        party: { name: m.party.name, email: m.party.email, phone: m.party.phone },
+        homeProperty: m.propertyCode
+          ? { code: m.propertyCode, name: "" }
+          : m.homePropertyId
+            ? (properties.find((p) => p.id === m.homePropertyId) ?? null)
+            : null,
+        kycCompletedAt: m.status === "active" || m.status === "verified" ? new Date() : null,
+        createdAt: new Date()
+      }));
+    } catch {
+      members = [];
+      properties = [];
+    }
+  } else {
+    const [dbMembers, dbProperties, dues] = await Promise.all([
+      prisma.memberProfile.findMany({
+        where,
+        include: { party: true, homeProperty: true },
+        orderBy: { createdAt: "desc" }
+      }),
+      prisma.property.findMany({ where: { tenantId: user.tenantId }, orderBy: { code: "asc" } }),
+      prisma.invoice.groupBy({
+        by: ["memberProfileId"],
+        where: { property: { tenantId: user.tenantId }, status: { in: ["issued", "partial_paid", "overdue"] }, amountDueMinor: { gt: 0 } },
+        _sum: { amountDueMinor: true }
+      })
+    ]);
+    members = dbMembers;
+    properties = dbProperties;
+    duesByMember = new Map(dues.map((d) => [d.memberProfileId, d._sum.amountDueMinor ?? 0]));
+  }
 
   return (
     <div>

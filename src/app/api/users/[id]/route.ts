@@ -46,6 +46,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       if (roles.some((r) => r.key === "SUPER_ADMIN") && !g.user.isSuperAdmin) {
         throw new Error("Only a Super Admin can grant the Super Admin role");
       }
+      const disabled = roles.find((r) => !r.active);
+      if (disabled) throw new Error(`Cannot assign the disabled role "${disabled.name}"`);
       await tx.userRole.deleteMany({ where: { userId: id } });
       await tx.userRole.createMany({ data: d.roleIds.map((roleId) => ({ userId: id, roleId })) });
     }

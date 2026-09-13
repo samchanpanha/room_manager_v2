@@ -1,0 +1,168 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# RentManager — Infrastructure Services (Phase 0)
+# Nacos · Keycloak · Kafka (KRaft) · Confluent Schema Registry
+# ──────────────────────────────────────────────────────────────────────────────
+# Usage:
+#   docker compose -f deploy/docker-compose.infra.yml up -d
+#   docker compose -f deploy/docker-compose.infra.yml down
+#
+# Ports exposed on host:
+#   8848  → Nacos console  (http://localhost:8848/nacos  user/pass: nacos/nacos)
+#   8080  → Keycloak       (http://localhost:7080        admin/admin)
+#   9092  → Kafka broker   (PLAINTEXT)
+#   8081  → Schema Registry
+# ──────────────────────────────────────────────────────────────────────────────
+
+networks:
+  rm-infra:
+    driver: bridge
+    name: rm-infra
+
+volumes:
+  nacos-data:
+  keycloak-data:
+  kafka-data:
+
+services:
+
+  # ── Nacos 2.x — service discovery + config centre ──────────────────────────
+  nacos:
+    image: nacos/nacos-server:v2.3.2
+    platform: linux/amd64
+    container_name: rm-nacos
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "false"   # enable in prod; keep off for dev convenience
+      JVM_XMS: 256m
+      JVM_XMX: 512m
+    ports:
+      - "8848:8848"   # HTTP / console
+      - "9848:9848"   # gRPC (client SDK)
+      - "9849:9849"   # gRPC (raft, cluster only — harmless in standalone)
+    volumes:
+      - nacos-data:/home/nacos/data
+      # Seed default config files into Nacos on first start
+      - ./nacos/config:/home/nacos/init.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8848/nacos/v1/ns/operator/metrics"]
+      interval: 15s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+    networks:
+      - rm-infra
+    restart: unless-stopped
+
+  # ── Keycloak 24 — IdP / OIDC ────────────────────────────────────────────────
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    platform: linux/amd64
+    container_name: rm-keycloak
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8080
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_LOG_LEVEL: WARN
+      KC_DB: dev-file
+    ports:
+      - "7080:8080"
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      # Realm import — loaded automatically on start-dev with --import-realm
+      - ./keycloak:/opt/keycloak/data/import:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ready || exit 1"]
+      interval: 15s
+      timeout: 8s
+      retries: 15
+      start_period: 60s
+    networks:
+      - rm-infra
+    restart: unless-stopped
+
+  # ── Kafka (KRaft mode, single broker) ────────────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    platform: linux/amd64
+    container_name: rm-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"   # stable ID for KRaft
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - rm-infra
+    restart: unless-stopped
+
+  # ── Confluent Schema Registry ────────────────────────────────────────────────
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.1
+    platform: linux/amd64
+    container_name: rm-schema-registry
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    ports:
+      - "8091:8081"
+    networks:
+      - rm-infra
+    restart: unless-stopped
+
+  # ── Kafka UI (dev convenience — inspect topics visually) ─────────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    platform: linux/amd64
+    container_name: rm-kafka-ui
+    depends_on:
+      - kafka
+      - schema-registry
+    environment:
+      KAFKA_CLUSTERS_0_NAME: rentmanager-dev
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+    ports:
+      - "8090:8080"
+    networks:
+      - rm-infra
+    restart: unless-stopped
+
+  # ── Prometheus (Metrics Collection & Monitoring) ────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    platform: linux/amd64
+    container_name: rm-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks:
+      - rm-infra
+    restart: unless-stopped

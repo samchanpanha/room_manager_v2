@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { PermissionGrid } from "./permission-grid";
+import { ToggleRoleButton } from "../role-actions";
 import { Tx } from "@/components/i18n-text";
 
 export const dynamic = "force-dynamic";
@@ -47,11 +48,18 @@ export default async function RoleDetailPage({ params }: { params: Promise<{ id:
         description={role.description ?? undefined}
         actions={
           <>
+            {!role.active ? <Badge variant="secondary">disabled</Badge> : null}
             <Badge variant="outline">{role._count.users} users</Badge>
             <Badge variant="outline">{role.permissions.length} grants</Badge>
+            {canUpdate && !role.isProtected ? <ToggleRoleButton id={role.id} name={role.name} active={role.active} /> : null}
           </>
         }
       />
+      {!role.active ? (
+        <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          <Tx>This role is disabled — memberships do not grant any permissions right now. Re-enable it to restore access without reassigning users.</Tx>
+        </div>
+      ) : null}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Module × action × scope</CardTitle>

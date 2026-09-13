@@ -1,0 +1,201 @@
+{
+  "realm": "rentmanager",
+  "enabled": true,
+  "displayName": "RentManager",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "offlineSessionIdleTimeout": 2592000,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 10,
+  "roles": {
+    "realm": [
+      {
+        "name": "SUPER_ADMIN",
+        "description": "Full system access including config and delete",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "ADMIN",
+        "description": "Manage (CRU) all modules; audit log viewer; can revoke sessions",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "PROPERTY_MANAGER",
+        "description": "Manages operations for assigned properties",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "ACCOUNTANT",
+        "description": "Financial read/manage: invoices, payments, ledger, expenses",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "STAFF",
+        "description": "Operational write access: maintenance, inspections, POS",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "OWNER",
+        "description": "Owner portal: own properties, statements, documents",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "MEMBER",
+        "description": "Tenant portal: own lease, invoices, complaints, profile",
+        "composite": false,
+        "clientRole": false
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "gateway",
+      "name": "API Gateway (BootUI)",
+      "description": "Public PKCE client used by the Next.js / BootUI frontend",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:8080/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://localhost:8080"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "defaultClientScopes": ["openid", "profile", "email", "roles"],
+      "optionalClientScopes": ["offline_access"]
+    },
+    {
+      "clientId": "api",
+      "name": "RentManager Service Account",
+      "description": "Confidential client for service-to-service client_credentials grant",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "rm-api-secret-change-in-prod",
+      "defaultClientScopes": ["openid", "profile", "roles"],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "identity-service",
+      "name": "Identity Service",
+      "description": "Client credentials for identity-service inter-service calls",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "identity-service-secret-change-in-prod",
+      "defaultClientScopes": ["openid", "roles"],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "billing-service",
+      "name": "Billing Service",
+      "description": "Client credentials for billing-service inter-service calls",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "billing-service-secret-change-in-prod",
+      "defaultClientScopes": ["openid", "roles"],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "property-service",
+      "name": "Property Service",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "property-service-secret-change-in-prod",
+      "defaultClientScopes": ["openid", "roles"],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "ops-service",
+      "name": "Operations Service",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "ops-service-secret-change-in-prod",
+      "defaultClientScopes": ["openid", "roles"],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "notification-service",
+      "name": "Notification Service",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "notification-service-secret-change-in-prod",
+      "defaultClientScopes": ["openid", "roles"],
+      "optionalClientScopes": []
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "roles",
+      "description": "Adds realm roles to access token",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true" },
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "superadmin",
+      "email": "superadmin@rentmanager.local",
+      "firstName": "Super",
+      "lastName": "Admin",
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": true
+        }
+      ],
+      "realmRoles": ["SUPER_ADMIN"]
+    }
+  ]
+}

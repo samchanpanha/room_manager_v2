@@ -45,6 +45,7 @@ let runnable = false;
 
 beforeAll(async () => {
   // fixture: make sure LSE-0001's member has at least one open invoice
+  const root = await prisma.user.findFirstOrThrow();
   const lease = await prisma.lease.findFirstOrThrow({ where: { code: "LSE-0001" } });
   if (lease.status !== "active") {
     await prisma.lease.update({ where: { id: lease.id }, data: { status: "active", terminatedAt: null } });
@@ -52,7 +53,7 @@ beforeAll(async () => {
   }
   const open = await prisma.invoice.count({ where: { memberProfileId: lease.memberProfileId, status: { in: ["issued", "partial_paid", "overdue"] } } });
   if (open === 0) {
-    await generateInvoices({ id: "fixture", name: "fixture" });
+    await generateInvoices({ id: root.id, name: root.name });
     const stillOpen = await prisma.invoice.count({ where: { memberProfileId: lease.memberProfileId, status: { in: ["issued", "partial_paid", "overdue"] } } });
     if (stillOpen === 0) {
       const paid = await prisma.invoice.findFirstOrThrow({ where: { memberProfileId: lease.memberProfileId, status: "paid" }, orderBy: { periodStart: "desc" } });

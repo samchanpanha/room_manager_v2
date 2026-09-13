@@ -34,7 +34,7 @@ beforeAll(async () => {
   const root = await prisma.user.findFirstOrThrow({ where: { email: "root@demo.test" } });
   actor = { id: root.id, name: root.name };
   const member = await prisma.memberProfile.findFirstOrThrow({
-    where: { status: "active", leases: { some: { status: "active" } } },
+    where: { status: "active", leases: { some: { status: "active" } }, party: { email: { not: null } } },
     include: { party: true }
   });
   memberId = member.id;
