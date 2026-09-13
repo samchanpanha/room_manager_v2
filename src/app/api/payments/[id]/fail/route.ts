@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/auth/session";
 import { can, hasModuleAccess } from "@/lib/rbac/can";
 import { prisma } from "@/lib/db";
 import { failPayment } from "@/lib/payments/service";
+import { logError } from "@/lib/errors";
 
 const schema = z.object({ reason: z.string().min(3).max(500) });
 
@@ -22,10 +23,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return fail(403, "FORBIDDEN", "Payment outside your assigned properties");
   }
 
-  const result = await failPayment(id, parsed.data.reason, { id: user.id, name: user.name }, clientIp(req));
-  if (!result.ok) {
-    const status = result.code === "NOT_FOUND" ? 404 : result.code === "INVALID_TRANSITION" ? 422 : 400;
-    return fail(status, result.code, result.message);
+  try {
+    const result = await failPayment(id, parsed.data.reason, { id: user.id, name: user.name }, clientIp(req));
+    if (!result.ok) {
+      const status = result.code === "NOT_FOUND" ? 404 : result.code === "INVALID_TRANSITION" ? 422 : 400;
+      return fail(status, result.code, result.message);
+    }
+    return ok(result);
+  } catch (e) {
+    logError("payments:fail", e, { paymentId: id });
+    return fail(500, "PAYMENT_FAIL_FAILED", "Failed to mark the payment as failed — check the container logs.");
   }
-  return ok(result);
 }

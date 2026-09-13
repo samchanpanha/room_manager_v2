@@ -423,6 +423,26 @@ export async function updateSettings(
     await writeGroup(def, next, actor, ip, `Reports configuration updated (${describeReportPatch(next)})`, tenantId);
     return;
   }
+  if (group === "paymentGateway") {
+    // Deep-merge the nested `aba` map: a partial save (e.g. toggling `enabled`
+    // or editing one merchant field) must never wipe the sibling merchant
+    // configuration, which would otherwise break QR generation downstream.
+    const cur = (current as unknown as PaymentGatewaySettings) ?? {};
+    const pg = patch as Partial<PaymentGatewaySettings>;
+    const next: PaymentGatewaySettings = {
+      provider: pg.provider ?? cur.provider ?? "devmock",
+      aba: { ...(cur.aba ?? {}), ...(pg.aba ?? {}) }
+    };
+    await writeGroup(
+      def,
+      next,
+      actor,
+      ip,
+      `Payment gateway updated (provider: ${next.provider})`,
+      tenantId
+    );
+    return;
+  }
   const next = { ...current, ...patch };
   await writeGroup(def, next, actor, ip, `Settings group "${group}" updated (${Object.keys(patch).join(", ")})`, tenantId);
 }

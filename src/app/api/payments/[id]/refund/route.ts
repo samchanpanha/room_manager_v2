@@ -3,6 +3,7 @@ import { clientIp, fail, ok, parseBody } from "@/lib/api";
 import { getAuthUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { refundPayment } from "@/lib/payments/service";
+import { logError } from "@/lib/errors";
 
 const schema = z.object({ reason: z.string().min(3).max(500) });
 
@@ -21,10 +22,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const payment = await prisma.payment.findUnique({ where: { id } });
   if (!payment) return fail(404, "NOT_FOUND", "Payment not found");
 
-  const result = await refundPayment(id, parsed.data.reason, { id: user.id, name: user.name }, clientIp(req));
-  if (!result.ok) {
-    const status = result.code === "NOT_FOUND" ? 404 : result.code === "INVALID_TRANSITION" || result.code === "NOTHING_TO_REFUND" ? 422 : 400;
-    return fail(status, result.code, result.message);
+  try {
+    const result = await refundPayment(id, parsed.data.reason, { id: user.id, name: user.name }, clientIp(req));
+    if (!result.ok) {
+      const status = result.code === "NOT_FOUND" ? 404 : result.code === "INVALID_TRANSITION" || result.code === "NOTHING_TO_REFUND" ? 422 : 400;
+      return fail(status, result.code, result.message);
+    }
+    return ok(result);
+  } catch (e) {
+    logError("payments:refund", e, { paymentId: id });
+    return fail(500, "PAYMENT_REFUND_FAILED", "Failed to process the refund — check the container logs.");
   }
-  return ok(result);
 }

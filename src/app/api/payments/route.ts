@@ -6,6 +6,7 @@ import { toMinor } from "@/lib/money";
 import { prisma } from "@/lib/db";
 import { createPayment } from "@/lib/payments/service";
 import { canCreateForMember, visiblePaymentScope, paymentInScope } from "@/lib/payments/visibility";
+import { logError } from "@/lib/errors";
 
 const createSchema = z.object({
   memberProfileId: z.string().min(1),
@@ -32,23 +33,28 @@ export async function POST(req: Request) {
   }
 
   const d = parsed.data;
-  const result = await createPayment(
-    { id: user.id, name: user.name },
-    {
-      memberProfileId: d.memberProfileId,
-      method: d.method,
-      amountMinor: toMinor(d.amount),
-      allocations: d.allocations?.map((a) => ({ invoiceId: a.invoiceId, amountMinor: toMinor(a.amount) })),
-      idempotencyKey: d.idempotencyKey ?? null,
-      gatewayRef: d.gatewayRef ?? null
-    },
-    clientIp(req)
-  );
-  if (!result.ok) {
-    const status = result.code === "NOT_FOUND" ? 404 : result.code === "EXCEEDS_DUE" ? 422 : 400;
-    return fail(status, result.code, result.message);
+  try {
+    const result = await createPayment(
+      { id: user.id, name: user.name },
+      {
+        memberProfileId: d.memberProfileId,
+        method: d.method,
+        amountMinor: toMinor(d.amount),
+        allocations: d.allocations?.map((a) => ({ invoiceId: a.invoiceId, amountMinor: toMinor(a.amount) })),
+        idempotencyKey: d.idempotencyKey ?? null,
+        gatewayRef: d.gatewayRef ?? null
+      },
+      clientIp(req)
+    );
+    if (!result.ok) {
+      const status = result.code === "NOT_FOUND" ? 404 : result.code === "EXCEEDS_DUE" ? 422 : 400;
+      return fail(status, result.code, result.message);
+    }
+    return ok(result, 201);
+  } catch (e) {
+    logError("payments:create", e, { memberProfileId: d.memberProfileId, method: d.method });
+    return fail(500, "PAYMENT_CREATE_FAILED", "Failed to record the payment — check the container logs.");
   }
-  return ok(result, 201);
 }
 
 export async function GET(req: Request) {

@@ -1,5 +1,18 @@
 import type { NextConfig } from "next";
+import os from "node:os";
 import { BACKEND_ENABLED, BACKEND_ORIGIN, MIGRATED_PREFIXES } from "./src/lib/backend/config";
+
+/// Next's build worker pool defaults to every core; a 1-core pin made `next build`
+/// take ~30 min on dev machines (and every deploy). Use half the cores (capped at
+/// 6) so small CI boxes stay under their memory ceiling, while local rebuilds keep
+/// most of the machine's parallelism. Override with NEXT_BUILD_CPUS (e.g. `1`).
+const buildWorkers = (() => {
+  if (process.env.NEXT_BUILD_CPUS) {
+    const n = Number(process.env.NEXT_BUILD_CPUS);
+    if (Number.isInteger(n) && n >= 1) return n;
+  }
+  return Math.max(1, Math.min(Math.floor(os.cpus().length / 2), 6));
+})();
 
 /// §M27 security headers. CSP frame-ancestors admits the sandbox preview host
 /// (*.e2b.app) alongside same-origin; a production deploy should tighten this
@@ -25,11 +38,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  // Deploy (§10 row 22): small CI/deploy boxes OOM in parallel static
-  // generation — run the page-data phase single-threaded (negligible for a
-  // ~30-page app; all data pages are force-dynamic anyway).
+  // Deploy (§10 row 22): keep the page-data phase from over-parallelizing on
+  // tight CI boxes — see buildWorkers above (adaptive; NEXT_BUILD_CPUS wins).
   experimental: {
-    cpus: 1
+    cpus: buildWorkers
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
@@ -74,7 +86,15 @@ const nextConfig: NextConfig = {
       { source: "/api/qrpay/pay-all", destination: "/api/rm-file/qrpay/pay-all" },
       { source: "/api/qrpay/status", destination: "/api/rm-file/qrpay/status" },
       { source: "/api/portal/pay-all", destination: "/api/rm-file/portal/pay-all" },
-      { source: "/api/webhooks/payments", destination: "/api/rm-file/webhooks/payments" }
+      { source: "/api/webhooks/payments", destination: "/api/rm-file/webhooks/payments" },
+
+      // §M01 Roles UI mutations: the roles API lives in-app (RBAC catalog +
+      // permission grants + the new enable/disable toggle), but /api/roles is a
+      // migrated prefix — carve the mutating subroutes back so the manager UI
+      // writes our role store instead of the Spring identity-service stub.
+      { source: "/api/roles/:id/permissions", destination: "/api/rm-file/roles/permissions/:id" },
+      { source: "/api/roles/:id", destination: "/api/rm-file/roles/update/:id" },
+      { source: "/api/roles", destination: "/api/rm-file/roles/create" }
     ];
     const afterFiles = MIGRATED_PREFIXES.flatMap((prefix) => [
       { source: prefix, destination: `${BACKEND_ORIGIN}${prefix}` },

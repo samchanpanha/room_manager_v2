@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth/session";
 import { can, hasModuleAccess } from "@/lib/rbac/can";
 import { visibleDepositScope } from "@/lib/deposits/visibility";
+import { api as backend, BackendError, type DepositSummary } from "@/lib/backend/client";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -32,6 +33,7 @@ export default async function DepositsPage({
   }
   const sp = await searchParams;
   const scope = await visibleDepositScope(user, user.permissions);
+  const tenantId = user.tenantId;
   if (scope !== "ALL" && scope.propertyIds.length === 0 && scope.memberIds.length === 0) {
     return (
       <div>
@@ -41,37 +43,85 @@ export default async function DepositsPage({
     );
   }
 
-  const deposits = await prisma.deposit.findMany({
-    where: {
-      lease: { property: { tenantId: user.tenantId } },
-      ...(sp.status ? { status: sp.status } : {}),
-      ...(scope === "ALL" ? {} : { OR: [{ propertyId: { in: scope.propertyIds } }, { memberProfileId: { in: scope.memberIds } }] })
-    },
-    include: { lease: true, member: { include: { party: true } }, invoice: true, transactions: true },
-    orderBy: { createdAt: "desc" },
-    take: 200
+  // Strangler-fig: deposits are served by the Spring billing-service; fall
+  // back to Prisma when the backend is unreachable or when the caller is
+  // property/member-scoped (the in-app RBDC scope filter applies on that path).
+  async function loadFromPrisma(): Promise<DepositRow[]> {
+    const deposits = await prisma.deposit.findMany({
+      where: {
+        lease: { property: { tenantId } },
+        ...(sp.status ? { status: sp.status } : {}),
+        ...(scope === "ALL" ? {} : { OR: [{ propertyId: { in: scope.propertyIds } }, { memberProfileId: { in: scope.memberIds } }] })
+      },
+      include: { lease: true, member: { include: { party: true } }, invoice: true, transactions: true },
+      orderBy: { createdAt: "desc" },
+      take: 200
+    });
+    return deposits.map((d) => {
+      const collected = d.invoice?.amountPaidMinor ?? 0;
+      const deducted = d.transactions.filter((t) => t.type === "deduction").reduce((s, t) => s + t.amountMinor, 0);
+      const refunded = d.transactions.filter((t) => t.type === "refund").reduce((s, t) => s + t.amountMinor, 0);
+      return {
+        id: d.id,
+        leaseId: d.leaseId,
+        leaseCode: d.lease.code,
+        leaseStatus: d.lease.status,
+        member: { id: d.memberProfileId, name: d.member.party.name },
+        status: d.status,
+        requiredMinor: d.requiredMinor,
+        collectedMinor: collected,
+        deductedMinor: deducted,
+        refundedMinor: refunded,
+        remainingMinor: Math.max(0, collected - deducted - refunded),
+        invoiceId: d.invoiceId,
+        invoiceCode: d.invoice?.code ?? null
+      };
+    });
+  }
+
+  interface DepositRow {
+    id: string;
+    leaseId: string;
+    leaseCode: string;
+    leaseStatus: string;
+    member: { id: string; name: string };
+    status: string;
+    requiredMinor: number;
+    collectedMinor: number;
+    deductedMinor: number;
+    refundedMinor: number;
+    remainingMinor: number;
+    invoiceId: string | null;
+    invoiceCode: string | null;
+  }
+
+  const fromSpring = (d: DepositSummary): DepositRow => ({
+    id: d.id,
+    leaseId: d.leaseId,
+    leaseCode: d.leaseCode ?? "",
+    leaseStatus: d.leaseStatus ?? "",
+    member: { id: d.member?.id ?? d.memberProfileId, name: d.member?.name ?? "Unknown" },
+    status: d.status,
+    requiredMinor: d.requiredMinor,
+    collectedMinor: d.collectedMinor,
+    deductedMinor: d.deductedMinor,
+    refundedMinor: d.refundedMinor,
+    remainingMinor: d.remainingMinor,
+    invoiceId: d.invoiceId,
+    invoiceCode: d.invoiceCode ?? null
   });
 
-  const rows = deposits.map((d) => {
-    const collected = d.invoice?.amountPaidMinor ?? 0;
-    const deducted = d.transactions.filter((t) => t.type === "deduction").reduce((s, t) => s + t.amountMinor, 0);
-    const refunded = d.transactions.filter((t) => t.type === "refund").reduce((s, t) => s + t.amountMinor, 0);
-    return {
-      id: d.id,
-      leaseId: d.leaseId,
-      leaseCode: d.lease.code,
-      leaseStatus: d.lease.status,
-      member: { id: d.memberProfileId, name: d.member.party.name },
-      status: d.status,
-      requiredMinor: d.requiredMinor,
-      collectedMinor: collected,
-      deductedMinor: deducted,
-      refundedMinor: refunded,
-      remainingMinor: Math.max(0, collected - deducted - refunded),
-      invoiceId: d.invoiceId,
-      invoiceCode: d.invoice?.code ?? null
-    };
-  });
+  let rows: DepositRow[];
+  if (scope === "ALL") {
+    try {
+      rows = (await backend.deposits.list(sp.status ? { status: sp.status } : undefined)).map(fromSpring);
+    } catch (e) {
+      if (e instanceof BackendError) rows = await loadFromPrisma();
+      else throw e;
+    }
+  } else {
+    rows = await loadFromPrisma();
+  }
 
   const held = rows.reduce((s, r) => s + r.remainingMinor, 0);
   const awaiting = rows.filter((r) => r.status === "billed").length;

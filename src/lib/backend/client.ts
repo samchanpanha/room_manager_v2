@@ -190,7 +190,10 @@ export interface PaymentSummary {
 export interface DepositSummary {
   id: string;
   leaseId: string;
+  leaseCode?: string | null;
+  leaseStatus?: string | null;
   memberProfileId: string;
+  member?: { id: string; name: string };
   propertyId: string | null;
   status: string;
   requiredMinor: number;
@@ -199,6 +202,7 @@ export interface DepositSummary {
   refundedMinor: number;
   remainingMinor: number;
   invoiceId: string | null;
+  invoiceCode?: string | null;
 }
 
 export interface LedgerAccountDto {

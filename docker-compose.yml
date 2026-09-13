@@ -1,11 +1,22 @@
 # ──────────────────────────────────────────────────────────────────────────────
 # RentManager — Full System Unified Docker Compose (One-Command Local Deployment)
 # ──────────────────────────────────────────────────────────────────────────────
-# Usage:
-#   docker compose up --build -d         # Build + start all services in background
-#   docker compose down                  # Stop and remove all containers
-#   docker compose logs -f gateway       # Follow Gateway logs
+# Usage (identical on Windows PowerShell, Git Bash, and macOS/Linux):
+#   docker compose up --build -d    # Build + start ALL services (background)
+#   docker compose up -d --wait     # …and block until every healthcheck passes
+#   docker compose down             # Stop and remove all containers
+#   docker compose logs -f gateway  # Follow Gateway logs
 #   docker compose logs -f rentmanager   # Follow Frontend logs
+#
+# Cross-platform notes (Windows + Mac):
+#   * All images are multi-arch, so no `platform` pins are needed — Docker
+#     pulls the host-native build automatically on Windows (amd64) and macOS
+#     (Apple Silicon arm64 / Intel amd64).
+#   * Bind mounts and volumes use relative paths — safe on Windows paths.
+#   * Dashboard: http://localhost:3000  (demo login root@demo.test / Demo1234!)
+#     Gateway:  http://localhost:8080   Nacos: http://localhost:8848/nacos
+#     Keycloak: http://localhost:7080  Grafana: http://localhost:9090  (admin/admin)
+#     Kafka UI: http://localhost:8090   MinIO: http://localhost:9001
 #
 # Unified Stack:
 #   - PostgreSQL Database (5432)
@@ -93,8 +104,9 @@ services:
 
   # ── 2. Nacos Discovery & Config Center ─────────────────────────────────────
   nacos:
+    # Multi-arch image (amd64 + arm64) — no `platform` pin so Docker pulls the
+    # host-native build on both Windows (amd64) and macOS (arm64/amd64).
     image: nacos/nacos-server:v2.4.3
-    platform: linux/arm64
     container_name: rm-nacos
     environment:
       MODE: standalone
@@ -122,7 +134,6 @@ services:
   # ── 3. Keycloak IAM & OAuth2 ─────────────────────────────────────────────
   keycloak:
     image: quay.io/keycloak/keycloak:24.0
-    platform: linux/arm64
     container_name: rm-keycloak
     command: start-dev --import-realm
     environment:
@@ -154,7 +165,6 @@ services:
   # ── 4. Apache Kafka (KRaft Single Broker) ──────────────────────────────────
   kafka:
     image: confluentinc/cp-kafka:7.6.1
-    platform: linux/amd64
     container_name: rm-kafka
     environment:
       KAFKA_NODE_ID: 1
@@ -185,7 +195,6 @@ services:
   # ── 5. Schema Registry & Kafka UI ────────────────────────────────────────
   schema-registry:
     image: confluentinc/cp-schema-registry:7.6.1
-    platform: linux/amd64
     container_name: rm-schema-registry
     depends_on:
       kafka:
@@ -196,13 +205,18 @@ services:
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
     ports:
       - "8091:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/subjects || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
     networks:
       - rm-network
     restart: unless-stopped
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
-    platform: linux/amd64
     container_name: rm-kafka-ui
     depends_on:
       - kafka
@@ -220,10 +234,15 @@ services:
   # ── 6. Monitoring: Prometheus (internal scraper) + Grafana (UI on 9090) ───
   prometheus:
     image: prom/prometheus:v2.51.0
-    platform: linux/amd64
     container_name: rm-prometheus
     volumes:
       - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:9090/-/healthy || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
     networks:
       - rm-network
     restart: unless-stopped
@@ -245,6 +264,12 @@ services:
       - rentmanager-grafana:/var/lib/grafana
     ports:
       - "9090:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     networks:
       - rm-network
     restart: unless-stopped
@@ -252,7 +277,6 @@ services:
   # ── 7. MinIO Object Storage (S3-compatible) ──────────────────────────────
   minio:
     image: quay.io/minio/minio:latest
-    platform: linux/arm64
     container_name: rm-minio
     command: server /data --console-address ":9001"
     environment:
@@ -450,9 +474,12 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - identity-service
-      - property-service
-      - billing-service
+      identity-service:
+        condition: service_healthy
+      property-service:
+        condition: service_healthy
+      billing-service:
+        condition: service_healthy
     environment:
       <<: *backend-env
     healthcheck:

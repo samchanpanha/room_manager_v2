@@ -6,6 +6,7 @@ import { handlePaymentWebhook, GATEWAY_ACTOR } from "@/lib/payments/service";
 import { resolveProvider, tryNormalizeWebhook } from "@/lib/qrpay/adapter";
 import { prisma } from "@/lib/db";
 import { completeUrgentSettlementAfterPayment } from "@/lib/leases/urgent-settlement";
+import { logError } from "@/lib/errors";
 
 const URGENT_QR_PREFIX = "URGENT:";
 
@@ -63,8 +64,10 @@ export async function POST(req: Request) {
 
   const raw = (await req.json().catch(() => null)) as unknown;
   let payload: z.infer<typeof genericSchema>;
+  let providerName: string | undefined;
   if (typeof raw === "object" && raw !== null && "provider" in raw) {
-    const normalized = resolveProvider((raw as { provider?: string }).provider).parseWebhook(raw);
+    providerName = (raw as { provider?: string }).provider;
+    const normalized = resolveProvider(providerName).parseWebhook(raw);
     if (!normalized) return fail(400, "INVALID_PAYLOAD", "Unrecognized provider webhook payload");
     payload = { gatewayRef: normalized.gatewayRef, idempotencyKey: normalized.idempotencyKey, status: normalized.status, reason: normalized.reason };
     if (!payload.gatewayRef && !payload.idempotencyKey) {
@@ -90,10 +93,16 @@ export async function POST(req: Request) {
     }
   }
 
-  const result = await handlePaymentWebhook(payload, clientIp(req));
-  if (!result.ok) {
-    const status = result.code === "NOT_FOUND" ? 404 : result.code === "INVALID_TRANSITION" ? 422 : 400;
-    return fail(status, result.code, result.message);
+  let result: Awaited<ReturnType<typeof handlePaymentWebhook>>;
+  try {
+    result = await handlePaymentWebhook(payload, clientIp(req));
+    if (!result.ok) {
+      const status = result.code === "NOT_FOUND" ? 404 : result.code === "INVALID_TRANSITION" ? 422 : 400;
+      return fail(status, result.code, result.message);
+    }
+  } catch (e) {
+    logError("webhook:payments", e, { provider: providerName, refs: payload });
+    return fail(500, "WEBHOOK_FAILED", "Webhook processing failed — check the container logs.");
   }
   if (payload.status === "confirmed") {
     await maybeFinishUrgentSettlement(payload, result.receiptCode);

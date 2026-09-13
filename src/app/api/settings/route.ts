@@ -2,6 +2,7 @@ import { fail, ok, parseBody, clientIp } from "@/lib/api";
 import { getAuthUser } from "@/lib/auth/session";
 import { getSettings, updateSettings, type SettingsGroupName } from "@/lib/settings";
 import { hasModuleAccess } from "@/lib/rbac/can";
+import { logError } from "@/lib/errors";
 import { z } from "zod";
 
 const patchSchema = z.object({
@@ -53,6 +54,7 @@ export async function PATCH(req: Request) {
       targetTenantId
     );
   } catch (e) {
+    logError("settings:update", e, { group: parsed.data.group });
     return fail(400, "INVALID_SETTINGS", e instanceof Error ? e.message : "Invalid settings update");
   }
   return ok({

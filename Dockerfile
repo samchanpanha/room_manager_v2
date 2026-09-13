@@ -21,6 +21,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # `/api/*` proxying points at the internal `gateway` container (not localhost).
 ARG BACKEND_ORIGIN
 ENV BACKEND_ORIGIN=${BACKEND_ORIGIN:-http://gateway:8080}
+# Optional build-worker cap (see next.config.ts buildWorkers); leave unset to
+# auto-size from cores.
+ARG NEXT_BUILD_CPUS
+ENV NEXT_BUILD_CPUS=${NEXT_BUILD_CPUS}
 RUN npm run build
 
 # ── Stage 3: Production runner ────────────────────────────────────────────────

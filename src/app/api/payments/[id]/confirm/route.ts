@@ -4,6 +4,7 @@ import { can, hasModuleAccess } from "@/lib/rbac/can";
 import { prisma } from "@/lib/db";
 import { confirmPayment } from "@/lib/payments/service";
 import { completeUrgentSettlementAfterPayment } from "@/lib/leases/urgent-settlement";
+import { logError } from "@/lib/errors";
 
 const URGENT_QR_PREFIX = "URGENT:";
 
@@ -23,13 +24,18 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return fail(403, "FORBIDDEN", "Payment outside your assigned properties");
   }
 
-  const result = await confirmPayment(id, { id: user.id, name: user.name }, { ip: clientIp(req) });
-  if (!result.ok) {
-    const status = result.code === "NOT_FOUND" ? 404 : result.code === "INVALID_TRANSITION" ? 422 : 400;
-    return fail(status, result.code, result.message);
+  try {
+    const result = await confirmPayment(id, { id: user.id, name: user.name }, { ip: clientIp(req) });
+    if (!result.ok) {
+      const status = result.code === "NOT_FOUND" ? 404 : result.code === "INVALID_TRANSITION" ? 422 : 400;
+      return fail(status, result.code, result.message);
+    }
+    if (payment.gatewayRef?.startsWith(URGENT_QR_PREFIX)) {
+      await completeUrgentSettlementAfterPayment(id, { id: user.id, name: user.name }, clientIp(req)).catch(() => undefined);
+    }
+    return ok(result);
+  } catch (e) {
+    logError("payments:confirm", e, { paymentId: id });
+    return fail(500, "PAYMENT_CONFIRM_FAILED", "Failed to confirm the payment — check the container logs.");
   }
-  if (payment.gatewayRef?.startsWith(URGENT_QR_PREFIX)) {
-    await completeUrgentSettlementAfterPayment(id, { id: user.id, name: user.name }, clientIp(req)).catch(() => undefined);
-  }
-  return ok(result);
 }

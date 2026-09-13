@@ -4,6 +4,7 @@ import { can } from "@/lib/rbac/can";
 import { prisma } from "@/lib/db";
 import { createInvoiceQr } from "@/lib/qrpay/service";
 import { isProviderName } from "@/lib/qrpay/adapter";
+import { logError } from "@/lib/errors";
 
 /// Dynamic QR for one invoice (§M13): members may pay their own invoice
 /// (M13:O create), staff need M13:create in the invoice's property scope.
@@ -34,10 +35,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     provider = undefined;
   }
 
-  const result = await createInvoiceQr(id, { id: user.id, name: user.name }, { provider });
-  if (!result.ok) {
-    const status = result.code === "NOT_FOUND" ? 404 : result.code === "NOTHING_DUE" || result.code === "INVOICE_VOID" || result.code === "ALREADY_SETTLED" ? 422 : 400;
-    return fail(status, result.code, result.message);
+  try {
+    const result = await createInvoiceQr(id, { id: user.id, name: user.name }, { provider });
+    if (!result.ok) {
+      const status = result.code === "NOT_FOUND" ? 404 : result.code === "NOTHING_DUE" || result.code === "INVOICE_VOID" || result.code === "ALREADY_SETTLED" ? 422 : 400;
+      return fail(status, result.code, result.message);
+    }
+    return ok(result);
+  } catch (e) {
+    logError("qr:create", e, { invoiceId: id, provider });
+    return fail(500, "QR_GENERATION_FAILED", "Could not generate a payment QR — check the payment gateway settings and try again.");
   }
-  return ok(result);
 }

@@ -23,6 +23,10 @@ import { POST as qrpayPayAll } from "@/app/api/qrpay/pay-all/route";
 import { POST as qrpayStatus } from "@/app/api/qrpay/status/route";
 import { POST as portalPayAll } from "@/app/api/portal/pay-all/route";
 import { POST as paymentsWebhook } from "@/app/api/webhooks/payments/route";
+import { POST as rolesCreate } from "@/app/api/roles/route";
+import { PATCH as rolesPatch, DELETE as rolesDelete } from "@/app/api/roles/[id]/route";
+import { PUT as rolesPermissions } from "@/app/api/roles/[id]/permissions/route";
+import { logError } from "@/lib/errors";
 
 /// Internal dispatch namespace for subroutes shadowed by the gateway rewrites
 /// (strangler-fig). next.config.ts `beforeFiles` rewrites rewrite e.g.
@@ -60,6 +64,13 @@ async function dispatch(req: Request, segments: string[]): Promise<Response> {
       case "payments/confirm": return req.method === "POST" ? paymentConfirm(req, ctx("id")) : notAllowed("POST");
       case "payments/fail": return req.method === "POST" ? paymentFail(req, ctx("id")) : notAllowed("POST");
       case "payments/refund": return req.method === "POST" ? paymentRefund(req, ctx("id")) : notAllowed("POST");
+
+      // §M01 roles mutations (PATCH toggle/rename, DELETE, PUT grants).
+      case "roles/update":
+        if (req.method === "PATCH") return rolesPatch(req, ctx("id"));
+        if (req.method === "DELETE") return rolesDelete(req, ctx("id"));
+        return notAllowed("PATCH, DELETE");
+      case "roles/permissions": return req.method === "PUT" ? rolesPermissions(req, ctx("id")) : notAllowed("PUT");
     }
   }
 
@@ -74,16 +85,49 @@ async function dispatch(req: Request, segments: string[]): Promise<Response> {
       case "qrpay/status": return req.method === "POST" ? qrpayStatus(req) : notAllowed("POST");
       case "portal/pay-all": return req.method === "POST" ? portalPayAll(req) : notAllowed("POST");
       case "webhooks/payments": return req.method === "POST" ? paymentsWebhook(req) : notAllowed("POST");
+      case "roles/create": return req.method === "POST" ? rolesCreate(req) : notAllowed("POST");
     }
   }
 
   return new Response("Not found", { status: 404 });
 }
 
+/// Catch-all wiring: a throwing carve-out handler never yields an opaque empty
+/// 500 — `logError` emits the structured line (grep `docker compose logs
+/// rentmanager` by `ctx`/`kind`/`message`), while the browser still receives a
+/// client-safe JSON error.
+async function handle(req: Request, segments: string[]): Promise<Response> {
+  const route = segments.join("/");
+  try {
+    return await dispatch(req, segments);
+  } catch (e) {
+    logError(`rm-file:${route}`, e, { method: req.method });
+    return new Response(JSON.stringify({ error: "INTERNAL", message: "Internal error — see container logs" }), {
+      status: 500,
+      headers: { "content-type": "application/json" }
+    });
+  }
+}
+
 export function GET(req: Request, ctx: { params: Promise<{ h: string[] }> }) {
-  return ctx.params.then(({ h: segments }) => dispatch(req, segments));
+  return ctx.params.then(({ h: segments }) => handle(req, segments));
 }
 
 export function POST(req: Request, ctx: { params: Promise<{ h: string[] }> }) {
-  return ctx.params.then(({ h: segments }) => dispatch(req, segments));
+  return ctx.params.then(({ h: segments }) => handle(req, segments));
+}
+
+// PATCH/PUT/DELETE go through the same dispatcher (roles toggle/grants, and
+// any future carved verb) — Next rejects unexported methods with an opaque 405
+// before the handler runs, so export them or the carve-outs never execute.
+export function PATCH(req: Request, ctx: { params: Promise<{ h: string[] }> }) {
+  return ctx.params.then(({ h: segments }) => handle(req, segments));
+}
+
+export function PUT(req: Request, ctx: { params: Promise<{ h: string[] }> }) {
+  return ctx.params.then(({ h: segments }) => handle(req, segments));
+}
+
+export function DELETE(req: Request, ctx: { params: Promise<{ h: string[] }> }) {
+  return ctx.params.then(({ h: segments }) => handle(req, segments));
 }
