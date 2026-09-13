@@ -5,6 +5,8 @@
 > **Staff doing daily work** (front desk, cashiers, managers) should start with
 > the in-app **Help & Guide** (`/guide`) or
 > [`docs/manual/`](./manual/README.md) instead.
+> **In-app Administrator Guide:** `/admin-guide` (built from
+> [`admin-guide/`](./admin-guide/README.md), English / ខ្មែរ / 中文).
 >
 > 🌐 Also available in **Khmer** ([`ADMIN_GUIDE_KM.md`](./ADMIN_GUIDE_KM.md)) and
 > **Chinese** ([`ADMIN_GUIDE_ZH.md`](./ADMIN_GUIDE_ZH.md)).

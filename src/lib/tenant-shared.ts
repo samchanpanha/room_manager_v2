@@ -8,6 +8,7 @@ export const RESERVED_SLUGS = new Set([
   "pay",
   "account",
   "guide",
+  "admin-guide",
   "root",
   "system",
   "auth",

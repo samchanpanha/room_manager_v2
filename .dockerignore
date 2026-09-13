@@ -23,10 +23,14 @@ node_modules
 .DS_Store
 Thumbs.db
 
-# Documentation (not needed in image)
+# Documentation (not needed in image — except the admin-guide sources, which
+# the builder compiles into public/admin-guide/ during the image build)
 docs/
+!docs/admin-guide/
+!docs/admin-guide/**
 *.md
 !README.md
+!docs/admin-guide/**/*.md
 
 # Tests
 tests/

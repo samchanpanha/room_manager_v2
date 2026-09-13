@@ -22,7 +22,8 @@
     "docker:up": "docker compose up --build -d",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
-    "docker:status": "docker compose ps"
+    "docker:status": "docker compose ps",
+    "guide:admin": "node docs/admin-guide/site/build.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
