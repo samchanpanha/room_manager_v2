@@ -32,7 +32,8 @@ const PARTS = [
   { file: "11-faq.md", g: 4 },
   { file: "12-glossary.md", g: 4 },
   { file: "13-golden-paths.md", g: 4 },
-  { file: "14-move-out-settlement-guide.md", g: 1 }
+  { file: "14-move-out-settlement-guide.md", g: 1 },
+  { file: "15-deployment-guide.md", g: 3 }
 ];
 
 const fileSlug = (f) => f.replace(/\.md$/, "");
@@ -706,6 +707,8 @@ fs.rmSync(publicGuide, { recursive: true, force: true });
 fs.mkdirSync(publicGuide, { recursive: true });
 fs.writeFileSync(path.join(publicGuide, "index.html"), html);
 fs.cpSync(path.join(here, "img"), path.join(publicGuide, "img"), { recursive: true });
+// Printable one-page cheat sheet (linked from Part 15) ships alongside the guide.
+fs.copyFileSync(path.join(here, "cheat-sheet.html"), path.join(publicGuide, "cheat-sheet.html"));
 
 console.log(`Built docs/manual/site/index.html — ${PARTS.length} parts × ${SITE_LOCALES.length} languages (${SITE_LOCALES.join(" / ")}), ${WALKS.en.length} walkthroughs per language`);
 console.log("Published to public/guide/ (in-app at /guide)");

@@ -25,7 +25,8 @@ export const PART_LABELS = {
   "11-faq": "សំណួរជួញជុំ",
   "12-glossary": "វចនានុក្រម",
   "13-golden-paths": "ផ្លូវមាស និងស្ថានការណ៍",
-  "14-move-out-settlement-guide": "មគ្គុទ្ទេសក៍ការបិទគណនីពេលចាកចេញ"
+  "14-move-out-settlement-guide": "មគ្គុទ្ទេសក៍ការបិទគណនីពេលចាកចេញ",
+  "15-deployment-guide": "មគ្គុទ្ទេសក៍ដំឡើងប្រព័ន្ធ (Mac & Windows)"
 };
 
 export const UI = {
@@ -278,6 +279,23 @@ export const WALKS = [
       { t: "ភ្ជាប់ក្នុងចម្លើយ", d: "ក្នុង Telegram អ្នកប្រើបើក bot ហើយផ្ញើ `/link <code>`។ bot ភ្ជាប់គណនីរបស់ពួកគេ (បានពិនិត្យសិទ្ធិ) ហើយបញ្ជាក់។", menu: "Bot → /link <code>" },
       { t: "កំណត់ការបិទបើកការជូនដំណឹង", d: "បិទ/បើកព្រឹត្តិការណ៍ដែលពួកគេទទួល: វិក្កយបត្រចេញ, ការទូទាត់បញ្ជាក់, ការហៅបង់, ការជ្រើស, ការបច្ចុប្បននភាពសំបុត្រ/ការតវ៉ា, របាយការណ៍ម្ចាស់, ស្តុកទាប, សង្ខេបសណ្ឋាគារ។", menu: "ការបិទបើកការជូនដំណឹង" },
       { t: "កែសម្រួលពាក្យ (ជម្រើស)", d: "ក្នុង **ការកំណត់ → Templates**, កែសារសម្រាប់ព្រឹត្តិការណ៍សមាជិក ៥ ប្រភេទដោយប្រើ {placeholders}។ ក្នុងប្រព័ន្ធ demo, សារត្រូវ**mock ទៅ outbox** (បង្ហាញនៅអេក្រង់ Telegram)។", menu: "ការកំណត់ → Templates" }
+    ]
+  },
+  {
+    id: "deploy",
+    title: "🚀 ដំឡើង RentManager (Mac & Windows)",
+    role: "Admin / IT",
+    time: "~៣០–៦០ នាទី",
+    intro: "ដំឡើងប្រព័ន្ធពេញលេញដោយ Docker, ផ្ទៀងផ្ទាត់វា, ហើយកំណត់ការបម្រុងទុករៀងរាល់យប់។",
+    steps: [
+      { t: "ពិនិត្យតម្រូវការ", d: "អ្នកត្រូវការ **RAM អប្បបរមា 8 GB (បានណែនាំ 16 GB)**, ថាសទំនេរ 20 GB និង **Docker Desktop** (Windows៖ ជាមួយ **WSL 2**)។ Ports 3000 / 5432 / 8080–8088 និងផ្សេងទៀតត្រូវទំនេរ។", menu: "ផ្នែកទី ១៥ → 15.1 តម្រូវការ" },
+      { t: "ដំឡើង Docker Desktop", d: "macOS៖ ទាញយកជំនាន់ Apple Silicon ឬ Intel។ Windows៖ ដំណើរការ `wsl --install` ជាមុន បន្ទាប់មកដំឡើង Docker ជាមួយ WSL 2 backend។ ផ្តល់ RAM **≥ 8 GB** ឲ្យ Docker ក្នុង Settings → Resources។", menu: "ដំឡើង Docker" },
+      { t: "Clone repository", d: "ដំណើរការ `git clone <URL> room_manager_v2` ទៅផ្លូវខ្លីគ្មានដកឃ្លា បន្ទាប់មក `cd room_manager_v2`។", menu: "Terminal / PowerShell" },
+      { t: "កំណត់ secrets (ជម្រើសសម្រាប់ demo)", d: "ប្តូរតម្លៃលំនាំដើមមុន boot លើកដំបូង៖ ពាក្យសម្ងាត់ MinIO/Grafana, webhook secrets, `SETTINGS_ENC_KEY`។ កុំ commit secrets ពិត។", menu: "Environment" },
+      { t: "ចាប់ផ្តើមទាំងអស់", d: "ដំណើរការ `docker compose up --build -d`។ Build លើកដំបូងត្រូវការ 10–40 នាទី፤ ពេល boot app ដំណើរការ **migrations + seed** ដោយស្វ័យប្រវត្តិ។", menu: "docker compose up" },
+      { t: "ផ្ទៀងផ្ទាត់", d: "រង់ចាំដោយ `docker compose up -d --wait` បន្ទាប់មកបញ្ជាក់ថា `http://localhost:3000/api/health` ត្រឡប់ ok ហើយទំព័រ login បើកឡើង។", menu: "ផ្ទៀងផ្ទាត់" },
+      { t: "ចូលលើកដំបូងជា Super Admin", d: "ចូលជា **root@demo.test / Demo1234!**, ចុះឈ្មោះ 2FA, បង្កើត admin ពិតរបស់អ្នក បន្ទាប់មកបិទគណនីសាកល្បង។", menu: "Login → Admin" },
+      { t: "កំណត់ការបម្រុងទុករៀងរាល់យប់", d: "បន្ថែម cron job (Mac) ឬ Task Scheduler task (Windows) ដែលហៅ `POST /api/jobs/backup` រៀងរាល់យប់ — បូកនឹង billing-daily និង rent-alerts។", menu: "Jobs → backup" }
     ]
   }
 ];

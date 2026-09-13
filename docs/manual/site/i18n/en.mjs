@@ -26,7 +26,8 @@ export const PART_LABELS = {
   "11-faq": "FAQ",
   "12-glossary": "Glossary",
   "13-golden-paths": "Golden Paths & Scenarios",
-  "14-move-out-settlement-guide": "Move-Out Settlement Guide"
+  "14-move-out-settlement-guide": "Move-Out Settlement Guide",
+  "15-deployment-guide": "Deployment Guide (Mac & Windows)"
 };
 
 export const UI = {
@@ -279,6 +280,23 @@ export const WALKS = [
       { t: "Link in the chat", d: "In Telegram the user opens the bot and sends `/link <code>`. The bot binds their account (permission-checked) and confirms.", menu: "Bot → /link <code>" },
       { t: "Set notification toggles", d: "Switch on/off which events they get: invoice issued, payment confirmed, dunning, reminders, ticket/complaint updates, owner statements, low stock, occupancy digest.", menu: "Notification toggles" },
       { t: "Customise wording (optional)", d: "In **Settings → Templates**, override message text for the five member events using {placeholders}. In the demo system, messages are **mocked to the outbox** (shown on the Telegram screen).", menu: "Settings → Templates" }
+    ]
+  },
+  {
+    id: "deploy",
+    title: "🚀 Deploy RentManager (Mac & Windows)",
+    role: "Admin / IT",
+    time: "~30–60 min",
+    intro: "Install the full system with Docker, verify it, and schedule the nightly backup.",
+    steps: [
+      { t: "Check the requirements", d: "You need **8 GB RAM minimum (16 GB recommended)**, 20 GB free disk and **Docker Desktop** (Windows: with **WSL 2**). Ports 3000 / 5432 / 8080–8088 and others must be free.", menu: "Part 15 → 15.1 Requirements" },
+      { t: "Install Docker Desktop", d: "macOS: download the Apple Silicon or Intel build. Windows: run `wsl --install` first, then install Docker with the WSL 2 backend. Give Docker **≥ 8 GB RAM** in Settings → Resources.", menu: "Install Docker" },
+      { t: "Clone the repository", d: "Run `git clone <URL> room_manager_v2` into a short, space-free path, then `cd room_manager_v2`.", menu: "Terminal / PowerShell" },
+      { t: "Set secrets (optional for a demo)", d: "Override the dev defaults before first boot: MinIO/Grafana passwords, webhook secrets, `SETTINGS_ENC_KEY`. Never commit real secrets.", menu: "Environment" },
+      { t: "Start everything", d: "Run `docker compose up --build -d`. The first build takes 10–40 min; on boot the app automatically runs **migrations + seed**.", menu: "docker compose up" },
+      { t: "Verify green", d: "Wait with `docker compose up -d --wait`, then confirm `http://localhost:3000/api/health` returns ok and the login page loads.", menu: "Verify" },
+      { t: "First login as Super Admin", d: "Sign in as **root@demo.test / Demo1234!**, enroll 2FA, create your real admin, then disable the demo accounts.", menu: "Login → Admin" },
+      { t: "Schedule the nightly backup", d: "Add a cron job (Mac) or Task Scheduler task (Windows) calling `POST /api/jobs/backup` nightly — plus billing-daily and rent-alerts.", menu: "Jobs → backup" }
     ]
   }
 ];
