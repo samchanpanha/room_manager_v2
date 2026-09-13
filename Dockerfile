@@ -25,6 +25,10 @@ ENV BACKEND_ORIGIN=${BACKEND_ORIGIN:-http://gateway:8080}
 # auto-size from cores.
 ARG NEXT_BUILD_CPUS
 ENV NEXT_BUILD_CPUS=${NEXT_BUILD_CPUS}
+# Compile the in-app administrator guide into public/admin-guide/ so it is
+# served at /admin-guide (see src/app/admin-guide/page.tsx). Sources live in
+# docs/admin-guide/ and are allow-listed in .dockerignore.
+RUN node docs/admin-guide/site/build.mjs
 RUN npm run build
 
 # ── Stage 3: Production runner ────────────────────────────────────────────────
@@ -50,7 +54,7 @@ COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/next-env.d.ts ./next-env.d.ts
 
-# Copy static assets (user guide at /guide, images) — served at runtime
+# Copy static assets (user guide at /guide, admin guide at /admin-guide, images)
 COPY --from=builder /app/public ./public
 
 # Copy prisma schema, migrations, and seed script

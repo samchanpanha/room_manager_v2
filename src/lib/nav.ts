@@ -94,7 +94,8 @@ export const NAV: NavGroup[] = [
     label: "nav.account",
     items: [
       { label: "My Account", href: "/account" },
-      { label: "Help & Guide", href: "/guide" }
+      { label: "Help & Guide", href: "/guide" },
+      { label: "Admin Guide", href: "/admin-guide" }
     ]
   }
 ];
