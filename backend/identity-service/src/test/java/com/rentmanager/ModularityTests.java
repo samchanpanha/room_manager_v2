@@ -30,8 +30,8 @@ import com.rentmanager.common.event.EventEnvelope;
     "spring.datasource.password=",
     "spring.jpa.hibernate.ddl-auto=create-drop",
     "spring.jpa.properties.hibernate.globally_quoted_identifiers=true",
-    // ── Disable infra auto-configs (Nacos / Kafka / Keycloak) ────────────
-    "spring.cloud.nacos.discovery.enabled=false",
+    // ── Disable infra auto-configs (Consul / Nacos config / Kafka / Keycloak) ──
+    "spring.cloud.consul.discovery.enabled=false",
     "spring.cloud.nacos.config.enabled=false",
     "spring.autoconfigure.exclude=" +
         "org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration," +

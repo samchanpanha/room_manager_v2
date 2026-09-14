@@ -1,12 +1,13 @@
 # ──────────────────────────────────────────────────────────────────────────────
 # RentManager — Infrastructure Services (Phase 0)
-# Nacos · Keycloak · Kafka (KRaft) · Confluent Schema Registry
+# Consul · Nacos · Keycloak · Kafka (KRaft) · Confluent Schema Registry
 # ──────────────────────────────────────────────────────────────────────────────
 # Usage:
 #   docker compose -f deploy/docker-compose.infra.yml up -d
 #   docker compose -f deploy/docker-compose.infra.yml down
 #
 # Ports exposed on host:
+#   8500  → Consul UI/API   (http://localhost:8500)
 #   8848  → Nacos console  (http://localhost:8848/nacos  user/pass: nacos/nacos)
 #   8080  → Keycloak       (http://localhost:7080        admin/admin)
 #   9092  → Kafka broker   (PLAINTEXT)
@@ -19,13 +20,35 @@ networks:
     name: rm-infra
 
 volumes:
+  consul-data:
   nacos-data:
   keycloak-data:
   kafka-data:
 
 services:
 
-  # ── Nacos 2.x — service discovery + config centre ──────────────────────────
+  # ── Consul — service discovery (services register here; `lb://` routes) ────
+  consul:
+    image: hashicorp/consul:1.20
+    container_name: rm-consul
+    command: agent -server -bootstrap -ui -client=0.0.0.0 -node=rm-consul
+    ports:
+      - "8500:8500"   # HTTP API + Web UI
+      - "8600:8600"   # DNS (TCP)
+      - "8600:8600/udp"
+    volumes:
+      - consul-data:/consul/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8500/v1/status/leader | grep -q '\"' || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    networks:
+      - rm-infra
+    restart: unless-stopped
+
+  # ── Nacos 2.x — config centre (discovery moved to Consul) ─────────────────
   nacos:
     image: nacos/nacos-server:v2.3.2
     platform: linux/amd64
@@ -62,6 +85,8 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
       KC_HTTP_PORT: 8080
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME_STRICT_HTTPS: "false"

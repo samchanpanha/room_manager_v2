@@ -7,10 +7,16 @@ spring:
     import:
       - optional:nacos:shared-common.yml
   cloud:
-    nacos:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: 8500
       discovery:
-        server-addr: ${NACOS_SERVER:localhost:8848}
-        namespace: ${NACOS_NAMESPACE:}
+        prefer-ip-address: true
+        instance-id: ${spring.application.name}:${server.port}
+        health-check-path: /actuator/health
+        health-check-interval: 15s
+        deregister-critical-service-after: 2m
+    nacos:
       config:
         server-addr: ${NACOS_SERVER:localhost:8848}
         namespace: ${NACOS_NAMESPACE:}

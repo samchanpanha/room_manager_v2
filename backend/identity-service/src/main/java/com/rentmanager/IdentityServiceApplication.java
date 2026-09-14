@@ -14,7 +14,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  *
  * <p>Migrated from Slice 1 (strangler-fig) with additions:
  * <ul>
- *   <li>Nacos service discovery registration ({@code @EnableDiscoveryClient})</li>
+ *   <li>Consul service discovery registration ({@code @EnableDiscoveryClient})</li>
  *   <li>Scheduled outbox relay ({@code @EnableScheduling} → {@link com.rentmanager.identity.kafka.OutboxRelay})</li>
  *   <li>Keycloak JWT acceptance in addition to the hand-rolled session cookie auth</li>
  * </ul>

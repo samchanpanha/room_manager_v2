@@ -80,7 +80,7 @@
         <scope>import</scope>
       </dependency>
 
-      <!-- Spring Cloud Alibaba BOM (Nacos discovery + config) -->
+      <!-- Spring Cloud Alibaba BOM (Nacos config; discovery handled by Consul) -->
       <dependency>
         <groupId>com.alibaba.cloud</groupId>
         <artifactId>spring-cloud-alibaba-dependencies</artifactId>

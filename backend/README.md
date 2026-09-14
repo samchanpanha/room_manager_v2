@@ -75,7 +75,7 @@ Browser / BootUI (Next.js :3000)
         ▼
   API Gateway :8080
   (Keycloak JWT validation → X-Rm-* headers injected)
-  (lb:// Nacos service discovery)
+  (lb:// Consul service discovery)
         │
   ┌─────┴──────────────────────────────────────────────┐
   │                                                     │

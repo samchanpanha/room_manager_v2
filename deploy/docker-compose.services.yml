@@ -20,6 +20,7 @@ x-service-defaults: &service-defaults
   restart: unless-stopped
   environment: &common-env
     NACOS_SERVER: nacos:8848
+    CONSUL_HOST: consul
     KAFKA_BOOTSTRAP: kafka:9092
     DB_URL: jdbc:postgresql://rentmanager-postgres:5432/rentmanager
     DB_USER: rentmanager

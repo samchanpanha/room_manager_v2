@@ -15,13 +15,15 @@
 #   * Bind mounts and volumes use relative paths — safe on Windows paths.
 #   * Dashboard: http://localhost:3000  (demo login root@demo.test / Demo1234!)
 #     Gateway:  http://localhost:8080   Nacos: http://localhost:8848/nacos
-#     Keycloak: http://localhost:7080  Grafana: http://localhost:9090  (admin/admin)
-#     Kafka UI: http://localhost:8090   MinIO: http://localhost:9001
+#     Consul:   http://localhost:8500   Keycloak: http://localhost:7080
+#     Grafana:  http://localhost:9090  (admin/admin)  Kafka UI: http://localhost:8090
+#     MinIO:    http://localhost:9001
 #
 # Unified Stack:
 #   - PostgreSQL Database (5432)
 #   - Object Storage: MinIO (9000 API / 9001 Console)
-#   - Infrastructure: Nacos (8848), Keycloak (7080), Kafka (9092), Schema Registry (8091), Kafka UI (8090), Grafana (9090, Prometheus datasource internal)
+#   - Infrastructure: Consul (8500), Nacos (8848), Keycloak (7080), Kafka (9092), Schema Registry (8091), Kafka UI (8090), Grafana (9090, Prometheus datasource internal)
+#   - Discovery: Consul (services register + `lb://` routes); Nacos (config centre only)
 #   - Backend Microservices: Gateway (8080), Identity (8081), Property (8082), Billing (8083), Ops (8084), Staff (8085), Commerce (8086), Notification (8087), Report (8088)
 #   - Frontend Web App: Next.js (3000)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -41,6 +43,7 @@ volumes:
   rentmanager-backups:
   rentmanager-minio:
   rentmanager-grafana:
+  rentmanager-consul:
 
 x-backend-defaults: &backend-defaults
   networks:
@@ -48,6 +51,7 @@ x-backend-defaults: &backend-defaults
   restart: unless-stopped
   environment: &backend-env
     NACOS_SERVER: nacos:8848
+    CONSUL_HOST: consul
     KAFKA_BOOTSTRAP: kafka:9092
     DB_URL: jdbc:postgresql://postgres:5432/rentmanager
     DB_USER: rentmanager
@@ -131,6 +135,27 @@ services:
       - rm-network
     restart: unless-stopped
 
+  # ── 2b. Consul Service Discovery ─────────────────────────────────────────
+  consul:
+    image: hashicorp/consul:1.20
+    container_name: rm-consul
+    command: agent -server -bootstrap -ui -client=0.0.0.0 -node=rm-consul
+    ports:
+      - "8500:8500"   # HTTP API + Web UI
+      - "8600:8600"   # DNS (TCP)
+      - "8600:8600/udp"
+    volumes:
+      - rentmanager-consul:/consul/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8500/v1/status/leader | grep -q '\"' || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    networks:
+      - rm-network
+    restart: unless-stopped
+
   # ── 3. Keycloak IAM & OAuth2 ─────────────────────────────────────────────
   keycloak:
     image: quay.io/keycloak/keycloak:24.0
@@ -139,6 +164,8 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
       KC_HTTP_PORT: 8080
       KC_HOSTNAME_STRICT: "false"
       KC_OPTS: -Xms256m -Xmx768m
@@ -311,6 +338,8 @@ services:
         condition: service_healthy
       nacos:
         condition: service_healthy
+      consul:
+        condition: service_started
     environment:
       <<: *backend-env
       ENFORCE_MANDATORY_TOTP: "true"

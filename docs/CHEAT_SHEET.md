@@ -10,6 +10,7 @@
 | App | http://localhost:3000 | `root@demo.test` / `Demo1234!` |
 | Swagger APIs | http://localhost:8080/swagger-ui.html | — |
 | Nacos / Keycloak | :8848/nacos · :7080 | `nacos/nacos` · `admin/admin` |
+| Consul | :8500 | — (services/health via UI) |
 | Kafka UI / MinIO / Grafana | :8090 · :9001 · :9090 | — · `rentmanager/…-s3-secret` · `admin/admin` |
 
 Demo accounts, all password `Demo1234!`: `root@` Super Admin · `admin@` Admin ·

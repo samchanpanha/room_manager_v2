@@ -17,14 +17,18 @@ spring:
       password: ${REDIS_PASSWORD:rentmanager-redis-secret}
       timeout: 2000ms
 
-  # ── Nacos Config ──────────────────────────────────────────────────────────
+  # ── Consul Discovery + Nacos Config ──────────────────────────────────────
   cloud:
-    nacos:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: 8500
       discovery:
-        server-addr: ${NACOS_SERVER:localhost:8848}
-        namespace: ${NACOS_NAMESPACE:}          # empty = public namespace
-        group: DEFAULT_GROUP
-        register-enabled: true
+        prefer-ip-address: true
+        instance-id: ${spring.application.name}:${server.port}
+        health-check-path: /actuator/health
+        health-check-interval: 15s
+        deregister-critical-service-after: 2m
+    nacos:
       config:
         server-addr: ${NACOS_SERVER:localhost:8848}
         namespace: ${NACOS_NAMESPACE:}
@@ -198,6 +202,20 @@ spring:
             - Path=/v3/api-docs/report
           filters:
             - RewritePath=/v3/api-docs/report, /v3/api-docs
+
+        # ── SpringDoc Swagger UI static assets ────────────────────────────────
+        # The gateway's own springdoc serves /v3/api-docs, swagger-config and the
+        # /swagger-ui.html redirect via router functions, but its /webjars static
+        # resources are swallowed by the legacy catch-all below (→ Next.js 404).
+        # Every service bundles the identical swagger-ui-5.13.0 webjars, so proxy
+        # the gateway's UI assets to one of them. Rewrite /webjars → /swagger-ui
+        # (the path springdoc-webmvc exposes them at). Must precede the catch-all.
+        - id: openapi-swagger-ui
+          uri: lb://identity-service
+          predicates:
+            - Path=/swagger-ui.html, /swagger-ui/**, /webjars/swagger-ui/**
+          filters:
+            - RewritePath=/webjars/swagger-ui/(?<path>.*), /swagger-ui/$\{path}
 
         # ── Strangler-fig: Legacy Next.js catch-all ──────────────────────────
         # All unmatched paths fall through to the existing Next.js app on :3000.

@@ -13,7 +13,7 @@
 
   <artifactId>rentmanager-gateway</artifactId>
   <name>RentManager API Gateway</name>
-  <description>Spring Cloud Gateway — single entry point with Keycloak JWT validation, Nacos service discovery, and RBDC header injection</description>
+  <description>Spring Cloud Gateway — single entry point with Keycloak JWT validation, Consul service discovery, and RBDC header injection</description>
 
   <dependencies>
 
@@ -29,10 +29,10 @@
       <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
     </dependency>
 
-    <!-- Nacos service discovery (lets gateway resolve service names → instances) -->
+    <!-- Consul service discovery (lets gateway resolve service names → instances) -->
     <dependency>
-      <groupId>com.alibaba.cloud</groupId>
-      <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-consul-discovery</artifactId>
     </dependency>
 
     <!-- Nacos config (gateway routes & rate-limit rules hot-reloaded from Nacos) -->
@@ -41,7 +41,7 @@
       <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
     </dependency>
 
-    <!-- LoadBalancer for lb:// (Nacos discovery) route URIs -->
+    <!-- LoadBalancer for lb:// (Consul discovery) route URIs -->
     <dependency>
       <groupId>org.springframework.cloud</groupId>
       <artifactId>spring-cloud-starter-loadbalancer</artifactId>
