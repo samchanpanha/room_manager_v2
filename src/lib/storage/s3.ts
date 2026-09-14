@@ -33,6 +33,7 @@ export function s3ConfigFromEnv(): S3Config | null {
 
 export class S3Storage implements StorageBackend {
   private client: AwsClient;
+  private bucketReady = false;
 
   constructor(private config: S3Config) {
     this.client = new AwsClient({
@@ -43,6 +44,21 @@ export class S3Storage implements StorageBackend {
       // defaults to "execute-api" and MinIO rejects the signature (400).
       service: "s3"
     });
+  }
+
+  /// Ensure the target bucket exists; idempotent (PUT on existing bucket → 409).
+  private async ensureBucket(): Promise<void> {
+    if (this.bucketReady) return;
+    const url = this.config.endpoint
+      ? `${this.config.endpoint.replace(/\/+$/, "")}/${this.config.bucket}`
+      : `https://s3.${this.config.region}.amazonaws.com/${this.config.bucket}`;
+    const signed = await this.client.sign(url, { method: "PUT" });
+    const res = await fetch(signed.url, { method: signed.method, headers: signed.headers });
+    // 200 = created, 409 = already exists — both are fine.
+    if (!res.ok && res.status !== 409) {
+      throw new Error(`S3 CreateBucket failed: ${res.status} ${res.statusText}`);
+    }
+    this.bucketReady = true;
   }
 
   private objectUrl(key: string): string {
@@ -60,6 +76,7 @@ export class S3Storage implements StorageBackend {
   }
 
   async put(key: string, body: Buffer, contentType?: string): Promise<void> {
+    await this.ensureBucket();
     // Sign the PUT with aws4fetch, then send the payload as a plain Buffer via
     // the platform fetch: undici frames it with a Content-Length, which MinIO
     // requires (aws4fetch's own fetch sends the body streamed, and inside the

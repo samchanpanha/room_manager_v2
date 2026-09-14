@@ -43,6 +43,11 @@ const nextConfig: NextConfig = {
   experimental: {
     cpus: buildWorkers
   },
+  // Lint + typecheck already gate every push/PR in CI (.github/workflows/ci.yml).
+  // Re-running both serially inside `next build` cost ~8 min of every Docker
+  // image build (and dev deploy); skip so image builds are fast+lean.
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
