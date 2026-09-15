@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/auth/session";
 import { can, hasModuleAccess } from "@/lib/rbac/can";
 import { prisma } from "@/lib/db";
 import { createComplaint } from "@/lib/operations/complaints-service";
+import { propertyIdFilter, propertyAccessible } from "@/lib/tenant-scope";
 
 const createSchema = z.object({
   memberProfileId: z.string().min(1),
@@ -21,15 +22,16 @@ export async function GET() {
   const ownMemberId = user.partyId
     ? (await prisma.memberProfile.findUnique({ where: { partyId: user.partyId }, select: { id: true } }))?.id ?? null
     : null;
-  const grants = user.permissions.filter((p) => p.module === "M22" && p.action === "read");
-  const isGlobal = grants.some((g) => g.scope === "GLOBAL");
+  const propFilter = await propertyIdFilter(user, "M22");
   const complaints = await prisma.complaint.findMany({
+    where: propFilter,
     include: { member: { include: { party: true } }, comments: { orderBy: { createdAt: "asc" } }, ticket: { select: { code: true } } },
     orderBy: { createdAt: "desc" },
     take: 200
   });
   const visible = complaints.filter((c) => {
-    if (isGlobal || user.propertyIds.includes(c.propertyId)) return true;
+    if (propFilter === undefined) return true;
+    if (propFilter.propertyId.in.includes(c.propertyId)) return true;
     return ownMemberId != null && c.memberProfileId === ownMemberId;
   });
   return ok({
@@ -64,6 +66,9 @@ export async function POST(req: Request) {
   const staffAllowed = can(user, "create", "M22", scope);
   const isOwn = ownMemberId != null && ownMemberId === parsed.data.memberProfileId;
   if (!staffAllowed && !isOwn) return fail(403, "FORBIDDEN", "Members can only file their own complaints");
+  if (staffAllowed && target?.homePropertyId && !(await propertyAccessible(user, target.homePropertyId))) {
+    return fail(403, "FORBIDDEN", "Member does not belong to your organization");
+  }
   const result = await createComplaint(
     { ...parsed.data, source: staffAllowed && !isOwn ? "staff" : "portal" },
     { id: user.id, name: user.name },

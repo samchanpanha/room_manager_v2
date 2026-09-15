@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/auth/session";
 import { can, hasModuleAccess } from "@/lib/rbac/can";
 import { prisma } from "@/lib/db";
 import { createTicket } from "@/lib/operations/maintenance-service";
+import { propertyIdFilter, propertyAccessible } from "@/lib/tenant-scope";
 
 const createSchema = z.object({
   roomId: z.string().min(1).optional(),
@@ -24,18 +25,18 @@ export async function GET() {
   const ownMemberId = user.partyId
     ? (await prisma.memberProfile.findUnique({ where: { partyId: user.partyId }, select: { id: true } }))?.id ?? null
     : null;
-  const grants = user.permissions.filter((p) => p.module === "M19" && p.action === "read");
-  const isGlobal = grants.some((g) => g.scope === "GLOBAL");
-  const ownerPropertyIds = grants.some((g) => g.scope === "OWN") && user.partyId
-    ? (await prisma.ownerProfile.findUnique({ where: { partyId: user.partyId }, select: { buildings: { select: { propertyId: true } } } }))?.buildings.map((b) => b.propertyId) ?? []
-    : [];
+  // DB-level property scope (GLOBAL/PROPERTY/OWN grants ∩ tenant boundary);
+  // undefined only for the platform root, who sees every workspace.
+  const propFilter = await propertyIdFilter(user, "M19");
   const tickets = await prisma.maintenanceTicket.findMany({
+    where: propFilter,
     include: { room: true, costs: true, member: { include: { party: true } } },
     orderBy: { createdAt: "desc" },
     take: 200
   });
   const visible = tickets.filter((t) => {
-    if (isGlobal || user.propertyIds.includes(t.propertyId) || ownerPropertyIds.includes(t.propertyId)) return true;
+    if (propFilter === undefined) return true;
+    if (propFilter.propertyId.in.includes(t.propertyId)) return true;
     return ownMemberId != null && t.memberProfileId === ownMemberId;
   });
   return ok({
@@ -78,6 +79,7 @@ export async function POST(req: Request) {
     : null;
   const staffAllowed = can(user, "create", "M19", { propertyId: scopePropertyId });
   if (!staffAllowed && !ownMemberId) return fail(403, "FORBIDDEN", "Missing permission M19:create for this property");
+  if (staffAllowed && !(await propertyAccessible(user, scopePropertyId))) return fail(403, "FORBIDDEN", "Property does not belong to your organization");
 
   const result = await createTicket(
     { ...parsed.data, propertyId: scopePropertyId, source: staffAllowed ? "staff" : "portal" },

@@ -235,16 +235,17 @@ export async function checkAvailability(
 async function resolveGuestMember(
   guestName: string,
   guestPhone: string | null,
-  homePropertyId: string | null
+  homePropertyId: string | null,
+  tenantId: string
 ): Promise<{ id: string; created: boolean }> {
   const phone = guestPhone?.trim();
   if (phone) {
-    const party = await prisma.party.findFirst({ where: { phone }, include: { memberProfiles: { where: { status: { not: "moved_out" } }, take: 1 } } });
+    const party = await prisma.party.findFirst({ where: { phone, tenantId }, include: { memberProfiles: { where: { status: { not: "moved_out" } }, take: 1 } } });
     const member = party?.memberProfiles[0];
     if (member) return { id: member.id, created: false };
   }
   const member = await prisma.$transaction(async (tx) => {
-    const party = await tx.party.create({ data: { type: "PERSON", name: guestName.trim(), phone: phone ?? null } });
+    const party = await tx.party.create({ data: { type: "PERSON", tenantId, name: guestName.trim(), phone: phone ?? null } });
     return tx.memberProfile.create({ data: { partyId: party.id, homePropertyId, status: "active" } });
   }, HEAVY_TX);
   return { id: member.id, created: true };
@@ -359,7 +360,7 @@ export async function createBooking(input: CreateBookingInput, actor: ActorCtx):
   const member =
     input.memberProfileId && (await prisma.memberProfile.findUnique({ where: { id: input.memberProfileId } }))
       ? { id: input.memberProfileId, created: false }
-      : await resolveGuestMember(input.guestName, input.guestPhone ?? null, property.id);
+      : await resolveGuestMember(input.guestName, input.guestPhone ?? null, property.id, property.tenantId);
 
   const year = new Date().getUTCFullYear();
   const code = await nextNumber("STAYBOOK", (n) => `STY-${year}-${String(n).padStart(4, "0")}`);

@@ -190,11 +190,11 @@ describe("§M12: assign WiFi + parking → both appear on the invoice", () => {
   });
 
   it("catalog creation validates pricing model and code uniqueness", async () => {
-    const bad = await createService({ code: "GYM", name: "Gym", pricingModel: "subscription", price: 10 }, actor);
+    const bad = await createService({ tenantId: "DEFAULT", code: "GYM", name: "Gym", pricingModel: "subscription", price: 10 }, actor);
     expect(bad).toMatchObject({ ok: false, code: "INVALID_PRICING" });
-    const dup = await createService({ code: "WIFI", name: "WiFi clone", pricingModel: "fixed_monthly", price: 10 }, actor);
+    const dup = await createService({ tenantId: "DEFAULT", code: "WIFI", name: "WiFi clone", pricingModel: "fixed_monthly", price: 10 }, actor);
     expect(dup).toMatchObject({ ok: false, code: "DUPLICATE_CODE" });
-    const okOne = await createService({ code: "CLEAN", name: "Deep cleaning", pricingModel: "per_use", price: 2500, unitLabel: "session" }, actor);
+    const okOne = await createService({ tenantId: "DEFAULT", code: "CLEAN", name: "Deep cleaning", pricingModel: "per_use", price: 2500, unitLabel: "session" }, actor);
     expect(okOne.ok).toBe(true);
   });
 });

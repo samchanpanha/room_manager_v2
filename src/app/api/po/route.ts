@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/auth/session";
 import { hasModuleAccess, can } from "@/lib/rbac/can";
 import { createPurchaseOrder, listPurchaseOrders } from "@/lib/operations/po-service";
 import { prisma } from "@/lib/db";
+import { tenantWhere, propertyAccessible, visiblePropertyIds } from "@/lib/tenant-scope";
 
 const lineSchema = z.object({
   stockItemId: z.string().min(1),
@@ -39,16 +40,18 @@ export async function GET(req: Request) {
 
   let propertyId: string | null = parsed.data.propertyId ?? null;
   if (!propertyId) {
-    // Default to the first property visible to the user.
-    const first = await prisma.property.findFirst({ orderBy: { code: "asc" }, select: { id: true } });
-    propertyId = first?.id ?? null;
+    const scopedIds = await visiblePropertyIds(user, "M29");
+    if (scopedIds !== "ALL") {
+      const first = await prisma.property.findFirst({ where: { id: { in: scopedIds } }, orderBy: { code: "asc" }, select: { id: true } });
+      propertyId = first?.id ?? null;
+    }
   }
   if (propertyId && !can(user, "read", "M29", { propertyId })) return fail(403, "FORBIDDEN", "No read access to this property");
 
   const [orders, stockItems, suppliers] = await Promise.all([
-    listPurchaseOrders(propertyId, parsed.data.status),
+    listPurchaseOrders(propertyId, parsed.data.status, user.tenantId),
     prisma.stockItem.findMany({ where: { ...(propertyId ? { propertyId } : {}), isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, unit: true, qtyMilli: true } }),
-    prisma.supplier.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } })
+    prisma.supplier.findMany({ where: tenantWhere(user), orderBy: { name: "asc" }, select: { id: true, name: true } })
   ]);
   return ok({ orders, stockItems, suppliers });
 }
@@ -62,6 +65,7 @@ export async function POST(req: Request) {
   if (parsed.response) return parsed.response;
   const { propertyId } = parsed.data;
   if (!can(user, "create", "M29", { propertyId })) return fail(403, "FORBIDDEN", "No create access on this property");
+  if (!(await propertyAccessible(user, propertyId))) return fail(403, "FORBIDDEN", "Property does not belong to your organization");
 
   const result = await createPurchaseOrder(parsed.data, { id: user.id, name: user.name }, ip);
   if (!result.ok) return fail(400, result.code, result.message);

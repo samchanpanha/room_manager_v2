@@ -24,11 +24,16 @@ model Tenant {
   status       String     @default("active") // active | suspended | disabled
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @default(now()) @updatedAt
-  users        User[]
-  properties   Property[]
-  parties      Party[]
-  auditLogs    AuditLog[]
-  settings     Setting[]
+  users          User[]
+  properties     Property[]
+  parties        Party[]
+  auditLogs      AuditLog[]
+  settings       Setting[]
+  tariffs        Tariff[]
+  serviceCatalog ServiceCatalog[]
+  stockCategories StockCategory[]
+  suppliers      Supplier[]
+  posProducts    PosProduct[]
 
   @@index([status])
   @@index([slug])
@@ -965,6 +970,8 @@ model MeterReading {
 /// (tiers JSON: [{ upToMilli: number | null, ratePerUnitMinor: number }]).
 model Tariff {
   id            String   @id @default(cuid())
+  tenantId      String   @default("DEFAULT")
+  tenant        Tenant?  @relation(fields: [tenantId], references: [id])
   utilityType   String // elec | water | gas
   name          String
   propertyId    String? // null = organisation-wide default
@@ -974,6 +981,7 @@ model Tariff {
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
 
+  @@index([tenantId])
   @@index([utilityType, effectiveFrom])
 }
 
@@ -1009,7 +1017,9 @@ model UtilityCharge {
 /// Billable add-on catalog (M12): WiFi, parking, laundry, general services.
 model ServiceCatalog {
   id             String   @id @default(cuid())
-  code           String   @unique // WIFI / PARK-A / LAUNDRY
+  tenantId       String   @default("DEFAULT")
+  tenant         Tenant?  @relation(fields: [tenantId], references: [id])
+  code           String // WIFI / PARK-A / LAUNDRY (unique per workspace)
   name           String
   pricingModel   String // fixed_monthly | per_use | metered
   unitPriceMinor Int // monthly price, or price per unit for per_use
@@ -1021,6 +1031,9 @@ model ServiceCatalog {
 
   assignments ServiceAssignment[]
   usages      ServiceUsage[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
 }
 
 /// Assignment of a catalog service to a lease. fixed_monthly assignments are
@@ -1373,6 +1386,8 @@ model StockItem {
 /// refused; archive (isActive=false) instead.
 model StockCategory {
   id         String             @id @default(cuid())
+  tenantId   String             @default("DEFAULT")
+  tenant     Tenant?            @relation(fields: [tenantId], references: [id])
   propertyId String? // null = shared (products/catalog)
   parentId   String?
   parent     StockCategory?     @relation("CategoryTree", fields: [parentId], references: [id])
@@ -1385,13 +1400,16 @@ model StockCategory {
   createdAt  DateTime           @default(now())
   updatedAt  DateTime           @updatedAt
 
-  @@unique([name, parentId, propertyId])
+  @@unique([name, parentId, propertyId, tenantId])
+  @@index([tenantId])
   @@index([propertyId, parentId])
 }
 
 model Supplier {
   id             String          @id @default(cuid())
-  name           String          @unique
+  tenantId       String          @default("DEFAULT")
+  tenant         Tenant?         @relation(fields: [tenantId], references: [id])
+  name           String
   phone          String?
   email          String?
   notes          String?
@@ -1399,6 +1417,9 @@ model Supplier {
   purchaseOrders PurchaseOrder[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 /// Append-only stock movements (purchase, sale, consumption, maintenance_use,
@@ -1510,12 +1531,14 @@ model PurchaseOrderLine {
 /// decrement inventory (§M14).
 model PosProduct {
   id          String        @id @default(cuid())
-  name        String        @unique
+  tenantId    String        @default("DEFAULT")
+  tenant      Tenant?       @relation(fields: [tenantId], references: [id])
+  name        String
   priceMinor  Int
   category    String? // snapshotted category path — mirror of categoryId
   categoryId  String?
   categoryRef StockCategory? @relation(fields: [categoryId], references: [id])
-  barcode     String?       @unique // EAN-13 / UPC / SKU for scanning + label printing
+  barcode     String? // EAN-13 / UPC / SKU for scanning + label printing
   sku         String? // human-friendly stock-keeping unit
   description String?
   /// Optional product photo — a DocumentRegistry row (entity POS_PRODUCT).
@@ -1526,6 +1549,10 @@ model PosProduct {
   saleItems   PosSaleItem[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
+  @@unique([tenantId, name])
+  @@unique([tenantId, barcode])
+  @@index([tenantId])
 }
 
 /// Cash-drawer session: open → close with expected-vs-counted variance (§M14).

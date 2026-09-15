@@ -674,7 +674,7 @@ async function seedUtilitiesServices(): Promise<void> {
   // Assign sample WiFi service to Chan Ling's lease (LSE-0001)
   const lse1 = await db.lease.findUnique({ where: { code: "LSE-0001" } });
   if (lse1) {
-    const wifiCatalog = await db.serviceCatalog.findUnique({ where: { code: "WIFI" } });
+    const wifiCatalog = await db.serviceCatalog.findUnique({ where: { tenantId_code: { tenantId: "DEFAULT", code: "WIFI" } } });
     const wifi101 = await db.wifiAccount.findUnique({ where: { ssid: "demo-wifi-101" } });
 
     if (wifiCatalog && wifi101) {
@@ -732,7 +732,7 @@ async function seedStockPos(): Promise<void> {
     { name: "Mekong Supplies", phone: "+855 12 555 002", email: "sales@mekong-supplies.test" }
   ];
   for (const sup of suppliers) {
-    await db.supplier.upsert({ where: { name: sup.name }, create: sup, update: sup });
+    await db.supplier.upsert({ where: { tenantId_name: { tenantId: "DEFAULT", name: sup.name } }, create: { ...sup, tenantId: "DEFAULT" }, update: sup });
   }
 
   // M30 category hierarchy (shared catalogue + BLR-owned stock categories).
@@ -764,7 +764,7 @@ async function seedStockPos(): Promise<void> {
     { name: "Coffee beans", categoryId: "Hot", unit: "kg", minQtyMilli: 2_000, supplier: "Angkor Wholesale", priceMinor: 1200, barcode: "8890000005004" }
   ];
   for (const it of items) {
-    const supplier = await db.supplier.findUniqueOrThrow({ where: { name: it.supplier } });
+    const supplier = await db.supplier.findUniqueOrThrow({ where: { tenantId_name: { tenantId: "DEFAULT", name: it.supplier } } });
     const categoryId = catIds.get(it.categoryId) ?? null;
     const categoryPath = catDefs.find((c) => c.name === it.categoryId)?.parent
       ? `${catDefs.find((c) => c.name === it.categoryId)?.parent}/${it.categoryId}`
@@ -775,14 +775,14 @@ async function seedStockPos(): Promise<void> {
       update: { minQtyMilli: it.minQtyMilli, supplierId: supplier.id, category: categoryPath, categoryId, unit: it.unit, packUnit: it.packUnit ?? null, packSize: it.packSize ?? null, isActive: true }
     });
     await db.posProduct.upsert({
-      where: { name: it.name },
-      create: { name: it.name, priceMinor: it.priceMinor, category: categoryPath, categoryId, barcode: it.barcode ?? null, stockItemId: item.id, isActive: true },
+      where: { tenantId_name: { tenantId: "DEFAULT", name: it.name } },
+      create: { tenantId: "DEFAULT", name: it.name, priceMinor: it.priceMinor, category: categoryPath, categoryId, barcode: it.barcode ?? null, stockItemId: item.id, isActive: true },
       update: { priceMinor: it.priceMinor, category: categoryPath, categoryId, barcode: it.barcode ?? null, stockItemId: item.id, isActive: true }
     });
   }
   await db.posProduct.upsert({
-    where: { name: "Print / scan service" },
-    create: { name: "Print / scan service", priceMinor: 25, category: "Service", isActive: true },
+    where: { tenantId_name: { tenantId: "DEFAULT", name: "Print / scan service" } },
+    create: { tenantId: "DEFAULT", name: "Print / scan service", priceMinor: 25, category: "Service", isActive: true },
     update: { priceMinor: 25, isActive: true }
   });
 }

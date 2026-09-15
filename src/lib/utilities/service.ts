@@ -51,8 +51,13 @@ export async function createMeter(
 
 /// Latest tariff for a meter type at a moment: property-specific wins, then
 /// latest effectiveFrom (pure pickTariff applied to the DB candidates).
+/// Candidates are scoped to the meter's workspace so one organization can
+/// never price against another's tariffs.
 export async function resolveTariff(utilityType: string, propertyId: string, at: Date) {
-  const candidates = await prisma.tariff.findMany({ where: { utilityType, isActive: true } });
+  const property = await prisma.property.findUnique({ where: { id: propertyId }, select: { tenantId: true } });
+  const candidates = await prisma.tariff.findMany({
+    where: { utilityType, tenantId: property?.tenantId ?? "DEFAULT", isActive: true }
+  });
   return pickTariff(candidates, utilityType, propertyId, at);
 }
 
@@ -259,7 +264,7 @@ export async function importReadingsCsv(
 
 /// Create/update a tariff (admin). Tiers payload validated by machines.
 export async function upsertTariff(
-  input: { utilityType: string; name: string; propertyId?: string | null; unitRateMinor: number; tiers?: unknown; effectiveFrom: Date },
+  input: { tenantId: string; utilityType: string; name: string; propertyId?: string | null; unitRateMinor: number; tiers?: unknown; effectiveFrom: Date },
   actor: ActorCtx,
   ip?: string | null
 ): Promise<Result<{ id: string }>> {
@@ -272,6 +277,7 @@ export async function upsertTariff(
   }
   const tariff = await prisma.tariff.create({
     data: {
+      tenantId: input.tenantId,
       utilityType: input.utilityType,
       name: input.name,
       propertyId: input.propertyId ?? null,

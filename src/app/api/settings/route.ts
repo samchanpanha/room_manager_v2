@@ -3,6 +3,7 @@ import { getAuthUser } from "@/lib/auth/session";
 import { getSettings, updateSettings, type SettingsGroupName } from "@/lib/settings";
 import { hasModuleAccess } from "@/lib/rbac/can";
 import { logError } from "@/lib/errors";
+import { isPlatformRoot } from "@/lib/tenant-scope";
 import { z } from "zod";
 
 const patchSchema = z.object({
@@ -24,8 +25,10 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const reqTenantId = url.searchParams.get("tenantId");
 
-  // Only Super Admins can query settings for other organization workspaces
-  const isSuperAdmin = user.roles.includes("SUPER_ADMIN") || user.tenantId === "DEFAULT";
+  // Only the platform root super admin can query settings for other
+  // organization workspaces; org admins (SUPER_ADMIN within their tenant)
+  // always read/write their own tenant's settings.
+  const isSuperAdmin = isPlatformRoot(user);
   const targetTenantId = isSuperAdmin && reqTenantId ? reqTenantId : user.tenantId;
 
   return ok({
@@ -42,7 +45,7 @@ export async function PATCH(req: Request) {
   const parsed = await parseBody(req, patchSchema);
   if (parsed.response) return parsed.response;
 
-  const isSuperAdmin = user.roles.includes("SUPER_ADMIN") || user.tenantId === "DEFAULT";
+  const isSuperAdmin = isPlatformRoot(user);
   const targetTenantId = isSuperAdmin && parsed.data.tenantId ? parsed.data.tenantId : user.tenantId;
 
   try {

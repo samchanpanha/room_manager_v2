@@ -20,9 +20,10 @@ export function isPricingModel(v: string): v is (typeof PRICING_MODELS)[number] 
   return (PRICING_MODELS as readonly string[]).includes(v);
 }
 
-/// Create a catalog service.
+/// Create a catalog service (workspace-scoped: tenantId stamps the row and
+/// the code uniqueness is checked within that workspace only).
 export async function createService(
-  input: { code: string; name: string; pricingModel: string; price: number; unitLabel?: string },
+  input: { tenantId: string; code: string; name: string; pricingModel: string; price: number; unitLabel?: string },
   actor: ActorCtx,
   ip?: string | null
 ): Promise<Result<{ id: string }>> {
@@ -30,10 +31,11 @@ export async function createService(
     return { ok: false, code: "INVALID_PRICING", message: `pricingModel must be one of ${PRICING_MODELS.join(", ")}` };
   }
   if (!/^[A-Z0-9-]{2,20}$/.test(input.code)) return { ok: false, code: "INVALID_CODE", message: "code must be 2–20 chars A-Z 0-9 dash" };
-  const dup = await prisma.serviceCatalog.findUnique({ where: { code: input.code } });
-  if (dup) return { ok: false, code: "DUPLICATE_CODE", message: `Service code ${input.code} already exists` };
+  const dup = await prisma.serviceCatalog.findFirst({ where: { tenantId: input.tenantId, code: input.code } });
+  if (dup) return { ok: false, code: "DUPLICATE_CODE", message: `Service code ${input.code} already exists in this workspace` };
   const service = await prisma.serviceCatalog.create({
     data: {
+      tenantId: input.tenantId,
       code: input.code,
       name: input.name,
       pricingModel: input.pricingModel,
@@ -63,11 +65,12 @@ export async function assignService(
   actor: ActorCtx,
   ip?: string | null
 ): Promise<Result<{ assignmentId: string }>> {
-  const lease = await prisma.lease.findUnique({ where: { id: leaseId }, include: { member: { include: { party: true } } } });
+  const lease = await prisma.lease.findUnique({ where: { id: leaseId }, include: { member: { include: { party: true } }, property: { select: { tenantId: true } } } });
   if (!lease) return { ok: false, code: "NOT_FOUND", message: "Lease not found" };
   if (lease.status !== "active") return { ok: false, code: "LEASE_NOT_ACTIVE", message: "Services can only be assigned to an active lease" };
   const service = await prisma.serviceCatalog.findUnique({ where: { id: input.serviceId } });
   if (!service || !service.isActive) return { ok: false, code: "NOT_FOUND", message: "Catalog service not found or inactive" };
+  if (service.tenantId !== lease.property.tenantId) return { ok: false, code: "NOT_FOUND", message: "Catalog service not found or inactive" };
 
   let parkingSlotId: string | null = null;
   let wifiAccountId: string | null = null;
@@ -241,11 +244,12 @@ export async function recordUsage(
   actor: ActorCtx,
   ip?: string | null
 ): Promise<Result<{ usageId: string; amountMinor: number }>> {
-  const lease = await prisma.lease.findUnique({ where: { id: leaseId } });
+  const lease = await prisma.lease.findUnique({ where: { id: leaseId }, include: { property: { select: { tenantId: true } } } });
   if (!lease) return { ok: false, code: "NOT_FOUND", message: "Lease not found" };
   if (lease.status !== "active") return { ok: false, code: "LEASE_NOT_ACTIVE", message: "Usages can only be recorded on an active lease" };
   const service = await prisma.serviceCatalog.findUnique({ where: { id: input.serviceId } });
   if (!service || !service.isActive) return { ok: false, code: "NOT_FOUND", message: "Catalog service not found or inactive" };
+  if (service.tenantId !== lease.property.tenantId) return { ok: false, code: "NOT_FOUND", message: "Catalog service not found or inactive" };
   if (service.pricingModel !== "per_use") {
     return { ok: false, code: "INVALID_PRICING", message: `${service.name} is ${service.pricingModel} — per-use entries apply to per_use services` };
   }

@@ -87,9 +87,9 @@ async function seedFullDemo(db: PrismaClient): Promise<void> {
   const suite = await db.rentPlan.findUniqueOrThrow({ where: { name: "Suite" } });
   const standard = await db.rentPlan.findUniqueOrThrow({ where: { name: "Standard Room" } });
 
-  const wifi = await db.serviceCatalog.findUniqueOrThrow({ where: { code: "WIFI" } });
-  const park = await db.serviceCatalog.findUniqueOrThrow({ where: { code: "PARK" } });
-  const laundry = await db.serviceCatalog.findUniqueOrThrow({ where: { code: "LAUNDRY" } });
+  const wifi = await db.serviceCatalog.findUniqueOrThrow({ where: { tenantId_code: { tenantId: "DEFAULT", code: "WIFI" } } });
+  const park = await db.serviceCatalog.findUniqueOrThrow({ where: { tenantId_code: { tenantId: "DEFAULT", code: "PARK" } } });
+  const laundry = await db.serviceCatalog.findUniqueOrThrow({ where: { tenantId_code: { tenantId: "DEFAULT", code: "LAUNDRY" } } });
 
   const remarksSummary: string[] = [];
 

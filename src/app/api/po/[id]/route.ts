@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/auth/session";
 import { hasModuleAccess, can } from "@/lib/rbac/can";
 import { placePurchaseOrder, receivePurchaseOrder, voidPurchaseOrder, purchaseOrderById } from "@/lib/operations/po-service";
 import type { AuthUser } from "@/lib/auth/session";
+import { propertyAccessible } from "@/lib/tenant-scope";
 
 type Po = NonNullable<Awaited<ReturnType<typeof purchaseOrderById>>>;
 
@@ -17,7 +18,7 @@ async function authorize(req: Request, poId: string): Promise<{ user: AuthUser; 
   if (!hasModuleAccess(user, "update", "M29")) return { error: fail(403, "FORBIDDEN", "Missing permission M29:update") };
   const po = await loadPo(poId);
   if (!po) return { error: fail(404, "NOT_FOUND", "Purchase order not found") };
-  if (!can(user, "update", "M29", { propertyId: po.propertyId })) {
+  if (!can(user, "update", "M29", { propertyId: po.propertyId }) || !(await propertyAccessible(user, po.propertyId))) {
     return { error: fail(403, "FORBIDDEN", "No access on this purchase order") };
   }
   return { user, po };
@@ -30,7 +31,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const { id } = await ctx.params;
   const po = await loadPo(id);
   if (!po) return fail(404, "NOT_FOUND", "Purchase order not found");
-  if (!can(user, "read", "M29", { propertyId: po.propertyId })) return fail(403, "FORBIDDEN", "No read access on this purchase order");
+  if (!can(user, "read", "M29", { propertyId: po.propertyId }) || !(await propertyAccessible(user, po.propertyId))) return fail(403, "FORBIDDEN", "No read access on this purchase order");
   return ok({ purchaseOrder: po });
 }
 

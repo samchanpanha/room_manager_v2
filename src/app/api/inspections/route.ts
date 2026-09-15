@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/auth/session";
 import { can, hasModuleAccess } from "@/lib/rbac/can";
 import { prisma } from "@/lib/db";
 import { createInspection } from "@/lib/operations/inspections-service";
+import { propertyIdFilter, propertyAccessible } from "@/lib/tenant-scope";
 
 const createSchema = z.object({
   type: z.enum(["move_in", "move_out", "periodic"]),
@@ -22,15 +23,16 @@ export async function GET() {
   const ownMemberId = user.partyId
     ? (await prisma.memberProfile.findUnique({ where: { partyId: user.partyId }, select: { id: true } }))?.id ?? null
     : null;
-  const grants = user.permissions.filter((p) => p.module === "M18" && p.action === "read");
-  const isGlobal = grants.some((g) => g.scope === "GLOBAL");
+  const propFilter = await propertyIdFilter(user, "M18");
   const inspections = await prisma.inspection.findMany({
+    where: propFilter,
     include: { lease: { include: { member: { include: { party: true } } } }, room: true, findings: true },
     orderBy: { createdAt: "desc" },
     take: 200
   });
   const visible = inspections.filter((i) => {
-    if (isGlobal || user.propertyIds.includes(i.propertyId)) return true;
+    if (propFilter === undefined) return true;
+    if (propFilter.propertyId.in.includes(i.propertyId)) return true;
     return ownMemberId != null && i.lease.memberProfileId === ownMemberId;
   });
   return ok({
@@ -60,6 +62,7 @@ export async function POST(req: Request) {
   const lease = await prisma.lease.findUnique({ where: { id: parsed.data.leaseId }, select: { propertyId: true } });
   if (!lease) return fail(404, "NOT_FOUND", "Lease not found");
   if (!can(user, "create", "M18", { propertyId: lease.propertyId })) return fail(403, "FORBIDDEN", "Missing permission M18:create for this property");
+  if (!(await propertyAccessible(user, lease.propertyId))) return fail(403, "FORBIDDEN", "Lease does not belong to your organization");
   const result = await createInspection(
     {
       type: parsed.data.type,

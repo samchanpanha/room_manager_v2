@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/auth/session";
 import { can } from "@/lib/rbac/can";
 import { prisma } from "@/lib/db";
 import { normalizeEan13 } from "@/lib/barcode";
+import { tenantWhere } from "@/lib/tenant-scope";
 
 const createSchema = z.object({
   name: z.string().min(2).max(120),
@@ -30,9 +31,9 @@ const updateSchema = z.object({
 
 /// Resolve a category id to its "Parent/Child" path snapshot (mirrors the
 /// legacy string column so reports/tills that read `category` keep working).
-async function resolvePosCategory(categoryId: string | undefined | null, fallback: string | null | undefined): Promise<{ categoryId: string | null; category: string | null }> {
+async function resolvePosCategory(categoryId: string | undefined | null, fallback: string | null | undefined, tenantId: string): Promise<{ categoryId: string | null; category: string | null }> {
   if (categoryId) {
-    const cat = await prisma.stockCategory.findUnique({ where: { id: categoryId } });
+    const cat = await prisma.stockCategory.findFirst({ where: { id: categoryId, tenantId } });
     if (cat) {
       const parent = cat.parentId ? await prisma.stockCategory.findUnique({ where: { id: cat.parentId } }) : null;
       return { categoryId: cat.id, category: parent ? `${parent.name}/${cat.name}` : cat.name };
@@ -56,7 +57,7 @@ export async function GET() {
   const user = await getAuthUser();
   if (!user) return fail(401, "UNAUTHENTICATED", "Sign in required");
   if (!can(user, "read", "M14")) return fail(403, "FORBIDDEN", "Missing permission M14:read");
-  const products = await prisma.posProduct.findMany({ include: { stockItem: true }, orderBy: { name: "asc" } });
+  const products = await prisma.posProduct.findMany({ where: tenantWhere(user), include: { stockItem: true }, orderBy: { name: "asc" } });
   return ok({
     products: products.map((p) => ({
       id: p.id,
@@ -83,13 +84,14 @@ export async function POST(req: Request) {
   const bc = barcodeOrNull(parsed.data.barcode);
   if (bc.error) return fail(400, "INVALID_BARCODE", bc.error);
   if (bc.barcode) {
-    const dup = await prisma.posProduct.findUnique({ where: { barcode: bc.barcode } });
+    const dup = await prisma.posProduct.findFirst({ where: { tenantId: user.tenantId, barcode: bc.barcode } });
     if (dup) return fail(409, "BARCODE_TAKEN", `A product with barcode ${bc.barcode} already exists`);
   }
 
-  const cat = await resolvePosCategory(parsed.data.categoryId, parsed.data.category);
+  const cat = await resolvePosCategory(parsed.data.categoryId, parsed.data.category, user.tenantId);
   const product = await prisma.posProduct.create({
     data: {
+      tenantId: user.tenantId,
       name: parsed.data.name.trim(),
       priceMinor: Math.round(parsed.data.price * 100),
       category: cat.category,
@@ -115,11 +117,12 @@ export async function PATCH(req: Request) {
 
   const exists = await prisma.posProduct.findUnique({ where: { id } });
   if (!exists) return fail(404, "NOT_FOUND", "Product not found");
+  if (exists.tenantId !== user.tenantId) return fail(403, "FORBIDDEN", "Product does not belong to your organization");
 
   const bc = barcodeOrNull(parsed.data.barcode);
   if (bc.error) return fail(400, "INVALID_BARCODE", bc.error);
   if (bc.barcode) {
-    const dup = await prisma.posProduct.findFirst({ where: { barcode: bc.barcode, id: { not: id } } });
+    const dup = await prisma.posProduct.findFirst({ where: { tenantId: user.tenantId, barcode: bc.barcode, id: { not: id } } });
     if (dup) return fail(409, "BARCODE_TAKEN", `A product with barcode ${bc.barcode} already exists`);
   }
 
@@ -127,7 +130,7 @@ export async function PATCH(req: Request) {
   if (parsed.data.name !== undefined) data.name = parsed.data.name.trim();
   if (parsed.data.price !== undefined) data.priceMinor = Math.round(parsed.data.price * 100);
   if (parsed.data.categoryId !== undefined) {
-    const cat = await resolvePosCategory(parsed.data.categoryId, parsed.data.category);
+const cat = await resolvePosCategory(parsed.data.categoryId, parsed.data.category, user.tenantId);
     data.categoryId = cat.categoryId;
     data.category = cat.category;
   } else if (parsed.data.category !== undefined) {

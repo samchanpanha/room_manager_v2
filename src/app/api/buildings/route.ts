@@ -3,6 +3,7 @@ import { fail, ok, parseBody, clientIp } from "@/lib/api";
 import { authorize } from "@/lib/rbac/guard";
 import { prisma } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
+import { propertyAccessible } from "@/lib/tenant-scope";
 
 const createSchema = z.object({
   propertyId: z.string().min(1),
@@ -18,6 +19,7 @@ export async function POST(req: Request) {
 
   const property = await prisma.property.findUnique({ where: { id: parsed.data.propertyId } });
   if (!property) return fail(404, "NOT_FOUND", "Property not found");
+  if (!(await propertyAccessible(g.user, property.id))) return fail(403, "FORBIDDEN", "Property does not belong to your organization");
 
   const dupe = await prisma.building.findFirst({ where: { propertyId: property.id, name: parsed.data.name } });
   if (dupe) return fail(409, "DUPLICATE", "A building with this name already exists in the property");

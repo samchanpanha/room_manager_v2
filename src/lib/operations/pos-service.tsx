@@ -121,7 +121,7 @@ export async function recordSale(
   actor: ActorCtx,
   ip?: string | null
 ): Promise<Result<{ code: string; saleId: string; totalMinor: number; discountMinor: number; netMinor: number; invoiceCode?: string }>> {
-  const session = await prisma.posSession.findUnique({ where: { id: input.sessionId } });
+  const session = await prisma.posSession.findUnique({ where: { id: input.sessionId }, include: { property: { select: { tenantId: true } } } });
   if (!session) return { ok: false, code: "NOT_FOUND", message: "Session not found" };
   if (session.status !== "open") return { ok: false, code: "SESSION_CLOSED", message: "Session is closed — open a new one" };
   if (!["cash", "qr", "card", "room_charge"].includes(input.method)) {
@@ -130,7 +130,8 @@ export async function recordSale(
   if (!Array.isArray(input.lines) || input.lines.length === 0) return { ok: false, code: "LINES_REQUIRED", message: "At least one sale line is required" };
 
   const productIds = [...new Set(input.lines.map((l) => l.productId))];
-  const products = await prisma.posProduct.findMany({ where: { id: { in: productIds }, isActive: true }, include: { stockItem: true } });
+  // Products are workspace-scoped: only the session's own tenant's catalog is valid.
+  const products = await prisma.posProduct.findMany({ where: { id: { in: productIds }, isActive: true, tenantId: session.property.tenantId }, include: { stockItem: true } });
   if (products.length !== productIds.length) return { ok: false, code: "PRODUCT_INVALID", message: "One or more products are missing or inactive" };
 
   let totalMinor = 0;

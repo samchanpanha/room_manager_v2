@@ -132,7 +132,7 @@ describe("Lease creation API & Validation (M05)", () => {
     });
 
     // Ensure wifi catalog item exists
-    const wifiCatalog = await prisma.serviceCatalog.findUniqueOrThrow({ where: { code: "WIFI" } });
+    const wifiCatalog = await prisma.serviceCatalog.findUniqueOrThrow({ where: { tenantId_code: { tenantId: "DEFAULT", code: "WIFI" } } });
     // Ensure wifi account exists and is free
     const wifiAccount = await prisma.wifiAccount.upsert({
       where: { ssid: "test-reuse-wifi-999" },
@@ -236,7 +236,7 @@ describe("Lease creation API & Validation (M05)", () => {
       }
     });
 
-    const wifiCatalog = await prisma.serviceCatalog.findUniqueOrThrow({ where: { code: "WIFI" } });
+    const wifiCatalog = await prisma.serviceCatalog.findUniqueOrThrow({ where: { tenantId_code: { tenantId: "DEFAULT", code: "WIFI" } } });
     const wifiAccount = await prisma.wifiAccount.upsert({
       where: { ssid: "test-dup-wifi-888" },
       create: { ssid: "test-dup-wifi-888", propertyId, speedLabel: "100 Mbps", status: "free" },

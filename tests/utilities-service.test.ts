@@ -215,7 +215,7 @@ describe("§M11: readings → charges → next invoice cycle", () => {
 
   it("property-specific tariffs win over the org default", async () => {
     await upsertTariff(
-      { utilityType: "elec", name: "Premium (property)", propertyId, unitRateMinor: 50, effectiveFrom: new Date("2026-01-01") },
+      { tenantId: "DEFAULT", utilityType: "elec", name: "Premium (property)", propertyId, unitRateMinor: 50, effectiveFrom: new Date("2026-01-01") },
       actor
     );
     const result = await recordReading(meter1, { valueMilli: 640_000, readAt: new Date("2026-09-09T10:00:00Z") }, actor);

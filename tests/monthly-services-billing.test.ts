@@ -29,22 +29,22 @@ describe("Monthly Room Rental with Optional Services (WiFi, Parking, Laundry, Ut
 
     // Get or create active catalog services
     const wifi = await prisma.serviceCatalog.upsert({
-      where: { code: "WIFI" },
+      where: { tenantId_code: { tenantId: "DEFAULT", code: "WIFI" } },
       create: { code: "WIFI", name: "WiFi", pricingModel: "fixed_monthly", unitPriceMinor: 1500 },
       update: { name: "WiFi", pricingModel: "fixed_monthly", unitPriceMinor: 1500, isActive: true }
     });
     wifiCatalogId = wifi.id;
 
     const park = await prisma.serviceCatalog.upsert({
-      where: { code: "PARK" },
+      where: { tenantId_code: { tenantId: "DEFAULT", code: "PARK" } },
       create: { code: "PARK", name: "Parking", pricingModel: "fixed_monthly", unitPriceMinor: 3000 },
       update: { name: "Parking", pricingModel: "fixed_monthly", unitPriceMinor: 3000, isActive: true }
     });
     parkCatalogId = park.id;
 
     const laundry = await prisma.serviceCatalog.upsert({
-      where: { code: "LAUNDRY-M" },
-      create: { code: "LAUNDRY-M", name: "Monthly Laundry Plan", pricingModel: "fixed_monthly", unitPriceMinor: 2500 },
+      where: { tenantId_code: { tenantId: "DEFAULT", code: "LAUNDRY-M" } },
+      create: { tenantId: "DEFAULT", code: "LAUNDRY-M", name: "Monthly Laundry Plan", pricingModel: "fixed_monthly", unitPriceMinor: 2500 },
       update: { name: "Monthly Laundry Plan", pricingModel: "fixed_monthly", unitPriceMinor: 2500, isActive: true }
     });
     laundryCatalogId = laundry.id;

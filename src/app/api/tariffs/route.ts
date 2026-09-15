@@ -6,13 +6,27 @@ import { hasModuleAccess } from "@/lib/rbac/can";
 import { prisma } from "@/lib/db";
 import { upsertTariff } from "@/lib/utilities/service";
 import { isMeterType, isTierList } from "@/lib/utilities/machines";
+import { visiblePropertyIds, propertyAccessible } from "@/lib/tenant-scope";
 
-/// M11 tariffs — read for anyone with M11 read.
+/// M11 tariffs — read for anyone with M11 read, scoped to the workspace
+/// (org-wide tariffs + tariffs for the user's visible properties).
 export async function GET() {
   const user = await getAuthUser();
   if (!user) return fail(401, "UNAUTHENTICATED", "Sign in required");
   if (!hasModuleAccess(user, "read", "M11")) return fail(403, "FORBIDDEN", "Missing permission M11:read");
-  const tariffs = await prisma.tariff.findMany({ orderBy: [{ utilityType: "asc" }, { effectiveFrom: "desc" }] });
+  const scoped = await visiblePropertyIds(user, "M11");
+  const tariffs = await prisma.tariff.findMany({
+    where:
+      scoped === "ALL"
+        ? undefined // platform root sees every workspace's tariffs
+        : {
+            OR: [
+              { tenantId: user.tenantId, propertyId: null },
+              { tenantId: user.tenantId, propertyId: { in: scoped } }
+            ]
+          },
+    orderBy: [{ utilityType: "asc" }, { effectiveFrom: "desc" }]
+  });
   return ok({
     tariffs: tariffs.map((t) => ({
       id: t.id,
@@ -46,8 +60,10 @@ export async function POST(req: Request) {
   if (tiers && !isTierList(tiers)) return fail(400, "INVALID_TIERS", "tiers must be a non-empty list ending with an open bracket (upToMilli: null)");
   const g = await authorize("create", "M11", parsed.data.propertyId ? { propertyId: parsed.data.propertyId } : undefined);
   if (g.response) return g.response;
+  if (parsed.data.propertyId && !(await propertyAccessible(g.user, parsed.data.propertyId))) return fail(403, "FORBIDDEN", "Property does not belong to your organization");
   const result = await upsertTariff(
     {
+      tenantId: g.user.tenantId,
       utilityType: parsed.data.utilityType,
       name: parsed.data.name,
       propertyId: parsed.data.propertyId ?? null,

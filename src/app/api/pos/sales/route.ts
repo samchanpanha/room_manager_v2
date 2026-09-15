@@ -5,6 +5,7 @@ import { can } from "@/lib/rbac/can";
 import { prisma } from "@/lib/db";
 import { recordSale } from "@/lib/operations/pos-service";
 import { getSettings } from "@/lib/settings";
+import { propertyIdFilter, propertyAccessible } from "@/lib/tenant-scope";
 
 const schema = z.object({
   sessionId: z.string().min(1),
@@ -24,7 +25,10 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const sessionId = url.searchParams.get("sessionId");
   const sales = await prisma.posSale.findMany({
-    where: sessionId ? { sessionId } : {},
+    where: {
+      ...(await propertyIdFilter(user, "M14")),
+      ...(sessionId ? { sessionId } : {})
+    },
     include: { items: true, member: { include: { party: true } }, invoice: { select: { stayBooking: { select: { code: true } } } } },
     orderBy: { createdAt: "desc" },
     take: 100
@@ -56,6 +60,7 @@ export async function POST(req: Request) {
   const session = await prisma.posSession.findUnique({ where: { id: parsed.data.sessionId } });
   if (!session) return fail(404, "NOT_FOUND", "Session not found");
   if (!can(user, "create", "M14", { propertyId: session.propertyId })) return fail(403, "FORBIDDEN", "Missing permission M14:create for this property");
+  if (!(await propertyAccessible(user, session.propertyId))) return fail(403, "FORBIDDEN", "Session does not belong to your organization");
   const result = await recordSale(
     {
       sessionId: parsed.data.sessionId,

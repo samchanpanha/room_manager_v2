@@ -6,14 +6,16 @@ import { getAuthUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { createMeter } from "@/lib/utilities/service";
 import { isMeterType, METER_TYPES } from "@/lib/utilities/machines";
-import { visiblePropertyScope, propertyInScope } from "@/lib/rbac/propscope";
+import { propertyIdFilter, propertyAccessible } from "@/lib/tenant-scope";
 
 /// M11 meters — scoped by the room's property (staff see their buildings).
 export async function GET() {
   const user = await getAuthUser();
   if (!user) return fail(401, "UNAUTHENTICATED", "Sign in required");
   if (!hasModuleAccess(user, "read", "M11")) return fail(403, "FORBIDDEN", "Missing permission M11:read");
+  const propFilter = await propertyIdFilter(user, "M11");
   const meters = await prisma.meter.findMany({
+    where: propFilter ? { room: { floor: { building: { propertyId: propFilter.propertyId } } } } : undefined,
     include: {
       room: { include: { floor: { include: { building: { include: { property: true } } } } } },
       readings: { orderBy: { readAt: "desc" }, take: 1 },
@@ -21,10 +23,8 @@ export async function GET() {
     },
     orderBy: { code: "asc" }
   });
-  const scope = await visiblePropertyScope(user, user.permissions, "M11");
-  const visible = meters.filter((m) => propertyInScope(m.room.floor.building.propertyId, scope));
   return ok({
-    meters: visible.map((m) => {
+    meters: meters.map((m) => {
       const latest = m.readings[0] ?? null;
       return {
         id: m.id,
@@ -58,6 +58,7 @@ export async function POST(req: Request) {
   if (!room) return fail(404, "NOT_FOUND", "Room not found");
   const g = await authorize("create", "M11", { propertyId: room.floor.building.propertyId });
   if (g.response) return g.response;
+  if (!(await propertyAccessible(g.user, room.floor.building.propertyId))) return fail(403, "FORBIDDEN", "Room does not belong to your organization");
   const result = await createMeter(parsed.data, { id: g.user.id, name: g.user.name }, clientIp(req));
   if (!result.ok) {
     return fail(result.code === "NOT_FOUND" ? 404 : result.code === "DUPLICATE_CODE" || result.code === "INVALID_TYPE" ? 400 : 422, result.code, result.message);

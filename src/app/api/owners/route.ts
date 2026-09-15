@@ -38,8 +38,9 @@ export async function POST(req: Request) {
     if (dupe) return fail(409, "DUPLICATE", "A party with this email already exists");
   }
   for (const buildingId of d.buildingIds) {
-    const b = await prisma.building.findUnique({ where: { id: buildingId }, include: { owner: { include: { party: true } } } });
+    const b = await prisma.building.findUnique({ where: { id: buildingId }, include: { owner: { include: { party: true } }, property: { select: { tenantId: true } } } });
     if (!b) return fail(404, "NOT_FOUND", `Building ${buildingId} not found`);
+    if (b.property.tenantId !== g.user.tenantId) return fail(403, "FORBIDDEN", `${b.name} does not belong to your organization`);
     if (b.ownerId) return fail(409, "BUILDING_OWNED", `${b.name} is already owned by ${b.owner?.party.name} — unassign it first`);
   }
   if (d.portalLogin) {

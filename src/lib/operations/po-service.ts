@@ -73,6 +73,8 @@ export async function createPurchaseOrder(
   if (new Set(stockItemIds).size !== stockItemIds.length) {
     return { ok: false, code: "DUPLICATE_ITEM", message: "A stock item can appear in at most one line per purchase order" };
   }
+  const property = await prisma.property.findUnique({ where: { id: input.propertyId }, select: { tenantId: true } });
+  if (!property) return { ok: false, code: "NOT_FOUND", message: "Property not found" };
   const ids = [...new Set(stockItemIds)];
   const items = await stockItemsOf(input.propertyId, ids);
   if (items.length !== ids.length) return { ok: false, code: "ITEM_MISMATCH", message: "One or more stock items are missing, inactive, or belong to another property" };
@@ -81,6 +83,7 @@ export async function createPurchaseOrder(
   if (input.supplierId) {
     const supplier = await prisma.supplier.findUnique({ where: { id: input.supplierId } });
     if (!supplier) return { ok: false, code: "SUPPLIER_NOT_FOUND", message: "Supplier not found" };
+    if (supplier.tenantId !== property.tenantId) return { ok: false, code: "SUPPLIER_NOT_FOUND", message: "Supplier not found" };
     supplierName = supplier.name;
   }
 
@@ -286,9 +289,13 @@ export async function voidPurchaseOrder(id: string, actor: ActorCtx, ip?: string
   return { ok: true, data: { id: updated.id, code: updated.code } };
 }
 
-export async function listPurchaseOrders(propertyId: string | null, status?: string) {
+export async function listPurchaseOrders(propertyId: string | null, status?: string, tenantId?: string) {
   const rows = await prisma.purchaseOrder.findMany({
-    where: { ...(propertyId ? { propertyId } : {}), ...(status && status !== "all" ? { status } : {}) },
+    where: {
+      ...(tenantId ? { property: { tenantId } } : {}),
+      ...(propertyId ? { propertyId } : {}),
+      ...(status && status !== "all" ? { status } : {})
+    },
     include: {
       supplier: true,
       lines: { include: { stockItem: true } },

@@ -6,14 +6,16 @@ import { hasModuleAccess } from "@/lib/rbac/can";
 import { prisma } from "@/lib/db";
 import { createService } from "@/lib/services/service";
 import { PRICING_MODELS } from "@/lib/services/service";
+import { tenantWhere } from "@/lib/tenant-scope";
 
-/// M12 catalog — visible to anyone with M12 read; catalog creation is
-/// GLOBAL M12:update (admin/root only).
+/// M12 catalog — visible to anyone with M12 read, scoped to the workspace;
+/// catalog creation is GLOBAL M12:update (admin/root only).
 export async function GET() {
   const user = await getAuthUser();
   if (!user) return fail(401, "UNAUTHENTICATED", "Sign in required");
   if (!hasModuleAccess(user, "read", "M12")) return fail(403, "FORBIDDEN", "Missing permission M12:read");
   const services = await prisma.serviceCatalog.findMany({
+    where: tenantWhere(user),
     include: { _count: { select: { assignments: { where: { status: "active" } }, usages: { where: { status: "pending" } } } } },
     orderBy: { code: "asc" }
   });
@@ -46,7 +48,7 @@ export async function POST(req: Request) {
   if (parsed.response) return parsed.response;
   const g = await authorize("update", "M12"); // no resource → GLOBAL grants only
   if (g.response) return g.response;
-  const result = await createService(parsed.data, { id: g.user.id, name: g.user.name }, clientIp(req));
+  const result = await createService({ ...parsed.data, tenantId: g.user.tenantId }, { id: g.user.id, name: g.user.name }, clientIp(req));
   if (!result.ok) {
     return fail(result.code === "DUPLICATE_CODE" || result.code === "INVALID_CODE" || result.code === "INVALID_PRICING" ? 400 : 422, result.code, result.message);
   }
