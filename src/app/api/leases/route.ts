@@ -7,6 +7,7 @@ import { emitDomainEvent } from "@/lib/events";
 import { toMinor } from "@/lib/money";
 import { nextNumber } from "@/lib/numbering";
 import { isMoveInReady } from "@/lib/leases/rules";
+import { logger } from "@/lib/logger";
 
 const serviceSchema = z.object({
   serviceId: z.string().optional(),
@@ -215,7 +216,7 @@ export async function POST(req: Request) {
     }
     return ok({ id: lease.id, code: lease.code }, 201);
   } catch (err: unknown) {
-    console.error("POST /api/leases exception:", err);
+    logger.error({ ctx: "POST /api/leases" }, `Lease creation failed: ${err instanceof Error ? err.message : String(err)}`);
     const msg = err instanceof Error ? err.message : "Internal server error";
     return fail(500, "SERVER_ERROR", `Failed to create lease: ${msg}`);
   }

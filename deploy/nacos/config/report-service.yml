@@ -47,11 +47,16 @@ spring:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:7080/realms/rentmanager}
 
-# Report result cache (Caffeine)
-spring.cache:
-  type: caffeine
-  caffeine:
-    spec: "maximumSize=200,expireAfterWrite=5m"
+  # ── Redis Connection ──────────────────────────────────────────────────────
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:rentmanager-redis-secret}
+      timeout: 2000ms
+
+  cache:
+    type: redis
 
 management:
   endpoints:

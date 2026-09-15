@@ -8,6 +8,7 @@ import { createHash, randomBytes, randomInt } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
 import { logAudit } from "@/lib/audit";
+import { logger } from "@/lib/logger";
 
 export const OTP_TTL_MS = 10 * 60 * 1000;
 export const OTP_MAX_ATTEMPTS = 5;
@@ -67,7 +68,7 @@ export async function requestMemberOtp(rawIdentifier: string, ip?: string | null
     }
   });
   if (process.env.NODE_ENV !== "production") {
-    console.log(`[portal-otp] ${identifier} → ${code} (dev echo — delivery provider lands with M21/M28)`);
+    logger.debug({ ctx: "portal-otp", identifier }, "dev OTP echo");
   }
   return {
     ok: true,

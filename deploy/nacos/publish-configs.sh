@@ -3,6 +3,7 @@
 #
 # Data-ids pushed:
 #   shared-common.yml            — shared infra (db, kafka, keycloak, outbox)
+#   services.yml                 — per-service extension config (identity-service)
 #   gateway.yml + rentmanager-gateway.yml — gateway routes/security (extension + name)
 #   <service>.yml (x8)           — each service's full application config
 #
@@ -32,12 +33,15 @@ echo "NACOS_URL=$NACOS_URL group=$GROUP"
 # 1) shared infra
 publish shared-common.yml "$CONFIG_DIR/shared-common.yml"
 
-# 2) gateway (extension data-id used by the gateway, plus its name-based id)
+# 2) per-service extension config (referenced by identity-service extension-configs)
+publish services.yml "$CONFIG_DIR/services.yml"
+
+# 3) gateway (extension data-id used by the gateway, plus its name-based id)
 cp -f "$BACKEND_DIR/gateway/src/main/resources/application.yml" "$CONFIG_DIR/gateway.yml"
 publish gateway.yml "$CONFIG_DIR/gateway.yml"
 publish rentmanager-gateway.yml "$CONFIG_DIR/gateway.yml"
 
-# 3) one data-id per microservice, generated from each local application.yml
+# 4) one data-id per microservice, generated from each local application.yml
 for svc in "${SERVICES[@]}"; do
   src="$BACKEND_DIR/${svc}-service/src/main/resources/application.yml"
   dst="$CONFIG_DIR/${svc}-service.yml"

@@ -1,11 +1,12 @@
 /// M21 Telegram Bot — Bot API client. A token starting with "dev-" routes
-/// every send to the MOCK (TelegramOutbox status "mocked" + console line) so
-/// the full pipeline is exercisable without a real bot; a real token POSTs to
-/// api.telegram.org and records sent/failed. Every attempt lands in the
-/// outbox — that table is the acceptance evidence (§M21 "member gets receipt
+/// every send to the MOCK (TelegramOutbox status "mocked" + structured debug
+/// line) so the full pipeline is exercisable without a real bot; a real token
+/// POSTs to api.telegram.org and records sent/failed. Every attempt lands in
+/// the outbox — that table is the acceptance evidence (§M21 "member gets receipt
 /// message").
 import { prisma } from "@/lib/db";
 import { getProviderSecret } from "@/lib/settings";
+import { logger } from "@/lib/logger";
 
 export type OutboxStatus = "sent" | "mocked" | "failed";
 
@@ -15,7 +16,7 @@ export async function sendTelegramMessage(chatId: string, text: string, template
 
   const token = await getProviderSecret("telegramBotToken");
   if (!token || token.startsWith("dev-")) {
-    console.log(`[telegram:mock] chat ${chatId} (${template}): ${text.replace(/\n/g, " ⏎ ").slice(0, 160)}`);
+    logger.debug({ ctx: "telegram:mock", chatId, template }, text.replace(/\n/g, " ⏎ ").slice(0, 160));
   } else {
     try {
       const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {

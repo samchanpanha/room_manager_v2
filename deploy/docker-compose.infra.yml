@@ -12,6 +12,7 @@
 #   8080  → Keycloak       (http://localhost:7080        admin/admin)
 #   9092  → Kafka broker   (PLAINTEXT)
 #   8081  → Schema Registry
+#   8282  → Rootprint log UI (http://localhost:8282)
 # ──────────────────────────────────────────────────────────────────────────────
 
 networks:
@@ -24,8 +25,29 @@ volumes:
   nacos-data:
   keycloak-data:
   kafka-data:
+  redis-data:
+  rootprint-pgdata:
+  rootprint-quickwit:
 
 services:
+
+  # ── Redis — distributed cache & lock (used by gateway/identity/billing/report) ──
+  redis:
+    image: redis:7.2-alpine
+    container_name: rm-redis
+    command: redis-server --requirepass rentmanager-redis-secret --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "rentmanager-redis-secret", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - rm-infra
+    restart: unless-stopped
 
   # ── Consul — service discovery (services register here; `lb://` routes) ────
   consul:
@@ -188,6 +210,58 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
       - "9090:9090"
+    networks:
+      - rm-infra
+    restart: unless-stopped
+
+  # ── Rootprint Log Management (OTLP ingestion + search UI) ─────────────────
+  rootprint-db:
+    image: postgres:17
+    container_name: rm-rootprint-db
+    environment:
+      POSTGRES_USER: rootprint
+      POSTGRES_PASSWORD: rootprint
+      POSTGRES_DB: rootprint
+    volumes:
+      - rootprint-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rootprint"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - rm-infra
+    restart: unless-stopped
+
+  quickwit:
+    image: quickwit/quickwit:v0.9.0
+    container_name: rm-quickwit
+    volumes:
+      - rootprint-quickwit:/quickwit/qwdata
+    command: ["run"]
+    healthcheck:
+      test: ["CMD-SHELL", 'bash -c "echo > /dev/tcp/localhost/7280"']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - rm-infra
+    restart: unless-stopped
+
+  rootprint:
+    image: ghcr.io/rootprint/rootprint:latest
+    container_name: rm-rootprint
+    depends_on:
+      rootprint-db:
+        condition: service_healthy
+      quickwit:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://rootprint:rootprint@rootprint-db:5432/rootprint
+      QUICKWIT_URL: http://quickwit:7280
+      ORIGIN: http://localhost:8282
+    ports:
+      - "8282:8282"
     networks:
       - rm-infra
     restart: unless-stopped

@@ -18,6 +18,9 @@ x-service-defaults: &service-defaults
   networks:
     - rm-infra
   restart: unless-stopped
+  mem_limit: 768m
+  volumes:
+    - ../deploy/otel/opentelemetry-javaagent.jar:/otel/opentelemetry-javaagent.jar:ro
   environment: &common-env
     NACOS_SERVER: nacos:8848
     CONSUL_HOST: consul
@@ -28,6 +31,17 @@ x-service-defaults: &service-defaults
     KEYCLOAK_ISSUER: http://keycloak:8080/realms/rentmanager
     KEYCLOAK_JWKS: http://keycloak:8080/realms/rentmanager/protocol/openid-connect/certs
     NEXTJS_URL: http://rentmanager:3000
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    REDIS_PASSWORD: rentmanager-redis-secret
+    # ── OpenTelemetry Java Agent → Rootprint OTLP logs ────────────────────
+    JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar
+    OTEL_LOGS_EXPORTER: otlp
+    OTEL_METRICS_EXPORTER: none
+    OTEL_TRACES_EXPORTER: none
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://rootprint:8282
+    OTEL_EXPORTER_OTLP_LOGS_HEADERS: Authorization=Bearer%20${ROOTPRINT_INGEST_TOKEN:-your-ingest-key-here}
+    OTEL_SERVICE_NAME: rentmanager
 
 services:
 

@@ -44,11 +44,16 @@ volumes:
   rentmanager-minio:
   rentmanager-grafana:
   rentmanager-consul:
+  rootprint-pgdata:
+  rootprint-quickwit:
 
 x-backend-defaults: &backend-defaults
   networks:
     - rm-network
   restart: unless-stopped
+  mem_limit: 768m
+  volumes:
+    - ./deploy/otel/opentelemetry-javaagent.jar:/otel/opentelemetry-javaagent.jar:ro
   environment: &backend-env
     NACOS_SERVER: nacos:8848
     CONSUL_HOST: consul
@@ -62,6 +67,13 @@ x-backend-defaults: &backend-defaults
     REDIS_HOST: redis
     REDIS_PORT: 6379
     REDIS_PASSWORD: rentmanager-redis-secret
+    # ── OpenTelemetry Java Agent → Rootprint OTLP logs ────────────────────
+    JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar
+    OTEL_LOGS_EXPORTER: otlp
+    OTEL_METRICS_EXPORTER: none
+    OTEL_TRACES_EXPORTER: none
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://rootprint:8282
+    OTEL_EXPORTER_OTLP_LOGS_HEADERS: Authorization=Bearer%20${ROOTPRINT_INGEST_TOKEN:-your-ingest-key-here}
 
 services:
 
@@ -342,6 +354,7 @@ services:
         condition: service_started
     environment:
       <<: *backend-env
+      OTEL_SERVICE_NAME: rentmanager-identity
       ENFORCE_MANDATORY_TOTP: "true"
       SESSION_TTL_DAYS: "30"
     healthcheck:
@@ -364,6 +377,7 @@ services:
         condition: service_healthy
     environment:
       <<: *backend-env
+      OTEL_SERVICE_NAME: rentmanager-property
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8082/actuator/health || exit 0"]
       interval: 15s
@@ -384,6 +398,7 @@ services:
         condition: service_healthy
     environment:
       <<: *backend-env
+      OTEL_SERVICE_NAME: rentmanager-billing
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8083/actuator/health || exit 0"]
       interval: 15s
@@ -404,6 +419,7 @@ services:
         condition: service_healthy
     environment:
       <<: *backend-env
+      OTEL_SERVICE_NAME: rentmanager-ops
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8084/actuator/health || exit 0"]
       interval: 15s
@@ -424,6 +440,7 @@ services:
         condition: service_healthy
     environment:
       <<: *backend-env
+      OTEL_SERVICE_NAME: rentmanager-staff
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8085/actuator/health || exit 0"]
       interval: 15s
@@ -444,6 +461,7 @@ services:
         condition: service_healthy
     environment:
       <<: *backend-env
+      OTEL_SERVICE_NAME: rentmanager-commerce
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8086/actuator/health || exit 0"]
       interval: 15s
@@ -464,6 +482,7 @@ services:
         condition: service_healthy
     environment:
       <<: *backend-env
+      OTEL_SERVICE_NAME: rentmanager-notification
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-dev-token}
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-dev-secret}
     healthcheck:
@@ -486,6 +505,7 @@ services:
         condition: service_healthy
     environment:
       <<: *backend-env
+      OTEL_SERVICE_NAME: rentmanager-report
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8088/actuator/health || exit 0"]
       interval: 15s
@@ -511,6 +531,7 @@ services:
         condition: service_healthy
     environment:
       <<: *backend-env
+      OTEL_SERVICE_NAME: rentmanager-gateway
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health || exit 0"]
       interval: 15s
@@ -551,6 +572,9 @@ services:
       - APP_BASE_URL=http://localhost:3000
       - SETTINGS_ENC_KEY=docker-settings-enc-key-change-me-32b
       - COOKIE_SECURE=false
+      - OTEL_SERVICE_NAME=rentmanager-frontend
+      - OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://rootprint:8282/v1/logs
+      - OTEL_EXPORTER_OTLP_LOGS_HEADERS=Authorization=Bearer%20${ROOTPRINT_INGEST_TOKEN:-your-ingest-key-here}
     volumes:
       - rentmanager-storage:/app/storage
       - rentmanager-backups:/app/backups
@@ -563,3 +587,55 @@ services:
       timeout: 5s
       retries: 3
       start_period: 40s
+
+  # ── 11. Rootprint Log Management ─────────────────────────────────────────
+  rootprint-db:
+    image: postgres:17
+    container_name: rm-rootprint-db
+    environment:
+      POSTGRES_USER: rootprint
+      POSTGRES_PASSWORD: rootprint
+      POSTGRES_DB: rootprint
+    volumes:
+      - rootprint-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rootprint"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - rm-network
+    restart: unless-stopped
+
+  quickwit:
+    image: quickwit/quickwit:v0.9.0
+    container_name: rm-quickwit
+    volumes:
+      - rootprint-quickwit:/quickwit/qwdata
+    command: ["run"]
+    healthcheck:
+      test: ["CMD-SHELL", 'bash -c "echo > /dev/tcp/localhost/7280"']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - rm-network
+    restart: unless-stopped
+
+  rootprint:
+    image: ghcr.io/rootprint/rootprint:latest
+    container_name: rm-rootprint
+    depends_on:
+      rootprint-db:
+        condition: service_healthy
+      quickwit:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://rootprint:rootprint@rootprint-db:5432/rootprint
+      QUICKWIT_URL: http://quickwit:7280
+      ORIGIN: http://localhost:8282
+    ports:
+      - "8282:8282"
+    networks:
+      - rm-network
+    restart: unless-stopped

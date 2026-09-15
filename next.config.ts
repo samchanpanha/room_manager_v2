@@ -43,6 +43,22 @@ const nextConfig: NextConfig = {
   experimental: {
     cpus: buildWorkers
   },
+  // Pino's worker-thread transports (pino-opentelemetry-transport →
+  // thread-stream) load their target module at runtime, outside webpack's
+  // reach. Keep the whole pino/otel shipping stack external so `next build`
+  // doesn't try to bundle the worker or its dynamic requires.
+  serverExternalPackages: [
+    "pino",
+    "thread-stream",
+    "pino-opentelemetry-transport",
+    "@opentelemetry/sdk-logs",
+    "@opentelemetry/exporter-logs-otlp-proto",
+    "@opentelemetry/exporter-logs-otlp-http",
+    "@opentelemetry/otlp-exporter-base",
+    "@opentelemetry/otlp-transformer",
+    "@opentelemetry/resources",
+    "@opentelemetry/sdk-trace-base"
+  ],
   // Lint + typecheck already gate every push/PR in CI (.github/workflows/ci.yml).
   // Re-running both serially inside `next build` cost ~8 min of every Docker
   // image build (and dev deploy); skip so image builds are fast+lean.

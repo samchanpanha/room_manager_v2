@@ -9,6 +9,14 @@ spring:
     import:
       - optional:nacos:shared-common.yml
 
+  # ── Redis Connection ──────────────────────────────────────────────────────
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:rentmanager-redis-secret}
+      timeout: 2000ms
+
   # ── Consul Discovery + Nacos Config ──────────────────────────────────────
   cloud:
     consul:
